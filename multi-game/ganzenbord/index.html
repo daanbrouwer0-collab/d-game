@@ -27,7 +27,8 @@
         <section id="setup" class="panel">
           <h2>Meedoen</h2>
           <p class="lede">
-            Tot 6 spelers. Maak een P2P-room: er verschijnt een QR. Anderen scannen die om te joinen.
+            Tot 6 spelers. Stoelen blijven aan jouw naam, ook als een ander later host.
+            Alleen wie aan de beurt is hoeft online te zijn.
           </p>
 
           <label class="field-label" for="player-name">Jouw naam</label>
@@ -151,10 +152,14 @@
 
           <div class="actions">
             <button type="button" id="btn-leave" class="btn btn-ghost">Verlaat lobby</button>
+            <button type="button" id="btn-reconnect" class="btn btn-ghost hidden">
+              Opnieuw verbinden
+            </button>
           </div>
         </section>
 
         <section id="game" class="panel hidden">
+          <p id="you-label" class="meta"></p>
           <p id="turn-label" class="meta"></p>
           <p id="log-label" class="log"></p>
 
@@ -166,15 +171,14 @@
               Gooi dobbelsteen
             </button>
             <button type="button" id="btn-leave-game" class="btn btn-ghost">Verlaten</button>
+            <button type="button" id="btn-reconnect-game" class="btn btn-ghost hidden">
+              Opnieuw verbinden
+            </button>
           </div>
         </section>
       </main>
     </div>
 
-    <script type="module">
-      import { mountShellNav } from "../js/shell/nav.js";
-      mountShellNav({ active: "games", base: "../" });
-    </script>
     <script type="module" src="./main.js"></script>
   </body>
 </html>

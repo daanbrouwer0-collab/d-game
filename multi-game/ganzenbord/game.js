@@ -9,6 +9,7 @@ export const Msg = Object.freeze({
   START: "start",
   ROLL: "roll",
   STATE: "state",
+  LOG: "log",
   REJECT: "reject",
 });
 
@@ -26,15 +27,35 @@ export const Msg = Object.freeze({
  */
 
 /**
- * @param {string} hostId
- * @param {string} hostName
  * @returns {GameState}
  */
-export function createLobbyState(hostId, hostName) {
+export function createEmptyLobby() {
+  return {
+    phase: "lobby",
+    players: [],
+    positions: {},
+    turnIndex: 0,
+    lastRoll: null,
+    lastLog: "Lobby: wacht op spelers…",
+    winnerId: null,
+  };
+}
+
+/**
+ * @param {string} playerId
+ * @param {string} playerName
+ * @returns {GameState}
+ */
+export function createLobbyState(playerId, playerName) {
   return {
     phase: "lobby",
     players: [
-      { id: hostId, name: hostName, isHost: true, peerId: null },
+      {
+        id: playerId,
+        name: playerName,
+        isHost: false,
+        peerId: null,
+      },
     ],
     positions: {},
     turnIndex: 0,

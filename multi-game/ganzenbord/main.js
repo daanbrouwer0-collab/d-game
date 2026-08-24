@@ -1,4 +1,4 @@
-import { createRoom } from "../js/core/room.js";
+import { createRoom, transportFromUrl } from "../js/core/room.js";
 import {
   clearRoom,
   getDisplayName,
@@ -11,10 +11,18 @@ import {
 import { parseP2pInvite } from "../js/shell/p2p-invite.js";
 import { showHostInviteCard } from "../js/shell/p2p-invite-ui.js";
 import { openQrScanner } from "../js/shell/qr-scanner.js";
-import { readRoomFromUrl } from "../js/shell/site-url.js";
+import { mountRoomStrip, mountShellNav } from "../js/shell/nav.js";
+import {
+  readHostIntentFromUrl,
+  readRoomFromUrl,
+  watchShellRoute,
+} from "../js/shell/site-url.js";
 import { GAME_ID, MAX_PLAYERS } from "./game.js";
 import { Room } from "./room.js";
 import { UI } from "./ui.js";
+
+mountShellNav({ active: "games", base: "../" });
+mountRoomStrip({ base: "../", currentGameId: GAME_ID });
 
 const GAME_PATH = "/ganzenbord/";
 
@@ -25,9 +33,13 @@ let session = null;
 let room = null;
 /** @type {string | null} */
 let shareUrl = null;
+let lastStatus = "idle";
 
 const savedName = getDisplayName();
 if (savedName && ui.nameInput) ui.nameInput.value = savedName;
+ui.nameInput?.addEventListener("change", () => {
+  setDisplayName(ui.nameInput.value);
+});
 
 function currentCode() {
   return session?.roomCode || null;
@@ -49,21 +61,65 @@ function refreshRecent() {
   );
 }
 
+function syncView() {
+  if (!room) return;
+  const local = isLocal();
+  const online =
+    room.state.players.map((p) => ({
+      id: p.id,
+      online: room.isPlayerOnline(p.id),
+    })) || [];
+  if (room.state.phase === "lobby") {
+    ui.showLobby();
+    ui.renderLobby(room.state, room.localId, session?.role === "host", {
+      local,
+      online,
+      youName: room.localName,
+    });
+  } else {
+    ui.showGame();
+    ui.renderGame(room.state, room.localId, {
+      local,
+      online,
+      youName: room.localName,
+      connected: Boolean(session?.isConnected?.() || local),
+    });
+  }
+  refreshRecent();
+}
+
 function bindSession(s) {
   session = s;
 
   s.onStatus = (status, detail) => {
+    const wasDisconnected =
+      lastStatus === "disconnected" || lastStatus === "error";
+    lastStatus = status;
     ui.setConnectionStatus(status, detail);
+    ui.setReconnectVisible(
+      !isLocal() && (status === "disconnected" || status === "error"),
+    );
 
-    if (status === "connected" && s.role === "guest" && room && !room.joined) {
-      room.joined = true;
-      ui.showLobby();
-      room.beginAsGuest();
+    if (status === "connected" && s.role === "guest" && room) {
+      if (room.joined && wasDisconnected) {
+        room.onReconnected();
+      } else if (!room.joined) {
+        room.joined = true;
+        ui.showLobby();
+        room.beginAsGuest();
+      }
+      syncView();
       refreshRecent();
+    }
+
+    if (status === "connected" && s.role === "host" && room && !isLocal()) {
+      if (wasDisconnected) room.onReconnected();
+      syncView();
     }
 
     if (status === "hosting" && s.role === "host") {
       ui.showLobby();
+      syncView();
       refreshRecent();
     }
 
@@ -71,7 +127,8 @@ function bindSession(s) {
       (status === "disconnected" || status === "error") &&
       s.transport !== "local"
     ) {
-      ui.setError(detail || "Verbinding verbroken. De host moet online blijven.");
+      ui.setError(detail || "Verbinding verbroken.");
+      syncView();
     }
   };
 
@@ -83,17 +140,7 @@ function bindSession(s) {
 
 function bindRoom(r) {
   room = r;
-  r.onState = (state) => {
-    const local = isLocal();
-    if (state.phase === "lobby") {
-      ui.showLobby();
-      ui.renderLobby(state, r.localId, session?.role === "host", { local });
-      refreshRecent();
-    } else {
-      ui.showGame();
-      ui.renderGame(state, r.localId, { local });
-    }
-  };
+  r.onState = () => syncView();
   r.onReject = (reason) => {
     ui.setError(reason);
     clearRoom();
@@ -209,6 +256,19 @@ ui.btnCopyLink.addEventListener("click", async () => {
 ui.btnLeave.addEventListener("click", () => leaveAll());
 ui.btnLeaveGame?.addEventListener("click", () => leaveAll());
 
+ui.btnReconnect?.addEventListener("click", () => reconnectNow());
+ui.btnReconnectGame?.addEventListener("click", () => reconnectNow());
+
+async function reconnectNow() {
+  if (!session || session.transport === "local") return;
+  ui.setError("");
+  try {
+    await session.reconnect();
+  } catch (err) {
+    ui.setError(humanizePeerError(err));
+  }
+}
+
 ui.btnSwitchJoin?.addEventListener("click", async () => {
   const code = ui.switchCode?.value || "";
   if (!code.trim()) return;
@@ -246,12 +306,7 @@ async function switchToRecent(item) {
     await teardown({ clearUrl: true });
     clearRoom();
     if (item.role === "host") {
-      await startHost({
-        name: item.name || ui.playerName(),
-        code: item.code,
-        resumed: true,
-        transport: "p2p",
-      });
+      await resumeAsHost(item.code, item.name || ui.playerName());
     } else {
       await joinRoom(item.code, item.name || ui.playerName());
     }
@@ -283,8 +338,10 @@ async function leaveAll() {
   await teardown({ clearUrl: true });
   ui.showSetup();
   ui.setConnectionStatus("idle");
+  ui.setReconnectVisible(false);
   ui.setError("");
   ui.setHint("");
+  lastStatus = "idle";
   refreshRecent();
 }
 
@@ -302,6 +359,7 @@ async function startHost({
   transport = "p2p",
 }) {
   rememberName(name);
+  await teardown({ clearUrl: false });
   const s = createRoom({
     gameId: GAME_ID,
     transport,
@@ -318,11 +376,11 @@ async function startHost({
   remember(roomCode, name, "host");
   if (ui.nameInput) ui.nameInput.value = name;
   const r = new Room(s, { localName: name });
+  if (!local) r.loadPersisted(roomCode);
   bindRoom(r);
   r.beginAsHost();
   ui.showInvite(roomCode, shareUrl, true, { local });
-  ui.showLobby();
-  ui.renderLobby(r.state, r.localId, true, { local });
+  syncView();
   if (shareUrl && ui.inviteQrCanvas) {
     await showHostInviteCard({
       card: ui.inviteBox,
@@ -338,13 +396,33 @@ async function startHost({
     ui.setConnectionStatus("connected", "Op dit apparaat");
   } else if (resumed) {
     ui.setHint(
-      "Je bent terug in je lobby. Anderen moeten de link opnieuw openen als ze weg waren.",
+      "Room opnieuw gehost. Anderen joinen met dezelfde code; stoelen en stand blijven bewaard.",
     );
   } else {
     ui.setHint("Laat de ander jouw QR scannen of deel de link.");
   }
   refreshRecent();
   return roomCode;
+}
+
+/**
+ * @param {string} code
+ * @param {string} [name]
+ */
+async function resumeAsHost(code, name = ui.playerName()) {
+  const normalized = code.trim().toUpperCase();
+  ui.setError("");
+  ui.btnHost.disabled = true;
+  try {
+    await startHost({
+      name,
+      code: normalized,
+      resumed: true,
+      transport: "p2p",
+    });
+  } finally {
+    ui.btnHost.disabled = false;
+  }
 }
 
 /**
@@ -356,6 +434,7 @@ async function joinRoom(code, name = ui.playerName()) {
   ui.btnJoin.disabled = true;
   try {
     rememberName(name);
+    await teardown({ clearUrl: false });
     const s = createRoom({
       gameId: GAME_ID,
       transport: "p2p",
@@ -363,19 +442,21 @@ async function joinRoom(code, name = ui.playerName()) {
     });
     bindSession(s);
     const normalized = code.trim().toUpperCase();
+    const r = new Room(s, { localName: name });
+    r.loadPersisted(normalized);
+    bindRoom(r);
     await s.join(normalized);
     s.writeRoomToUrl(normalized);
     shareUrl = s.buildShareUrl(GAME_PATH, normalized);
     remember(normalized, name, "guest");
     if (ui.nameInput) ui.nameInput.value = name;
-    const r = new Room(s, { localName: name });
-    bindRoom(r);
     ui.showInvite(normalized, shareUrl, false, { local: false });
     ui.showLobby();
     if (s.isConnected() && !r.joined) {
       r.joined = true;
       r.beginAsGuest();
     }
+    syncView();
     refreshRecent();
   } catch (err) {
     ui.setError(
@@ -443,25 +524,36 @@ function humanizePeerError(err) {
   if (type === "peer-unavailable" || /Could not connect to peer/i.test(message)) {
     return "Peer niet gevonden.";
   }
-  if (type === "unavailable-id") return "Code is al in gebruik.";
+  if (type === "unavailable-id") {
+    return "Die kamercode is al in gebruik. Iemand host deze room nog — kies Join, of wacht tot de host weg is.";
+  }
   if (type === "network") return "Geen verbinding met PeerJS.";
   return message || "Onbekende fout";
 }
 
-async function resumeIfPossible() {
-  const saved = loadRoom(GAME_ID);
-  const roomFromUrl = readRoomFromUrl();
+const roomParam = readRoomFromUrl();
+let lastShellKey = `${roomParam || ""}:${readHostIntentFromUrl() ? "host" : "join"}`;
 
+async function bootFromUrl() {
+  const roomFromUrl = readRoomFromUrl();
+  if (roomFromUrl && transportFromUrl() !== "qr") {
+    ui.joinCode.value = roomFromUrl;
+    if (readHostIntentFromUrl()) {
+      ui.setHint("Bezig deze room opnieuw te hosten…");
+      await resumeAsHost(roomFromUrl);
+      return;
+    }
+    ui.setHint("Bezig met joinen via deellink…");
+    await joinRoom(roomFromUrl);
+    return;
+  }
+
+  const saved = loadRoom(GAME_ID);
   if (saved?.role === "host") {
     ui.nameInput.value = saved.name || "";
     ui.setHint(`Lobby ${saved.code} hervatten…`);
     try {
-      await startHost({
-        name: saved.name || "Speler",
-        code: saved.code,
-        resumed: true,
-        transport: "p2p",
-      });
+      await resumeAsHost(saved.code, saved.name || ui.playerName());
       return;
     } catch (err) {
       clearRoom();
@@ -478,15 +570,25 @@ async function resumeIfPossible() {
     return;
   }
 
-  if (roomFromUrl) {
-    ui.joinCode.value = roomFromUrl;
-    ui.setHint("Bezig met joinen via deellink…");
-    await joinRoom(roomFromUrl);
-    return;
-  }
-
   refreshRecent();
 }
 
+watchShellRoute(() => {
+  const roomCode = readRoomFromUrl();
+  const asHost = readHostIntentFromUrl();
+  const key = `${roomCode || ""}:${asHost ? "host" : "join"}`;
+  if (key === lastShellKey) return;
+  lastShellKey = key;
+  if (!roomCode || transportFromUrl() === "qr") return;
+  ui.joinCode.value = roomCode;
+  if (asHost) {
+    ui.setHint("Bezig deze room opnieuw te hosten…");
+    resumeAsHost(roomCode);
+  } else {
+    ui.setHint("Bezig met joinen via deellink…");
+    joinRoom(roomCode);
+  }
+});
+
 refreshRecent();
-resumeIfPossible();
+bootFromUrl();

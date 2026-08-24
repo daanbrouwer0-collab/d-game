@@ -31,6 +31,9 @@ export class UI {
     this.btnCopyLink = document.getElementById("btn-copy-link");
     this.btnLeave = document.getElementById("btn-leave");
     this.btnLeaveGame = document.getElementById("btn-leave-game");
+    this.btnReconnect = document.getElementById("btn-reconnect");
+    this.btnReconnectGame = document.getElementById("btn-reconnect-game");
+    this.youLabel = document.getElementById("you-label");
     this.turnLabel = document.getElementById("turn-label");
     this.logLabel = document.getElementById("log-label");
     this.positionsEl = document.getElementById("positions");
@@ -83,7 +86,7 @@ export class UI {
       idle: "Niet verbonden",
       hosting: "Lobby open",
       connecting: "Verbinden…",
-      connected: "In lobby",
+      connected: "Verbonden",
       disconnected: "Verbinding verbroken",
       error: "Fout",
     };
@@ -91,6 +94,14 @@ export class UI {
     this.statusEl.textContent = detail
       ? `${labels[status] || status}: ${detail}`
       : labels[status] || status;
+  }
+
+  /**
+   * @param {boolean} visible
+   */
+  setReconnectVisible(visible) {
+    this.btnReconnect?.classList.toggle("hidden", !visible);
+    this.btnReconnectGame?.classList.toggle("hidden", !visible);
   }
 
   /**
@@ -121,10 +132,14 @@ export class UI {
    * @param {import('./game.js').GameState} state
    * @param {string} localId
    * @param {boolean} isHost
-   * @param {{ local?: boolean }} [opts]
+   * @param {{ local?: boolean, online?: { id: string, online: boolean }[], youName?: string }} [opts]
    */
   renderLobby(state, localId, isHost, opts = {}) {
     const local = Boolean(opts.local);
+    /** @type {Map<string, boolean>} */
+    const onlineMap = new Map(
+      (opts.online || []).map((o) => [o.id, o.online]),
+    );
     this.lobbyCount.textContent = `${state.players.length} / ${MAX_PLAYERS} spelers`;
     this.playerList.innerHTML = "";
     for (const p of state.players) {
@@ -132,7 +147,10 @@ export class UI {
       li.className = "player-row";
       const you = p.id === localId ? " (jij)" : "";
       const host = p.isHost ? " · host" : "";
-      li.textContent = `${p.name}${you}${host}`;
+      const online = onlineMap.has(p.id) ? onlineMap.get(p.id) : true;
+      const status = local ? "" : online ? "" : " · offline";
+      li.textContent = `${p.name}${you}${host}${status}`;
+      if (!online && !local) li.classList.add("is-offline");
       this.playerList.appendChild(li);
     }
 
@@ -163,19 +181,28 @@ export class UI {
   /**
    * @param {import('./game.js').GameState} state
    * @param {string} localId
-   * @param {{ local?: boolean }} [opts]
+   * @param {{ local?: boolean, youName?: string, connected?: boolean, online?: { id: string, online: boolean }[] }} [opts]
    */
   renderGame(state, localId, opts = {}) {
     const local = Boolean(opts.local);
+    const connected = opts.connected !== false;
     const current = state.players[state.turnIndex];
     const myTurn =
       state.phase === "playing" &&
       current &&
       (local || current.id === localId);
 
+    if (this.youLabel) {
+      const me = state.players.find((p) => p.id === localId);
+      const nm = me?.name || opts.youName || "";
+      this.youLabel.textContent = nm ? `Jij · ${nm}` : "";
+    }
+
     if (state.phase === "finished") {
       const winner = state.players.find((p) => p.id === state.winnerId);
-      this.turnLabel.textContent = winner ? `${winner.name} heeft gewonnen!` : "Afgelopen";
+      this.turnLabel.textContent = winner
+        ? `${winner.name} heeft gewonnen!`
+        : "Afgelopen";
       this.btnRoll.disabled = true;
     } else {
       this.turnLabel.textContent = myTurn
@@ -183,17 +210,24 @@ export class UI {
           ? `Beurt: ${current?.name || "…"} — gooi`
           : "Jouw beurt — gooi de dobbelsteen"
         : `Beurt: ${current?.name || "…"}`;
-      this.btnRoll.disabled = !myTurn;
+      this.btnRoll.disabled = !myTurn || (!local && !connected);
     }
 
     this.logLabel.textContent = state.lastLog || "";
+
+    /** @type {Map<string, boolean>} */
+    const onlineMap = new Map(
+      (opts.online || []).map((o) => [o.id, o.online]),
+    );
 
     this.positionsEl.innerHTML = "";
     for (const p of state.players) {
       const row = document.createElement("div");
       row.className = "pos-row";
       const pos = state.positions[p.id] ?? 0;
-      row.innerHTML = `<strong>${p.name}</strong> <span>vak ${pos} / ${BOARD_SIZE}</span>`;
+      const online = onlineMap.has(p.id) ? onlineMap.get(p.id) : true;
+      const off = !local && !online ? " · offline" : "";
+      row.innerHTML = `<strong>${p.name}</strong> <span>vak ${pos} / ${BOARD_SIZE}${off}</span>`;
       this.positionsEl.appendChild(row);
     }
 

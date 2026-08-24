@@ -1,4 +1,15 @@
 import { TransportType } from "../js/core/room.js";
+import { loadRoomLog, saveRoomLog, touchDeskRoom } from "../js/core/desk.js";
+import { getPlayerId } from "../js/core/storage.js";
+import {
+  appendEvent,
+  coerceEventLog,
+  createEventLog,
+  encodeSyncPacket,
+  mergeLogs,
+  parseSyncPacket,
+  tipSeq,
+} from "../js/sync/event-log.js";
 import {
   Msg,
   MIN_PLAYERS,
@@ -7,14 +18,22 @@ import {
   applyRoll,
   canStart,
   cloneState,
+  createEmptyLobby,
   createLobbyState,
   removePlayer,
   rollDice,
   startGame,
+  GAME_ID,
 } from "./game.js";
+import {
+  gbSummary,
+  matchSeat,
+  replayGanzenbord,
+  seatsFromLog,
+} from "./log.js";
 
 /**
- * Host-authoritative lobby + ganzenbord over a Room (local or p2p).
+ * Host-authoritative lobby + ganzenbord. P2P progress lives in an event log.
  */
 export class Room {
   /**
@@ -24,15 +43,16 @@ export class Room {
   constructor(session, { localName }) {
     this.session = session;
     this.localName = localName.trim() || "Speler";
+    this.playerId = getPlayerId();
     /** @type {string} */
-    this.localId =
-      session.role === "host"
-        ? "host"
-        : `p_${Math.random().toString(36).slice(2, 9)}`;
+    this.localId = this.playerId;
     /** @type {import('./game.js').GameState} */
-    this.state = createLobbyState("host", this.localName);
+    this.state = createEmptyLobby();
+    this.log = createEventLog(GAME_ID);
     /** @type {Map<string, string>} peerId → playerId */
     this.peerToPlayer = new Map();
+    /** @type {Set<string>} playerIds currently connected (excl. local host self) */
+    this.onlineIds = new Set();
     /** @type {((state: import('./game.js').GameState) => void) | null} */
     this.onState = null;
     /** @type {((reason: string) => void) | null} */
@@ -47,20 +67,58 @@ export class Room {
     return this.session.transport === "local";
   }
 
-  /** Call after session.host() */
+  /**
+   * @param {string} code
+   */
+  loadPersisted(code) {
+    this.log = loadRoomLog(GAME_ID, code);
+    this.#replay();
+  }
+
+  /** Call after session.host() / hostWithCode() */
   beginAsHost() {
-    this.localId = "host";
-    this.state = createLobbyState("host", this.localName);
+    this.localId = this.playerId;
+    this.localName = this.localName.trim() || "Speler";
     this.peerToPlayer.clear();
+    this.onlineIds = new Set([this.playerId]);
+
+    if (this.isLocal) {
+      this.log = createEventLog(GAME_ID);
+      this.state = createLobbyState(this.playerId, this.localName);
+      this.state.players[0].isHost = true;
+      this.#emit();
+      return;
+    }
+
+    this.#claimSeat(this.playerId, this.localName);
+    this.#markTransportHost();
+    this.#replay();
+    this.#persist();
     this.#emit();
   }
 
   /** Call after guest connection opens */
   beginAsGuest() {
+    this.localId = this.playerId;
     this.session.sendHello({
       name: this.localName,
-      playerId: this.localId,
+      playerId: this.playerId,
+      log: encodeSyncPacket(this.log),
     });
+  }
+
+  onReconnected() {
+    if (this.isLocal) return;
+    if (this.session.role === "host") {
+      this.#claimSeat(this.playerId, this.localName);
+      this.#markTransportHost();
+      this.#replay();
+      this.#persist();
+      this.#sendLogWelcome();
+      this.#emit();
+    } else {
+      this.beginAsGuest();
+    }
   }
 
   /**
@@ -80,22 +138,29 @@ export class Room {
     });
     if (!result.ok) return result;
     this.state = result.state;
+    this.onlineIds.add(id);
     this.#emit();
     return { ok: true, playerId: id };
   }
 
-  /**
-   * Host starts the game if enough players.
-   */
   tryStart() {
     if (this.session.role !== "host") {
       return { ok: false, reason: "Alleen de host kan starten" };
     }
-    const result = startGame(this.state);
-    if (!result.ok) return result;
-    this.state = result.state;
-    this.#syncAll();
-    this.#emit();
+    if (this.isLocal) {
+      const result = startGame(this.state);
+      if (!result.ok) return result;
+      this.state = result.state;
+      this.#emit();
+      return { ok: true };
+    }
+    if (!canStart(this.state)) {
+      return {
+        ok: false,
+        reason: `Minimaal ${MIN_PLAYERS} spelers nodig (nu ${this.state.players.length})`,
+      };
+    }
+    this.#appendAndBroadcast("start", null);
     return { ok: true };
   }
 
@@ -108,7 +173,6 @@ export class Room {
       return { ok: false, reason: "Geen beurt" };
     }
 
-    // Local hotseat: host rolls for whoever's turn it is.
     if (this.isLocal && this.session.role === "host") {
       const roll = rollDice();
       const result = applyRoll(this.state, current.id, roll);
@@ -126,9 +190,10 @@ export class Room {
       const roll = rollDice();
       const result = applyRoll(this.state, this.localId, roll);
       if (!result.ok) return result;
-      this.state = result.state;
-      this.#syncAll();
-      this.#emit();
+      this.#appendAndBroadcast("roll", {
+        playerId: this.localId,
+        value: roll,
+      });
       return { ok: true };
     }
 
@@ -136,20 +201,118 @@ export class Room {
     return { ok: true };
   }
 
+  /**
+   * @param {string} playerId
+   */
+  isPlayerOnline(playerId) {
+    if (this.isLocal) return true;
+    if (playerId === this.localId) return true;
+    return this.onlineIds.has(playerId);
+  }
+
   #emit() {
     this.onState?.(cloneState(this.state));
   }
 
-  #syncAll() {
-    if (this.isLocal) return;
-    this.session.broadcast(Msg.STATE, this.state);
+  #replay() {
+    this.state = replayGanzenbord(this.log);
+    this.#markTransportHost();
+  }
+
+  #markTransportHost() {
+    const hostSeat = this.session.role === "host";
+    for (const p of this.state.players) {
+      p.isHost = hostSeat && p.id === this.localId;
+    }
+  }
+
+  #persist() {
+    const code = this.session.roomCode;
+    if (!code || this.isLocal) return;
+    saveRoomLog(GAME_ID, code, this.log);
+    const role = this.session.role === "guest" ? "guest" : "host";
+    touchDeskRoom({
+      gameId: GAME_ID,
+      code,
+      role,
+      name: this.localName || role,
+      summary: gbSummary(this.state),
+      seq: tipSeq(this.log),
+    });
   }
 
   /**
-   * @param {string} peerId
+   * @param {string} type
+   * @param {unknown} payload
    */
-  #syncTo(peerId) {
-    this.session.sendTo(peerId, Msg.STATE, this.state);
+  #appendAndBroadcast(type, payload) {
+    const added = appendEvent(this.log, type, payload);
+    if (!added.ok) return;
+    this.log = added.log;
+    this.#replay();
+    this.#persist();
+    if (!this.isLocal) {
+      this.session.send(Msg.LOG, encodeSyncPacket(this.log));
+    }
+    this.#emit();
+  }
+
+  /**
+   * @param {string} [peerId]
+   * @param {string|null} [youAre]
+   */
+  #sendLogWelcome(peerId, youAre = null) {
+    this.session.sendWelcome(
+      {
+        youAre,
+        log: encodeSyncPacket(this.log),
+        state: this.state,
+        minPlayers: MIN_PLAYERS,
+        maxPlayers: MAX_PLAYERS,
+      },
+      peerId,
+    );
+  }
+
+  /**
+   * @param {string} playerId
+   * @param {string} name
+   */
+  #claimSeat(playerId, name) {
+    const id = String(playerId || "");
+    const nm = String(name || "").trim().slice(0, 20) || "Speler";
+    if (!id) return;
+    const seats = seatsFromLog(this.log);
+    const matched = matchSeat(seats, id, nm);
+    const seatId = matched || id;
+    const cur = seats.find((s) => s.playerId === seatId);
+    if (cur && cur.name === nm && seatId === id) {
+      if (id === this.playerId) this.localId = id;
+      return seatId;
+    }
+    if (!matched && seats.length >= MAX_PLAYERS) return null;
+    const added = appendEvent(this.log, "seat", {
+      playerId: seatId,
+      name: nm,
+    });
+    if (added.ok) this.log = added.log;
+    if (id === this.playerId) this.localId = seatId;
+    return seatId;
+  }
+
+  /**
+   * @param {unknown} raw
+   */
+  #adoptRemoteLog(raw) {
+    const packet = parseSyncPacket(raw);
+    if (!packet) return;
+    const remote = coerceEventLog(
+      { gameId: packet.gameId, events: packet.events },
+      GAME_ID,
+    );
+    this.log = mergeLogs(this.log, remote);
+    this.#replay();
+    this.#persist();
   }
 
   /**
@@ -161,54 +324,68 @@ export class Room {
     switch (msg.type) {
       case TransportType.HELLO: {
         if (this.session.role !== "host" || !from) break;
-        if (this.state.phase !== "lobby") {
-          this.session.sendTo(from, Msg.REJECT, {
-            reason: "Het spel is al gestart",
-          });
-          break;
-        }
-        const payload = /** @type {{ name?: string, playerId?: string }} */ (
+        const payload = /** @type {{ name?: string, playerId?: string, log?: unknown }} */ (
           msg.payload || {}
         );
-        const playerId =
-          payload.playerId || `p_${Math.random().toString(36).slice(2, 9)}`;
-        const name = (payload.name || "Speler").slice(0, 20);
-        const result = addPlayer(this.state, {
-          id: playerId,
-          name,
-          isHost: false,
-          peerId: from,
-        });
-        if (!result.ok) {
-          this.session.sendTo(from, Msg.REJECT, { reason: result.reason });
+        this.#adoptRemoteLog(payload.log);
+        this.#claimSeat(this.playerId, this.localName);
+
+        const guestId = String(payload.playerId || "");
+        const guestName = String(payload.name || "Speler").slice(0, 20);
+        const seats = seatsFromLog(this.log);
+        let youAre = matchSeat(seats, guestId, guestName);
+
+        if (!youAre) {
+          if (this.state.phase !== "lobby") {
+            this.session.sendTo(from, Msg.REJECT, {
+              reason: "Het spel is al gestart — alleen bekende spelers kunnen terugjoinen",
+            });
+            break;
+          }
+          if (seats.length >= MAX_PLAYERS) {
+            this.session.sendTo(from, Msg.REJECT, {
+              reason: `Lobby is vol (max ${MAX_PLAYERS})`,
+            });
+            break;
+          }
+          youAre = this.#claimSeat(guestId || `p_${Date.now().toString(36)}`, guestName);
+        } else {
+          this.#claimSeat(youAre, guestName);
+        }
+
+        if (!youAre) {
+          this.session.sendTo(from, Msg.REJECT, { reason: "Kon geen stoel toewijzen" });
           break;
         }
-        this.state = result.state;
-        this.peerToPlayer.set(from, playerId);
-        this.session.sendWelcome(
-          {
-            youAre: playerId,
-            state: this.state,
-            minPlayers: MIN_PLAYERS,
-            maxPlayers: MAX_PLAYERS,
-          },
-          from,
-        );
-        this.#syncAll();
+
+        this.peerToPlayer.set(from, youAre);
+        this.onlineIds.add(youAre);
+        this.#replay();
+        this.#persist();
+        this.#sendLogWelcome(from, youAre);
         this.#emit();
         break;
       }
 
       case TransportType.WELCOME: {
         if (this.session.role === "host") break;
-        const payload = /** @type {{ youAre?: string, state?: import('./game.js').GameState }} */ (
+        const payload = /** @type {{ youAre?: string, log?: unknown, state?: import('./game.js').GameState }} */ (
           msg.payload || {}
         );
-        if (payload.youAre) this.localId = payload.youAre;
-        if (payload.state) {
+        if (payload.log) this.#adoptRemoteLog(payload.log);
+        else if (payload.state) {
           this.state = cloneState(payload.state);
-          this.#emit();
         }
+        if (payload.youAre) this.localId = payload.youAre;
+        this.onlineIds = new Set(this.state.players.map((p) => p.id));
+        this.#emit();
+        break;
+      }
+
+      case Msg.LOG: {
+        if (this.session.role === "host") break;
+        this.#adoptRemoteLog(msg.payload);
+        this.#emit();
         break;
       }
 
@@ -225,12 +402,16 @@ export class Room {
         if (this.session.role !== "host") break;
         const payload = /** @type {{ playerId?: string }} */ (msg.payload || {});
         if (!payload.playerId) break;
+        const current = this.state.players[this.state.turnIndex];
+        if (!current || current.id !== payload.playerId) break;
+        if (payload.playerId === this.localId) break;
         const roll = rollDice();
         const result = applyRoll(this.state, payload.playerId, roll);
         if (!result.ok) break;
-        this.state = result.state;
-        this.#syncAll();
-        this.#emit();
+        this.#appendAndBroadcast("roll", {
+          playerId: payload.playerId,
+          value: roll,
+        });
         break;
       }
 
@@ -254,20 +435,17 @@ export class Room {
     if (this.session.role !== "host") return;
     const playerId = this.peerToPlayer.get(peerId);
     this.peerToPlayer.delete(peerId);
-    if (!playerId) return;
-    this.state = removePlayer(this.state, playerId);
-    if (this.state.phase === "lobby") {
-      this.#syncAll();
+    if (playerId) this.onlineIds.delete(playerId);
+
+    if (this.isLocal && playerId) {
+      this.state = removePlayer(this.state, playerId);
+      this.onlineIds.delete(playerId);
       this.#emit();
-    } else if (this.state.players.length < MIN_PLAYERS) {
-      this.state.phase = "lobby";
-      this.state.lastLog = "Te weinig spelers — terug in lobby";
-      this.#syncAll();
-      this.#emit();
-    } else {
-      this.#syncAll();
-      this.#emit();
+      return;
     }
+
+    // P2P: keep seat (lobby or mid-game); late rejoin rematches by playerId.
+    this.#emit();
   }
 }
 
