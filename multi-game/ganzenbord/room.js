@@ -252,7 +252,7 @@ export class Room {
     this.#replay();
     this.#persist();
     if (!this.isLocal) {
-      this.session.send(Msg.LOG, encodeSyncPacket(this.log));
+      this.session.broadcast(Msg.LOG, encodeSyncPacket(this.log));
     }
     this.#emit();
   }
