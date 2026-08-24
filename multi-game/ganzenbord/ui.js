@@ -75,10 +75,12 @@ export class UI {
     this.timerFill = document.getElementById("turn-timer-fill");
     this.timerLabel = document.getElementById("turn-timer-label");
     this.recentSetup = document.getElementById("recent-setup");
-    /** @type {ReturnType<typeof setInterval> | null} */
+    /** @type {ReturnType<typeof setTimeout> | null} */
     this._timerInterval = null;
     /** @type {string} */
     this._timerKey = "";
+    /** @type {number} */
+    this._timerDeadline = 0;
     /** @type {(() => void) | null} */
     this._onTimerExpire = null;
     this.recentSetupList = document.getElementById("recent-setup-list");
@@ -150,11 +152,12 @@ export class UI {
   }
 
   clearTurnTimer() {
-    if (this._timerInterval) {
-      clearInterval(this._timerInterval);
+    if (this._timerInterval != null) {
+      clearTimeout(this._timerInterval);
       this._timerInterval = null;
     }
     this._timerKey = "";
+    this._timerDeadline = 0;
     this._onTimerExpire = null;
     this.timerEl?.classList.add("hidden");
     if (this.timerFill) this.timerFill.style.width = "100%";
@@ -162,8 +165,25 @@ export class UI {
   }
 
   /**
+   * Fire expire immediately if the wall-clock deadline already passed
+   * (e.g. mobile tab woke from background).
+   */
+  nudgeTurnTimer() {
+    if (!this._timerDeadline || !this._onTimerExpire) return;
+    if (Date.now() < this._timerDeadline) return;
+    if (this._timerInterval != null) {
+      clearTimeout(this._timerInterval);
+      this._timerInterval = null;
+    }
+    const expire = this._onTimerExpire;
+    this._onTimerExpire = null;
+    this._timerDeadline = 0;
+    expire?.();
+  }
+
+  /**
    * Visual + optional expire callback for the roll deadline.
-   * Restarts only when `key` changes (new turn).
+   * Uses a wall-clock deadline so background tabs still expire correctly.
    * @param {{
    *   key: string,
    *   seconds: number,
@@ -180,38 +200,55 @@ export class UI {
     this.timerEl?.classList.remove("hidden");
     this._onTimerExpire = opts.canExpire ? opts.onExpire || null : null;
 
-    if (opts.key === this._timerKey && this._timerInterval) return;
-    this._timerKey = opts.key;
+    // Same turn and timer already running — only refresh expire handler.
+    if (opts.key === this._timerKey && this._timerInterval != null) {
+      return;
+    }
 
-    if (this._timerInterval) {
-      clearInterval(this._timerInterval);
+    if (this._timerInterval != null) {
+      clearTimeout(this._timerInterval);
       this._timerInterval = null;
     }
 
-    const total = Math.max(1, opts.seconds);
-    let left = total;
-    const paint = () => {
+    this._timerKey = opts.key;
+    const totalMs = Math.max(1, opts.seconds) * 1000;
+    const deadline = Date.now() + totalMs;
+    this._timerDeadline = deadline;
+
+    const paint = (leftSec) => {
+      const total = Math.max(1, opts.seconds);
       if (this.timerFill) {
-        this.timerFill.style.width = `${(left / total) * 100}%`;
+        this.timerFill.style.width = `${(leftSec / total) * 100}%`;
       }
       if (this.timerLabel) {
-        this.timerLabel.textContent = `${left}s`;
+        this.timerLabel.textContent = `${leftSec}s`;
       }
-      this.timerEl?.classList.toggle("is-urgent", left <= 5);
+      this.timerEl?.classList.toggle("is-urgent", leftSec <= 5);
     };
-    paint();
 
-    this._timerInterval = setInterval(() => {
-      left -= 1;
-      if (left <= 0) {
-        paint();
-        const expire = this._onTimerExpire;
-        this.clearTurnTimer();
-        expire?.();
+    const finish = () => {
+      if (this._timerInterval != null) {
+        clearTimeout(this._timerInterval);
+        this._timerInterval = null;
+      }
+      this._timerDeadline = 0;
+      paint(0);
+      const expire = this._onTimerExpire;
+      this._onTimerExpire = null;
+      expire?.();
+    };
+    const tick = () => {
+      const leftMs = deadline - Date.now();
+      const leftSec = Math.max(0, Math.ceil(leftMs / 1000));
+      paint(leftSec);
+      if (leftMs <= 0) {
+        finish();
         return;
       }
-      paint();
-    }, 1000);
+      this._timerInterval = setTimeout(tick, Math.min(250, leftMs));
+    };
+
+    tick();
   }
 
   /**
@@ -335,8 +372,13 @@ export class UI {
             ? "Jouw beurt — sloot: gooi 4 of 5 om eruit te komen"
             : "Jouw beurt — gooi de dobbelsteen"
         : `Beurt: ${current?.name || "…"}`;
-      this.btnRoll.disabled = !myTurn || (!local && !connected);
-      this.btnRoll.classList.toggle("is-pulse", Boolean(myTurn && !this.btnRoll.disabled));
+      // Allow roll whenever it's your turn — PeerJS "connected" flickers on mobile
+      // and was leaving the button stuck disabled after timeouts.
+      this.btnRoll.disabled = !myTurn;
+      this.btnRoll.classList.toggle("is-pulse", Boolean(myTurn));
+      if (myTurn && !local && !connected) {
+        this.turnLabel.textContent += " (verbinding zwak — toch proberen)";
+      }
     }
 
     this.winActions?.classList.toggle("hidden", !finished || !isHost);

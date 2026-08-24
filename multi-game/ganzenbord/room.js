@@ -268,12 +268,9 @@ export class Room {
       return { ok: true };
     }
 
-    // Guest: ask host (e.g. if their local display timer fired first)
-    if (current.id === this.localId) {
-      this.session.send(Msg.TIMEOUT, { playerId: this.localId });
-      return { ok: true };
-    }
-    return { ok: false, reason: "Alleen de host kan een timeout toepassen" };
+    // Guest: always ask host to advance — covers own turn and host-clock lag.
+    this.session.send(Msg.TIMEOUT, { playerId: current.id });
+    return { ok: true };
   }
 
   /**
@@ -328,6 +325,8 @@ export class Room {
     this.#persist();
     if (!this.isLocal) {
       this.session.broadcast(Msg.LOG, encodeSyncPacket(this.log));
+      // Snapshot backup — guests sometimes miss/fail log-merge after timeout.
+      this.session.broadcast(Msg.STATE, cloneState(this.state));
     }
     this.#emit();
   }
@@ -504,6 +503,7 @@ export class Room {
         const payload = /** @type {{ playerId?: string }} */ (msg.payload || {});
         if (!payload.playerId) break;
         const current = this.state.players[this.state.turnIndex];
+        // Only accept timeout for the player who is actually to move.
         if (!current || current.id !== payload.playerId) break;
         const result = applyTimeout(this.state, payload.playerId);
         if (!result.ok) break;

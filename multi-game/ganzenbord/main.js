@@ -104,17 +104,31 @@ function syncTurnTimer() {
   const posKey = room.state.players
     .map((p) => `${p.id}:${room.state.positions[p.id] ?? 0}`)
     .join("|");
-  const key = `${room.state.turnIndex}:${current.id}:${posKey}:${room.state.lastLog}`;
+  // Don't include lastLog — timeout updates it and caused timer/key races.
+  const key = `${room.state.turnIndex}:${current.id}:${posKey}`;
   const isHost = session?.role === "host";
+  const myClock = current.id === room.localId;
   ui.syncTurnTimer({
     key,
     seconds: TURN_SECONDS,
     active: true,
-    // Host (incl. local hotseat) enforces timeout for every turn.
-    canExpire: Boolean(isHost),
+    // Host enforces every turn; current player can also fire (mobile/guest).
+    canExpire: Boolean(isHost || myClock || isLocal()),
     onExpire: () => {
       room?.tryTimeout();
+      // Always re-arm from live state (covers failed/raced timeout).
+      queueMicrotask(() => syncTurnTimer());
     },
+  });
+}
+
+// When a backgrounded tab wakes, overdue deadlines fire immediately.
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    if (!room || room.state.phase !== "playing") return;
+    ui.nudgeTurnTimer();
+    queueMicrotask(() => syncTurnTimer());
   });
 }
 
