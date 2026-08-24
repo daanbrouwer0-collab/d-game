@@ -263,11 +263,11 @@ export function canStart(state) {
 
 /**
  * Start or rematch: always reset the board when seats are valid.
- * `start` events in the log must never be silently skipped — otherwise
- * rematch leaves pawns on 63 and a roll of 1 bounces to 62 ("one step back").
  * @param {GameState} state
+ * @param {{ championId?: string|null }} [opts]
+ *   Explicit crown (e.g. from compacted rematch `start` payload).
  */
-export function startGame(state) {
+export function startGame(state, opts = {}) {
   if (state.players.length < MIN_PLAYERS) {
     return {
       ok: false,
@@ -278,12 +278,10 @@ export function startGame(state) {
     return { ok: false, reason: `Maximaal ${MAX_PLAYERS} spelers` };
   }
   const next = cloneState(state);
-  // Reigning crown: previous game's winner wears it for this whole match.
-  if (state.phase === "finished" && state.winnerId) {
+  if (opts.championId !== undefined) {
+    next.championId = opts.championId || null;
+  } else if (state.phase === "finished" && state.winnerId) {
     next.championId = state.winnerId;
-  } else if (state.phase === "playing") {
-    // Rematch / recovery start while still "playing" in replay — keep existing champ.
-    next.championId = state.championId ?? null;
   } else {
     next.championId = state.championId ?? null;
   }

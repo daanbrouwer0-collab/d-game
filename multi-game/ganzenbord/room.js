@@ -180,12 +180,68 @@ export class Room {
     return { ok: true };
   }
 
-  /** Rematch with same seats after a finished game. */
+  /** Rematch: wipe room log (rolls/history), keep seats + crown only. */
   tryRematch() {
+    if (this.session.role !== "host") {
+      return { ok: false, reason: "Alleen de host kan opnieuw starten" };
+    }
     if (this.state.phase !== "finished") {
       return { ok: false, reason: "Partij is nog niet afgelopen" };
     }
-    return this.tryStart();
+    const championId = this.state.winnerId || this.state.championId || null;
+    return this.#resetRoomLog({ championId, thenStart: true });
+  }
+
+  /**
+   * Replace the event log with current seats (+ optional crown) and optionally start.
+   * Drops all rolls/timeouts/old starts — prevents growing-log rematch bugs.
+   * @param {{ championId?: string|null, thenStart?: boolean }} opts
+   */
+  #resetRoomLog(opts = {}) {
+    const championId =
+      opts.championId !== undefined ? opts.championId : this.state.championId;
+    const players = this.state.players.map((p) => ({
+      id: p.id,
+      name: p.name,
+      colors: p.colors ? { ...p.colors } : undefined,
+    }));
+    if (players.length < MIN_PLAYERS) {
+      return {
+        ok: false,
+        reason: `Minimaal ${MIN_PLAYERS} spelers nodig (nu ${players.length})`,
+      };
+    }
+
+    let log = createEventLog(GAME_ID);
+    for (const p of players) {
+      const added = appendEvent(log, "seat", {
+        playerId: p.id,
+        name: p.name,
+        colors: p.colors,
+      });
+      if (added.ok) log = added.log;
+    }
+    if (opts.thenStart) {
+      const started = appendEvent(log, "start", {
+        championId: championId || null,
+      });
+      if (!started.ok) return { ok: false, reason: started.reason };
+      log = started.log;
+    }
+
+    this.log = log;
+    this.hostCommit.clearTurnKeys();
+    this.#replay();
+    this.#persist();
+    if (!this.isLocal) {
+      const packet = this.hostCommit.encodeSince(this.log, 0);
+      this.session.broadcast(Msg.LOG, packet);
+      for (const [peerId, playerId] of this.peerToPlayer.entries()) {
+        this.#sendLogWelcome(peerId, playerId);
+      }
+    }
+    this.#emit();
+    return { ok: true };
   }
 
   /** Keep seats; return to lobby (host only). */

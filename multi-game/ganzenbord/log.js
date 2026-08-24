@@ -96,7 +96,13 @@ export function replayGanzenbord(log) {
       continue;
     }
     if (ev.type === "start") {
-      const started = startGame(state);
+      const payload = /** @type {{ championId?: string|null }} */ (ev.payload || {});
+      const started = startGame(state, {
+        championId:
+          payload.championId !== undefined
+            ? payload.championId
+            : undefined,
+      });
       if (started.ok) state = started.state;
       continue;
     }
