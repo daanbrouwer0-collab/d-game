@@ -247,28 +247,43 @@ export function removePlayer(state, playerId) {
 /**
  * @param {GameState} state
  */
+/**
+ * @param {GameState} state
+ * @returns {boolean}
+ */
 export function canStart(state) {
   return (
-    (state.phase === "lobby" || state.phase === "finished") &&
+    (state.phase === "lobby" ||
+      state.phase === "finished" ||
+      state.phase === "playing") &&
     state.players.length >= MIN_PLAYERS &&
     state.players.length <= MAX_PLAYERS
   );
 }
 
 /**
+ * Start or rematch: always reset the board when seats are valid.
+ * `start` events in the log must never be silently skipped — otherwise
+ * rematch leaves pawns on 63 and a roll of 1 bounces to 62 ("one step back").
  * @param {GameState} state
  */
 export function startGame(state) {
-  if (!canStart(state)) {
+  if (state.players.length < MIN_PLAYERS) {
     return {
       ok: false,
       reason: `Minimaal ${MIN_PLAYERS} spelers nodig (nu ${state.players.length})`,
     };
   }
+  if (state.players.length > MAX_PLAYERS) {
+    return { ok: false, reason: `Maximaal ${MAX_PLAYERS} spelers` };
+  }
   const next = cloneState(state);
   // Reigning crown: previous game's winner wears it for this whole match.
   if (state.phase === "finished" && state.winnerId) {
     next.championId = state.winnerId;
+  } else if (state.phase === "playing") {
+    // Rematch / recovery start while still "playing" in replay — keep existing champ.
+    next.championId = state.championId ?? null;
   } else {
     next.championId = state.championId ?? null;
   }

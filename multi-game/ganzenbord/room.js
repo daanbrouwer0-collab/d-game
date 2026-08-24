@@ -342,6 +342,12 @@ export class Room {
       const packet = this.hostCommit.encodeSince(this.log, 0);
       const n = this.session.broadcast(Msg.LOG, packet);
       if (!n) this.session.send(Msg.LOG, packet);
+      // Rematch/start: force full welcome so guests cannot stay on finished/63.
+      if (type === "start") {
+        for (const [peerId, playerId] of this.peerToPlayer.entries()) {
+          this.#sendLogWelcome(peerId, playerId);
+        }
+      }
     }
     this.#emit();
   }
@@ -528,13 +534,28 @@ export class Room {
         const payload = /** @type {{ playerId?: string }} */ (msg.payload || {});
         if (!payload.playerId || !from) break;
         const bound = this.hostCommit.playerForPeer(from);
-        if (!bound || bound !== payload.playerId) break;
+        if (!bound || bound !== payload.playerId) {
+          this.session.sendTo(from, Msg.REJECT, {
+            reason: "Niet herkend — opnieuw verbinden en joinen",
+          });
+          break;
+        }
         const current = this.state.players[this.state.turnIndex];
-        if (!current || current.id !== payload.playerId) break;
+        if (!current || current.id !== payload.playerId) {
+          this.session.sendTo(from, Msg.REJECT, {
+            reason: "Niet jouw beurt",
+          });
+          break;
+        }
         if (payload.playerId === this.localId) break;
         const roll = rollDice();
         const result = applyRoll(this.state, payload.playerId, roll);
-        if (!result.ok) break;
+        if (!result.ok) {
+          this.session.sendTo(from, Msg.REJECT, {
+            reason: result.reason || "Worp mislukt",
+          });
+          break;
+        }
         this.#appendAndBroadcast("roll", {
           playerId: payload.playerId,
           value: roll,
