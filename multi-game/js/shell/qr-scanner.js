@@ -159,8 +159,10 @@ function createScannerOverlay() {
       try {
         const value = await detectQrFromVideo(video);
         if (value) {
+          // stop() clears activeOpts — keep the callback first (Outdoor Drinks pattern)
+          const onScan = activeOpts.onScan;
           await stop();
-          await activeOpts.onScan(value);
+          await onScan(value);
           return;
         }
       } catch (err) {
