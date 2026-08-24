@@ -1,13 +1,18 @@
 import {
   BANKJE_SQUARES,
   BOARD_SIZE,
+  GRID_COLS,
+  GRID_ROWS,
   MAX_PLAYERS,
   MIN_PLAYERS,
   SPECIAL,
   canStart,
   normalizeColors,
+  squareAt,
+  squareBelow,
   squareInfo,
 } from "./game.js";
+import { squareIconSvg } from "./icons.js";
 
 /**
  * @param {import('./game.js').CharacterColors | undefined} colors
@@ -482,7 +487,7 @@ export class UI {
     if (!this.legendEl) return;
     const items = [
       { id: "bankje", label: "Bankje — worp ×½" },
-      { id: "bridge", label: "Brug — +12" },
+      { id: "bridge", label: "Brug — vak eronder" },
       { id: "deka", label: "Deka — 1 overslaan" },
       { id: "sloot", label: "Sloot — gooi 4/5" },
       { id: "park", label: "Park — naar 30" },
@@ -492,86 +497,83 @@ export class UI {
     this.legendEl.innerHTML = items
       .map(
         (it) =>
-          `<span class="goose-legend-item"><i class="goose-legend-swatch is-${it.id}"></i>${it.label}</span>`,
+          `<span class="goose-legend-item"><span class="goose-legend-icon is-${it.id}">${squareIconSvg(it.id)}</span>${it.label}</span>`,
       )
       .join("");
   }
 
   /**
-   * Spiral board: 0 (start) → 63 (finish).
+   * Zigzag grid: 6 wide, path goes down row by row (even L→R, odd R→L).
    * @param {import('./game.js').GameState} state
    */
   #renderSpiral(state) {
     if (!this.boardTrack) return;
     this.boardTrack.className = "goose-board";
-    this.boardTrack.setAttribute("aria-label", "Ganzenbord spiraal");
+    this.boardTrack.setAttribute("aria-label", "Ganzenbord zigzag-grid");
     this.boardTrack.removeAttribute("aria-hidden");
     this.boardTrack.innerHTML = "";
 
     const wrap = document.createElement("div");
-    wrap.className = "goose-spiral";
+    wrap.className = "goose-grid";
+    wrap.style.setProperty("--goose-cols", String(GRID_COLS));
 
-    const n = BOARD_SIZE + 1;
-    const cx = 50;
-    const cy = 50;
-    const turns = 3.35;
-    const angle0 = -Math.PI / 2;
-    const rMin = 6;
-    const rMax = 46;
+    for (let row = 0; row < GRID_ROWS; row++) {
+      for (let col = 0; col < GRID_COLS; col++) {
+        const i = squareAt(row, col);
+        const cell = document.createElement("div");
 
-    for (let i = 0; i < n; i++) {
-      const t = i / (n - 1);
-      const angle = angle0 + turns * 2 * Math.PI * t;
-      const r = rMin + (rMax - rMin) * t;
-      const x = cx + r * Math.cos(angle);
-      const y = cy + r * Math.sin(angle);
+        if (i == null) {
+          cell.className = "goose-cell is-empty";
+          cell.setAttribute("aria-hidden", "true");
+          wrap.appendChild(cell);
+          continue;
+        }
 
-      const cell = document.createElement("div");
-      cell.className = "goose-cell";
-      const info = squareInfo(i);
-      if (info) cell.classList.add(`is-${info.id}`);
-      if (BANKJE_SQUARES.includes(i)) cell.classList.add("is-bankje");
-      if (SPECIAL[i]) cell.classList.add(`is-${SPECIAL[i].id}`);
-      if (i === 0) cell.classList.add("is-start");
-      if (i === BOARD_SIZE) cell.classList.add("is-finish");
+        cell.className = "goose-cell";
+        const info = squareInfo(i);
+        if (info) cell.classList.add(`is-${info.id}`);
+        if (BANKJE_SQUARES.includes(i)) cell.classList.add("is-bankje");
+        if (SPECIAL[i]) cell.classList.add(`is-${SPECIAL[i].id}`);
+        if (i === 0) cell.classList.add("is-start");
+        if (i === BOARD_SIZE) cell.classList.add("is-finish");
+        if (row % 2 === 1) cell.classList.add("is-rtl");
 
-      cell.style.left = `${x}%`;
-      cell.style.top = `${y}%`;
-      cell.title = info ? `${i}: ${info.label}` : `Vak ${i}`;
+        const below = SPECIAL[i]?.id === "bridge" ? squareBelow(i) : null;
+        cell.title = below != null
+          ? `${i}: Brug → ${below}`
+          : info
+            ? `${i}: ${info.label}`
+            : `Vak ${i}`;
 
-      const num = document.createElement("span");
-      num.className = "goose-num";
-      num.textContent = String(i);
-      cell.appendChild(num);
+        const num = document.createElement("span");
+        num.className = "goose-num";
+        num.textContent = String(i);
+        cell.appendChild(num);
 
-      if (
-        info &&
-        info.id !== "start" &&
-        info.id !== "finish" &&
-        info.id !== "bankje"
-      ) {
-        const tag = document.createElement("span");
-        tag.className = "goose-tag";
-        tag.textContent = info.label[0] || "";
-        cell.appendChild(tag);
+        if (info) {
+          const icon = document.createElement("span");
+          icon.className = `goose-icon is-${info.id}`;
+          icon.innerHTML = squareIconSvg(info.id);
+          cell.appendChild(icon);
+        }
+
+        const here = state.players.filter((p) => (state.positions[p.id] ?? 0) === i);
+        if (here.length) {
+          const pawns = document.createElement("div");
+          pawns.className = "goose-pawns";
+          here.forEach((p) => {
+            const idx = state.players.findIndex((pl) => pl.id === p.id);
+            const wrapPawn = document.createElement("span");
+            wrapPawn.className = "goose-pawn";
+            wrapPawn.title = p.name;
+            wrapPawn.innerHTML = goosePawnHtml(p.colors, idx, p.name);
+            pawns.appendChild(wrapPawn);
+          });
+          cell.appendChild(pawns);
+        }
+
+        wrap.appendChild(cell);
       }
-
-      const here = state.players.filter((p) => (state.positions[p.id] ?? 0) === i);
-      if (here.length) {
-        const pawns = document.createElement("div");
-        pawns.className = "goose-pawns";
-        here.forEach((p) => {
-          const idx = state.players.findIndex((pl) => pl.id === p.id);
-          const wrapPawn = document.createElement("span");
-          wrapPawn.className = "goose-pawn";
-          wrapPawn.title = p.name;
-          wrapPawn.innerHTML = goosePawnHtml(p.colors, idx, p.name);
-          pawns.appendChild(wrapPawn);
-        });
-        cell.appendChild(pawns);
-      }
-
-      wrap.appendChild(cell);
     }
 
     this.boardTrack.appendChild(wrap);

@@ -2,6 +2,9 @@ export const GAME_ID = "ganzenbord";
 export const MAX_PLAYERS = 6;
 export const MIN_PLAYERS = 2;
 export const BOARD_SIZE = 63;
+/** Zigzag grid: 6 wide × ~11 high (0…63). */
+export const GRID_COLS = 6;
+export const GRID_ROWS = Math.ceil((BOARD_SIZE + 1) / GRID_COLS);
 
 /** Fallback palette when Geheugen-kleuren ontbreken (hotseat / oude seats). */
 export const FALLBACK_COLORS = Object.freeze([
@@ -45,15 +48,51 @@ export const BANKJE_SQUARES = Object.freeze([
 export const GOOSE_SQUARES = BANKJE_SQUARES;
 
 export const SPECIAL = Object.freeze({
-  6: { id: "bridge", label: "Brug", forward: 12 },
-  12: { id: "bridge", label: "Brug", forward: 12 },
-  24: { id: "bridge", label: "Brug", forward: 12 },
+  6: { id: "bridge", label: "Brug", below: true },
+  12: { id: "bridge", label: "Brug", below: true },
+  24: { id: "bridge", label: "Brug", below: true },
   19: { id: "deka", label: "Deka", skip: 1 },
   31: { id: "sloot", label: "Sloot" },
   42: { id: "park", label: "Park", to: 30 },
   52: { id: "prison", label: "Gevangenis", skip: 5 },
   58: { id: "knockout", label: "Knockout", to: 0 },
 });
+
+/**
+ * Visual column on the zigzag board (even rows left→right, odd right→left).
+ * @param {number} square
+ * @returns {{ row: number, col: number }}
+ */
+export function squareRowCol(square) {
+  const row = Math.floor(square / GRID_COLS);
+  const i = square % GRID_COLS;
+  const col = row % 2 === 0 ? i : GRID_COLS - 1 - i;
+  return { row, col };
+}
+
+/**
+ * Path index at visual (row, col), or null if outside 0…BOARD_SIZE.
+ * @param {number} row
+ * @param {number} col
+ * @returns {number | null}
+ */
+export function squareAt(row, col) {
+  if (row < 0 || col < 0 || col >= GRID_COLS) return null;
+  const i = row % 2 === 0 ? col : GRID_COLS - 1 - col;
+  const square = row * GRID_COLS + i;
+  if (square < 0 || square > BOARD_SIZE) return null;
+  return square;
+}
+
+/**
+ * Square directly below on the grid (same column, next row), or null.
+ * @param {number} square
+ * @returns {number | null}
+ */
+export function squareBelow(square) {
+  const { row, col } = squareRowCol(square);
+  return squareAt(row + 1, col);
+}
 
 export const Msg = Object.freeze({
   LOBBY: "lobby",
@@ -285,9 +324,10 @@ function resolveLanding(state, playerId, playerName, pos, notes, depth = 0) {
 
   const special = SPECIAL[pos];
 
-  if (special?.id === "bridge" && special.forward) {
-    const next = moveWithBounce(pos, special.forward);
-    notes.push(`${special.label} +${special.forward} → ${next}`);
+  if (special?.id === "bridge") {
+    const next = squareBelow(pos);
+    if (next == null) return pos;
+    notes.push(`${special.label} ↓ → ${next}`);
     return resolveLanding(state, playerId, playerName, next, notes, depth + 1);
   }
 
