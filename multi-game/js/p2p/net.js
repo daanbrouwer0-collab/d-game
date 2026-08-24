@@ -269,8 +269,15 @@ export class Net {
 
       const onError = (err) => {
         cleanup();
-        if (err?.type === "unavailable-id") {
-          this.host().then(resolve).catch(reject);
+        const type = err?.type || "";
+        if (type === "unavailable-id") {
+          const taken = new Error(
+            "Deze kamercode is al in gebruik. Iemand host deze room nog. Kies Join, of wacht tot de host weg is.",
+          );
+          taken.type = "unavailable-id";
+          this.#setStatus("error", taken.message);
+          this.onError?.(taken);
+          reject(taken);
           return;
         }
         this.#setStatus("error", err.message);

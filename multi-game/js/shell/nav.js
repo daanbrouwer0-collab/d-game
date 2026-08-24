@@ -1,3 +1,6 @@
+import { listDeskCards, deskHashHref } from "../core/desk.js";
+import { isHashShell, readRoomFromUrl } from "./site-url.js";
+
 /**
  * Inject shared bottom tab navigation for the D-Game sandbox shell.
  * @param {{ active: 'games'|'lobby'|'friends'|'netwerk'|'geheugen', base?: string }} opts
@@ -14,7 +17,6 @@ export function mountShellNav({ active, base = "" }) {
     { id: "geheugen", label: "Geheugen", href: `${root}geheugen/` },
   ];
 
-  // Prefer clean folder URLs when on a directory
   const normalized = tabs.map((t) => {
     if (t.id === "games") {
       return { ...t, href: root === "" ? "./" : `${root}` };
@@ -41,6 +43,44 @@ export function mountShellNav({ active, base = "" }) {
     .join("");
 
   document.documentElement.classList.add("has-shell-nav");
+}
+
+/**
+ * Compact switcher of rooms saved on this device.
+ * @param {{ base?: string, currentGameId?: string, currentCode?: string }} [opts]
+ */
+export function mountRoomStrip(opts = {}) {
+  const { base = "", currentGameId = "", currentCode = "" } = opts;
+  const cards = listDeskCards(base);
+  let strip = document.getElementById("room-strip");
+  if (!cards.length) {
+    strip?.remove();
+    document.documentElement.classList.remove("has-room-strip");
+    return;
+  }
+  if (!strip) {
+    strip = document.createElement("div");
+    strip.id = "room-strip";
+    strip.className = "room-strip";
+    strip.setAttribute("aria-label", "Mijn rooms");
+    const nav = document.getElementById("shell-nav");
+    if (nav) document.body.insertBefore(strip, nav);
+    else document.body.appendChild(strip);
+  }
+  const code = currentCode || readRoomFromUrl() || "";
+  strip.innerHTML = `<span class="room-strip-label">Mijn rooms</span>${cards
+    .map((c) => {
+      const here = c.gameId === currentGameId && code && c.code === code;
+      const role = c.role === "host" ? "host" : "gast";
+      const link = isHashShell() ? deskHashHref(c, "open") : c.openHref;
+      return `<a class="room-chip${here ? " is-current" : ""}" href="${link}" title="${c.summary}">
+        <strong>${c.title}</strong>
+        <span>${c.code}</span>
+        <span class="room-chip-role">${role}</span>
+      </a>`;
+    })
+    .join("")}`;
+  document.documentElement.classList.add("has-room-strip");
 }
 
 /**

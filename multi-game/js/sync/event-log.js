@@ -164,3 +164,55 @@ export function packetToQrText(packet) {
 export function packetFromQrText(text) {
   return parseSyncPacket(text.trim());
 }
+
+/**
+ * @param {EventLog} log
+ * @returns {number}
+ */
+export function tipSeq(log) {
+  const last = log.events[log.events.length - 1];
+  return last ? last.seq : 0;
+}
+
+/**
+ * @param {unknown} raw
+ * @returns {EventLog | null}
+ */
+export function coerceEventLog(raw, gameId) {
+  if (!raw || typeof raw !== "object") return null;
+  const log = /** @type {Partial<EventLog>} */ (raw);
+  if (typeof log.gameId !== "string" || !Array.isArray(log.events)) return null;
+  if (gameId && log.gameId !== gameId) return null;
+  return /** @type {EventLog} */ (log);
+}
+
+/**
+ * Longest valid chain wins. Forks: keep `preferred`.
+ * @param {EventLog} preferred
+ * @param {EventLog | null | undefined} other
+ * @returns {EventLog}
+ */
+export function mergeLogs(preferred, other) {
+  if (!other || !other.events?.length) return preferred;
+  if (!preferred.events.length) {
+    const ontoEmpty = applySyncPacket(createEventLog(preferred.gameId), {
+      v: 1,
+      gameId: other.gameId,
+      fromSeq: 0,
+      events: other.events,
+    });
+    return ontoEmpty.ok ? ontoEmpty.log : preferred;
+  }
+  const packetOther = encodeSyncPacket(other, 0);
+  const ontoPreferred = applySyncPacket(preferred, packetOther);
+  const packetPref = encodeSyncPacket(preferred, 0);
+  const ontoOther = applySyncPacket(other, packetPref);
+  if (ontoPreferred.ok && ontoOther.ok) {
+    return tipSeq(ontoPreferred.log) >= tipSeq(ontoOther.log)
+      ? ontoPreferred.log
+      : ontoOther.log;
+  }
+  if (ontoPreferred.ok) return ontoPreferred.log;
+  if (ontoOther.ok) return ontoOther.log;
+  return preferred;
+}

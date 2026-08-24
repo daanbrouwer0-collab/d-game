@@ -1,16 +1,19 @@
 import { createRoom, transportFromUrl } from "../js/core/room.js";
 import { saveRoom } from "../js/core/storage.js";
-import { mountShellNav } from "../js/shell/nav.js";
+import { mountRoomStrip, mountShellNav } from "../js/shell/nav.js";
 import { parseP2pInvite } from "../js/shell/p2p-invite.js";
 import { openQrScanner } from "../js/shell/qr-scanner.js";
-import { drawQr } from "../js/shell/qr-ui.js";
 import { showHostInviteCard } from "../js/shell/p2p-invite-ui.js";
-import { readRoomFromUrl } from "../js/shell/site-url.js";
+import {
+  readHostIntentFromUrl,
+  readRoomFromUrl,
+} from "../js/shell/site-url.js";
 import { GAME_ID } from "./game.js";
 import { GameEngine } from "./engine.js";
 import { UI } from "./ui.js";
 
 mountShellNav({ active: "games", base: "../" });
+mountRoomStrip({ base: "../", currentGameId: GAME_ID });
 
 const GAME_PATH = "/tic-tac-toe/";
 
@@ -80,7 +83,12 @@ function wireSession() {
     }
 
     if (status === "hosting") {
-      ui.showLobby();
+      if (engine.log.events.length) {
+        ui.showGame();
+        syncBoard();
+      } else {
+        ui.showLobby();
+      }
     }
 
     if (status === "disconnected" || status === "error") {
@@ -148,6 +156,7 @@ ui.btnHost.addEventListener("click", async () => {
     await teardown({ clearUrl: true });
     ensureSession("p2p");
     const code = await session.host();
+    engine.loadPersisted(code);
     shareUrl = session.buildShareUrl(GAME_PATH, code);
     session.writeRoomToUrl(code);
     saveRoom({
@@ -241,6 +250,7 @@ async function joinRoom(code) {
     ensureSession("p2p");
     ui.hideHostInvite();
     const normalized = code.trim().toUpperCase();
+    engine.loadPersisted(normalized);
     await session.join(normalized);
     session.writeRoomToUrl(normalized);
     shareUrl = session.buildShareUrl(GAME_PATH, normalized);
@@ -346,7 +356,7 @@ function humanizePeerError(err) {
     return "Peer niet gevonden. Controleer de code of of de host online is.";
   }
   if (type === "unavailable-id") {
-    return "Die kamercode is al in gebruik. Probeer opnieuw.";
+    return "Die kamercode is al in gebruik. Iemand host deze room nog — kies Join, of wacht tot de host weg is.";
   }
   if (type === "network" || /Lost connection to server/i.test(message)) {
     return "Geen verbinding met de PeerJS-server.";
@@ -354,9 +364,48 @@ function humanizePeerError(err) {
   return message || "Onbekende fout";
 }
 
+/**
+ * Re-open a saved room as host (host-wissel).
+ * @param {string} code
+ */
+async function resumeAsHost(code) {
+  const normalized = code.trim().toUpperCase();
+  ui.setLobbyError("");
+  ui.btnHost.disabled = true;
+  ui.showHostInvite(normalized, "");
+  ui.lobbyHint.textContent = "Room opnieuw hosten…";
+  try {
+    await teardown({ clearUrl: false });
+    ensureSession("p2p");
+    engine.loadPersisted(normalized);
+    await session.hostWithCode(normalized);
+    engine.startAsHost();
+    syncBoard();
+    shareUrl = session.buildShareUrl(GAME_PATH, normalized);
+    session.writeRoomToUrl(normalized);
+    saveRoom({
+      gameId: GAME_ID,
+      code: normalized,
+      name: "host",
+      role: "host",
+    });
+    ui.showHostInvite(normalized, shareUrl);
+    await showInviteQr(shareUrl, normalized);
+  } catch (err) {
+    ui.setLobbyError(humanizePeerError(err));
+  } finally {
+    ui.btnHost.disabled = false;
+  }
+}
+
 const roomParam = readRoomFromUrl();
 if (roomParam && transportFromUrl() !== "qr") {
   ui.joinCode.value = roomParam;
-  ui.lobbyHint.textContent = "Bezig met joinen via deellink…";
-  joinRoom(roomParam);
+  if (readHostIntentFromUrl()) {
+    ui.lobbyHint.textContent = "Bezig deze room opnieuw te hosten…";
+    resumeAsHost(roomParam);
+  } else {
+    ui.lobbyHint.textContent = "Bezig met joinen via deellink…";
+    joinRoom(roomParam);
+  }
 }

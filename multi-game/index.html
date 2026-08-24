@@ -34,9 +34,10 @@
     <script type="module">
       import { GAMES } from "./js/core/catalog.js";
       import { getPreferredTransport, listTransportMeta } from "./js/core/prefs.js";
-      import { mountShellNav } from "./js/shell/nav.js";
+      import { mountRoomStrip, mountShellNav } from "./js/shell/nav.js";
 
       mountShellNav({ active: "games", base: "" });
+      mountRoomStrip({ base: "" });
 
       const pref = getPreferredTransport();
       const meta = listTransportMeta().find((t) => t.id === pref);

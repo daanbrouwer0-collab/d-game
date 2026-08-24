@@ -119,6 +119,14 @@ export function readRoomFromUrl(search = getUrlSearch()) {
 }
 
 /**
+ * Lobby “Host opnieuw” sets as=host on the invite URL.
+ * @param {string} [search]
+ */
+export function readHostIntentFromUrl(search = getUrlSearch()) {
+  return getUrlParams(search).get("as") === "host";
+}
+
+/**
  * Build invite URL for QR / share.
  * Production (hash shell / d-game.nl): https://www.d-game.nl/#game/index.html?room=CODE
  * Local static server: http://localhost:8080/game/?room=CODE

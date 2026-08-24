@@ -1,6 +1,6 @@
 const ACTIVE_KEY = "dgame.room";
 const RECENT_KEY = "dgame.rooms.recent";
-const MAX_RECENT = 8;
+const MAX_RECENT = 16;
 
 /**
  * Active room (this tab) + recent rooms (this browser).
@@ -15,7 +15,11 @@ const MAX_RECENT = 8;
  *   name: string,
  * }} RoomMemory
  *
- * @typedef {RoomMemory & { lastSeen: number }} RecentRoom
+ * @typedef {RoomMemory & {
+ *   lastSeen: number,
+ *   summary?: string,
+ *   seq?: number,
+ * }} RecentRoom
  */
 
 /**
@@ -60,15 +64,16 @@ export function clearRoom() {
  */
 export function pushRecent(data) {
   try {
-    const list = listRecent(data.gameId).filter(
-      (r) => r.code !== data.code || r.role !== data.role,
-    );
+    const extra = /** @type {{ summary?: string, seq?: number }} */ (data);
+    const list = listRecent(data.gameId).filter((r) => r.code !== data.code);
     list.unshift({
       gameId: data.gameId,
       code: data.code,
       role: data.role,
       name: data.name,
       lastSeen: Date.now(),
+      summary: extra.summary || "",
+      seq: extra.seq || 0,
     });
     const trimmed = list.slice(0, MAX_RECENT);
     const all = readAllRecent().filter((r) => r.gameId !== data.gameId);
@@ -91,6 +96,12 @@ export function listRecent(gameId) {
 /**
  * @returns {RecentRoom[]}
  */
+export function listAllRecent() {
+  return readAllRecent()
+    .filter((r) => r.gameId && r.code)
+    .sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
+}
+
 function readAllRecent() {
   try {
     const raw = localStorage.getItem(RECENT_KEY);

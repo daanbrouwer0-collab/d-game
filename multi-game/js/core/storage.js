@@ -8,6 +8,7 @@ import {
   loadRoom as loadActiveRoom,
   clearRoom as clearActiveRoom,
   listRecent,
+  listAllRecent,
   removeRecent,
   pushRecent,
 } from "../p2p/room-memory.js";
@@ -159,14 +160,7 @@ export function clearFriends() {
  * @returns {import('../p2p/room-memory.js').RecentRoom[]}
  */
 export function listAllRecentRooms() {
-  try {
-    const raw = localStorage.getItem(RECENT_KEY);
-    if (!raw) return [];
-    const data = JSON.parse(raw);
-    return Array.isArray(data) ? data : [];
-  } catch {
-    return [];
-  }
+  return listAllRecent();
 }
 
 export function clearAllRecentRooms() {

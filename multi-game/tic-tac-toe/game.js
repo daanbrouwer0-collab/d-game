@@ -15,6 +15,7 @@ export const GameMsg = Object.freeze({
   MOVE: "move",
   STATE: "state",
   RESTART: "restart",
+  LOG: "log",
 });
 
 /**

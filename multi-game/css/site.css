@@ -574,6 +574,87 @@ html.has-shell-nav body {
   padding-bottom: 4.5rem;
 }
 
+html.has-shell-nav.has-room-strip body {
+  padding-bottom: 8rem;
+}
+
+.room-strip {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 3.55rem;
+  z-index: 39;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding: 0.4rem 0.6rem calc(0.4rem + env(safe-area-inset-bottom, 0px));
+  background: rgba(26, 31, 46, 0.94);
+  border-top: 1px solid var(--line);
+}
+
+.room-strip-label {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.room-chip {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-panel);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.room-chip.is-current {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.room-chip-role {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.lobby-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+}
+
+.lobby-card .meta {
+  flex: 1 1 12rem;
+}
+
+.lobby-card .room-code-line {
+  margin: 0.2rem 0 0;
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.lobby-card .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
 .shell-nav {
   position: fixed;
   left: 0;
