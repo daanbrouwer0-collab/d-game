@@ -13,6 +13,7 @@ Lees eerst [docs/README.md](../../README.md) voor de actieve documentatieset.
 | [2026-08-24-game-agnostic-rooms-design.md](./2026-08-24-game-agnostic-rooms-design.md) | Room ≠ game, twee log-lagen, room shell |
 | [2026-08-24-room-first-chat-design.md](./2026-08-24-room-first-chat-design.md) | Room-first navigatie + room chat (ingeklapt tijdens spel) |
 | [2026-08-24-embedded-games-standard-design.md](./2026-08-24-embedded-games-standard-design.md) | Embedded games adapter + catalog manifest |
+| [2026-08-24-game-integration-guide.md](./2026-08-24-game-integration-guide.md) | **Start hier:** profiel kiezen + checklist nieuw spel |
 | [2026-08-24-p2p-log-only-canon-design.md](./2026-08-24-p2p-log-only-canon-design.md) | Log-only canon, intent → ACK → LOG |
 
 Implementatieplannen: [../plans/](../plans/)

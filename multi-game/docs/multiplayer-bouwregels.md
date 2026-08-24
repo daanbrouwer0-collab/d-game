@@ -63,7 +63,7 @@ Game-types: kort en duidelijk (`move`, `roll`, `timeout`, …) of geprefixed (`r
 
 ### R6b — Embedded games standard
 
-- Catalog: `embedded: { syncProfile, roomReady, entry }` — zie [embedded-games-standard-design.md](./superpowers/specs/2026-08-24-embedded-games-standard-design.md).
+- Catalog: `embedded: { syncProfile, roomReady, entry }` — zie [embedded-games-standard-design.md](./superpowers/specs/2026-08-24-embedded-games-standard-design.md) en [game-integration-guide.md](./superpowers/specs/2026-08-24-game-integration-guide.md) (checklist).
 - Entry: `{game}/embedded.js` via `runEmbeddedGame(adapter)` uit `js/bridge/embedded-bootstrap.js`.
 - `roomReady: false` → niet startbaar in room (stemkaart disabled).
 - Profiel `event-log` → `SyncMsg.LOG` / `INTENT`; profiel `snapshot` → host snapshots + intents.

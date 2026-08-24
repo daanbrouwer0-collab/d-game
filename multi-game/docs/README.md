@@ -11,6 +11,7 @@
 | **Spelers (web)** | [handleiding/index.html](../handleiding/index.html) · [speler-handleiding.md](./speler-handleiding.md) (volledig) |
 | **Ontwikkelaar — hoe het werkt** | [p2p-multiplayer.md](./p2p-multiplayer.md) |
 | **Ontwikkelaar — regels nieuw spel** | [multiplayer-bouwregels.md](./multiplayer-bouwregels.md) |
+| **Ontwikkelaar — spel toevoegen aan room** | [game-integration-guide](./superpowers/specs/2026-08-24-game-integration-guide.md) |
 | **Audit / bekende gaten** | [p2p-kritisch-rapport.md](./p2p-kritisch-rapport.md) |
 | **Fundamenten & keuzes** | [p2p-fundamenten.md](./p2p-fundamenten.md) |
 
