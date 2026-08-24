@@ -74,6 +74,10 @@ export class Room {
     return this.session.transport === "local";
   }
 
+  get isBridge() {
+    return this.session.transport === "bridge";
+  }
+
   /**
    * @param {string} code
    */
@@ -110,12 +114,83 @@ export class Room {
 
   /** Call after guest connection opens */
   beginAsGuest() {
+    if (this.isBridge) return;
     this.localId = this.playerId;
     this.session.sendHello({
       name: this.localName,
       playerId: this.playerId,
       colors: getCharacter() || normalizeColors(null, 0),
     });
+  }
+
+  /**
+   * Room shell embedded mode — roster + session log from SESSION_INIT.
+   * @param {{
+   *   role: 'host'|'guest',
+   *   log?: unknown,
+   *   playerId: string,
+   *   name: string,
+   *   roster?: { playerId: string, name: string }[],
+   * }} init
+   */
+  bootstrapEmbedded(init) {
+    this.localName = String(init.name || this.localName).trim() || "Speler";
+    this.playerId = String(init.playerId || this.playerId);
+    this.localId = this.playerId;
+    this.joined = true;
+    this.peerToPlayer.clear();
+
+    if (init.log) {
+      const packet = parseSyncPacket(init.log);
+      if (packet) {
+        const replaced = replaceFromHostPacket(GAME_ID, packet);
+        if (replaced.ok) this.log = replaced.log;
+      }
+    }
+
+    const roster = Array.isArray(init.roster) ? init.roster : [];
+
+    if (init.role === "host") {
+      this.onlineIds = new Set(roster.map((m) => m.playerId));
+      if (!this.log.events.length && roster.length) {
+        this.#bootstrapFromRoster(roster);
+      } else {
+        this.#replay();
+      }
+      this.#markTransportHost();
+      if (this.isBridge && this.log.events.length) {
+        const packet = this.hostCommit.encodeSince(this.log, 0);
+        this.session.broadcast(Msg.LOG, packet);
+      }
+    } else {
+      this.#replay();
+      this.localId = this.playerId;
+      this.onlineIds = new Set(this.state.players.map((p) => p.id));
+    }
+
+    this.#emit();
+  }
+
+  /**
+   * @param {{ playerId: string, name: string }[]} roster
+   */
+  #bootstrapFromRoster(roster) {
+    let log = createEventLog(GAME_ID);
+    roster.forEach((m, i) => {
+      const added = appendEvent(log, "seat", {
+        playerId: m.playerId,
+        name: String(m.name || "Speler").trim().slice(0, 20) || "Speler",
+        colors: normalizeColors(getCharacter(), i),
+      });
+      if (added.ok) log = added.log;
+    });
+    if (roster.length >= MIN_PLAYERS) {
+      const started = appendEvent(log, "start", { championId: null });
+      if (started.ok) log = started.log;
+    }
+    this.log = log;
+    this.hostCommit.clearTurnKeys();
+    this.#replay();
   }
 
   onReconnected() {
@@ -370,6 +445,7 @@ export class Room {
   }
 
   #persist() {
+    if (this.isBridge) return;
     const code = this.session.roomCode;
     if (!code || this.isLocal) return;
     saveRoomLog(GAME_ID, code, this.log);
@@ -589,6 +665,10 @@ export class Room {
         if (this.session.role !== "host") break;
         const payload = /** @type {{ playerId?: string }} */ (msg.payload || {});
         if (!payload.playerId || !from) break;
+        if (this.isBridge) {
+          this.hostCommit.bindPeer(from, payload.playerId);
+          this.peerToPlayer.set(from, payload.playerId);
+        }
         const bound = this.hostCommit.playerForPeer(from);
         if (!bound || bound !== payload.playerId) {
           this.session.sendTo(from, Msg.REJECT, {

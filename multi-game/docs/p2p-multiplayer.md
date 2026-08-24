@@ -174,7 +174,7 @@ Room-events **nooit** in session log. Game-events **nooit** in room log.
 | Spel | Room embedded | Legacy standalone P2P |
 |------|---------------|------------------------|
 | Tic-tac-toe | Ja (`embedded.js`) | Ja |
-| Ganzenbord | Stub | Ja |
+| Ganzenbord | Ja (`embedded.js`) | Ja |
 | RobotRun | Stub | Ja |
 
 Wire types room shell: `js/sync/room-msg.js` (`room_log`, `session_intent`, `session_log`, …).

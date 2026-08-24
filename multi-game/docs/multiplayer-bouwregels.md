@@ -61,6 +61,14 @@ Game-types: kort en duidelijk (`move`, `roll`, `timeout`, …) of geprefixed (`r
 - Embedded spellen (`?embedded=1`): **geen eigen P2P** — alleen bridge naar `room/`.
 - Spelersflow: [speler-handleiding.md](./speler-handleiding.md).
 
+### R6b — Embedded games standard
+
+- Catalog: `embedded: { syncProfile, roomReady, entry }` — zie [embedded-games-standard-design.md](./superpowers/specs/2026-08-24-embedded-games-standard-design.md).
+- Entry: `{game}/embedded.js` via `runEmbeddedGame(adapter)` uit `js/bridge/embedded-bootstrap.js`.
+- `roomReady: false` → niet startbaar in room (stemkaart disabled).
+- Profiel `event-log` → `SyncMsg.LOG` / `INTENT`; profiel `snapshot` → host snapshots + intents.
+- Einde: `notifySessionEnded()` — room keert terug naar stemmen.
+
 ---
 
 ## 2. Identity & stoelen

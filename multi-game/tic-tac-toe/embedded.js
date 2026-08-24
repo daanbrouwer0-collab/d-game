@@ -1,5 +1,8 @@
-import { BridgeMsg } from "../js/bridge/bridge-protocol.js";
-import { BridgeTransport, connectGameBridge } from "../js/bridge/bridge-transport.js";
+import {
+  runEmbeddedGame,
+  notifySessionEnded,
+  watchSessionEnd,
+} from "../js/bridge/embedded-bootstrap.js";
 import { playerLabel } from "../js/core/storage.js";
 import { TURN_SECONDS } from "./game.js";
 import { GameEngine } from "./engine.js";
@@ -7,30 +10,24 @@ import { seatsFromLog } from "./log.js";
 import { UI } from "./ui.js";
 
 const ui = new UI();
-const transport = new BridgeTransport();
 /** @type {GameEngine | null} */
 let engine = null;
-let sessionEndedSent = false;
-
-function maybeNotifySessionEnd() {
-  if (!engine || sessionEndedSent || transport.role !== "host") return;
-  const { status } = engine.state;
-  if (status !== "won" && status !== "draw") return;
-  sessionEndedSent = true;
-  window.parent.postMessage(
-    { type: BridgeMsg.SESSION_ENDED, payload: { reason: status } },
-    "*",
-  );
-}
+const maybeEnd = watchSessionEnd(
+  () =>
+    !!engine &&
+    (engine.state.status === "won" || engine.state.status === "draw"),
+  "finished",
+);
 
 function syncBoard() {
   if (!engine) return;
-  ui.renderState(engine.state, engine.localMark, transport.isConnected(), {
+  ui.renderState(engine.state, engine.localMark, true, {
     hotseat: false,
-    isHost: transport.role === "host",
+    isHost: engine.session.role === "host",
     seats: seatsFromLog(engine.log),
   });
   syncTurnTimer();
+  maybeEnd();
 }
 
 function syncTurnTimer() {
@@ -46,7 +43,7 @@ function syncTurnTimer() {
     key,
     seconds: TURN_SECONDS,
     active: true,
-    canExpire: transport.role === "host",
+    canExpire: engine.session.role === "host",
     onExpire: () => {
       engine?.tryTimeout();
       queueMicrotask(() => syncTurnTimer());
@@ -60,10 +57,7 @@ function wireEngine() {
     ui.setRole(mark, engine?.playerName || playerLabel());
     syncBoard();
   };
-  engine.onState = () => {
-    syncBoard();
-    maybeNotifySessionEnd();
-  };
+  engine.onState = () => syncBoard();
   engine.onReject = (reason) => {
     if (ui.resultLabel) ui.resultLabel.textContent = reason;
   };
@@ -78,24 +72,24 @@ ui.onCellClick((index) => {
 });
 
 ui.btnRestart?.addEventListener("click", () => engine?.requestRestart());
-ui.btnLeave?.addEventListener("click", () => {
-  window.parent.postMessage(
-    { type: BridgeMsg.SESSION_ENDED, payload: { reason: "left" } },
-    "*",
-  );
-});
+ui.btnLeave?.addEventListener("click", () =>
+  notifySessionEnded({ reason: "left" }),
+);
 
-const lobbySection = document.getElementById("lobby");
-if (lobbySection) lobbySection.classList.add("hidden");
-
-connectGameBridge(transport, (init) => {
-  engine = new GameEngine(transport);
-  wireEngine();
-  engine.bootstrapEmbedded({
-    role: /** @type {'host'|'guest'} */ (init.role),
-    log: init.log,
-  });
-  ui.setConnectionStatus("connected", "Via room");
-  ui.showGame();
-  syncBoard();
+runEmbeddedGame({
+  gameId: "tic-tac-toe",
+  prepareUI() {
+    document.getElementById("lobby")?.classList.add("hidden");
+  },
+  start(ctx) {
+    engine = new GameEngine(ctx.transport);
+    wireEngine();
+    engine.bootstrapEmbedded({
+      role: ctx.role,
+      log: ctx.log,
+    });
+    ui.setConnectionStatus("connected", "Via room");
+    ui.showGame();
+    syncBoard();
+  },
 });

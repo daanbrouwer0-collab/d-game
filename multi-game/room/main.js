@@ -1,5 +1,6 @@
 import { createRoomSession } from "../js/core/room.js";
-import { gamesForPlayerCount, getGame } from "../js/core/catalog.js";
+import { gamesForPlayerCount, getGame, roomReadyGames } from "../js/core/catalog.js";
+import { isRoomPlayable } from "../js/bridge/embedded-contract.js";
 import {
   loadRoomLogByCode,
   saveRoomLogByCode,
@@ -228,7 +229,7 @@ function escapeHtml(s) {
 function renderGamePicker() {
   const state = roomState();
   const count = memberCount();
-  const playable = gamesForPlayerCount(count);
+  const playable = roomReadyGames(count);
   const playableIds = playable.map((g) => g.id);
   const tallies = tallyVotes(state.votes);
   const winner = pickWinningGame(tallies, playableIds);
@@ -241,7 +242,9 @@ function renderGamePicker() {
 
   gamePicker.innerHTML = "";
   for (const g of gamesForPlayerCount(999)) {
-    const ok = count >= g.minPlayers && count <= g.maxPlayers;
+    const countOk = count >= g.minPlayers && count <= g.maxPlayers;
+    const roomReady = isRoomPlayable(g.embedded);
+    const ok = countOk && roomReady;
     const votes = tallies.get(g.id) || 0;
     const isVoted = myVote === g.id;
     const isLeading = ok && winner === g.id && votes > 0;
@@ -253,9 +256,11 @@ function renderGamePicker() {
     if (isLeading) btn.classList.add("is-leading");
     btn.disabled = !ok || !!state.activeSession;
     btn.dataset.game = g.id;
-    const reason = ok
-      ? `${g.minPlayers}–${g.maxPlayers} spelers`
-      : `Vereist ${g.minPlayers}–${g.maxPlayers} spelers`;
+    const reason = !countOk
+      ? `Vereist ${g.minPlayers}–${g.maxPlayers} spelers`
+      : !roomReady
+        ? "Room-modus volgt"
+        : `${g.minPlayers}–${g.maxPlayers} spelers`;
     const voteLine =
       votes > 0
         ? `${votes} stem${votes === 1 ? "" : "men"}`
@@ -487,8 +492,10 @@ function bindSession(s) {
     }
     if (msg.type === RoomMsg.SESSION_INTENT) {
       if (s.role === "host") {
+        const p = /** @type {{ wireType?: string }} */ (msg.payload || {});
+        const wireType = p.wireType || SyncMsg.INTENT;
         gameBridge?.sendGameIn(
-          SyncMsg.INTENT,
+          wireType,
           msg.payload,
           msg.fromPeerId || null,
         );
@@ -633,6 +640,15 @@ function relayGameOut(msg) {
     }
     return;
   }
+
+  if (session.role === "guest") {
+    session.send(RoomMsg.SESSION_INTENT, {
+      sessionId: activeSession.sessionId,
+      gameId: activeSession.gameId,
+      wireType: gameType,
+      ...(typeof payload === "object" && payload !== null ? payload : { payload }),
+    });
+  }
 }
 
 /**
@@ -641,10 +657,13 @@ function relayGameOut(msg) {
 async function startGame(gameId) {
   if (!session || session.role !== "host" || !roomLog) return;
   const game = getGame(gameId);
-  if (!game) return;
+  if (!game || !isRoomPlayable(game.embedded)) {
+    setError("Dit spel is nog niet speelbaar in de room.");
+    return;
+  }
 
   const members = rosterArray();
-  const playable = gamesForPlayerCount(members.length);
+  const playable = roomReadyGames(members.length);
   if (!playable.some((g) => g.id === gameId)) {
     setError("Dit spel past niet bij het aantal spelers.");
     return;
@@ -681,7 +700,7 @@ async function startGame(gameId) {
 function startVotedGame() {
   if (!session || session.role !== "host") return;
   const state = roomState();
-  const playable = gamesForPlayerCount(memberCount());
+  const playable = roomReadyGames(memberCount());
   const winner = pickWinningGame(tallyVotes(state.votes), playable.map((g) => g.id));
   if (!winner) {
     setError("Stem eerst op een spel.");
