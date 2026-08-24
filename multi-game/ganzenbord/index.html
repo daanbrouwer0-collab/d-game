@@ -6,7 +6,7 @@
     <title>Ganzenbord — D-Game</title>
     <meta
       name="description"
-      content="Ganzenbord tot 6 spelers. Deel de lobby-link, host start wanneer je wilt."
+      content="Klassiek ganzenbord (63 vakjes) tot 6 spelers. Spiraalbord, speciale vakjes, deel de lobby-link."
     />
     <link rel="stylesheet" href="../css/site.css" />
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -158,21 +158,33 @@
           </div>
         </section>
 
-        <section id="game" class="panel hidden">
-          <p id="you-label" class="meta"></p>
-          <p id="turn-label" class="meta"></p>
-          <p id="log-label" class="log"></p>
+        <section id="game" class="panel panel-game hidden">
+          <div class="game-hud">
+            <p id="you-label" class="meta you-label-goose"></p>
+            <p id="turn-label" class="meta turn-banner"></p>
+            <p id="log-label" class="log"></p>
+          </div>
 
           <div id="positions" class="positions"></div>
-          <div id="board-track" class="board-track" aria-hidden="true"></div>
+          <div id="board-track" class="goose-board" role="img" aria-label="Ganzenbord"></div>
+          <div id="goose-legend" class="goose-legend" aria-label="Legenda speciale vakjes"></div>
 
           <div class="actions">
-            <button type="button" id="btn-roll" class="btn btn-primary" disabled>
+            <button type="button" id="btn-roll" class="btn btn-primary btn-roll" disabled>
               Gooi dobbelsteen
             </button>
             <button type="button" id="btn-leave-game" class="btn btn-ghost">Verlaten</button>
             <button type="button" id="btn-reconnect-game" class="btn btn-ghost hidden">
               Opnieuw verbinden
+            </button>
+          </div>
+
+          <div id="win-actions" class="actions win-actions hidden">
+            <button type="button" id="btn-rematch" class="btn btn-primary" disabled>
+              Opnieuw spelen
+            </button>
+            <button type="button" id="btn-to-lobby" class="btn btn-ghost" disabled>
+              Terug naar lobby
             </button>
           </div>
         </section>

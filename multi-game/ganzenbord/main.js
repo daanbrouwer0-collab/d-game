@@ -83,6 +83,7 @@ function syncView() {
       online,
       youName: room.localName,
       connected: Boolean(session?.isConnected?.() || local),
+      isHost: session?.role === "host",
     });
   }
   refreshRecent();
@@ -236,6 +237,18 @@ ui.btnStart.addEventListener("click", () => {
 
 ui.btnRoll.addEventListener("click", () => {
   room?.tryRoll();
+});
+
+ui.btnRematch?.addEventListener("click", () => {
+  if (!room) return;
+  const result = room.tryRematch();
+  if (!result.ok) ui.setError(result.reason || "Kon niet opnieuw starten");
+});
+
+ui.btnToLobby?.addEventListener("click", () => {
+  if (!room) return;
+  const result = room.tryToLobby();
+  if (!result.ok) ui.setError(result.reason || "Kon niet terug naar lobby");
 });
 
 ui.btnShareWhatsapp.addEventListener("click", () => openWhatsAppShare());

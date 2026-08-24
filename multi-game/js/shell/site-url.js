@@ -378,7 +378,11 @@ export function parseShellHref(href) {
         params: Object.fromEntries(url.searchParams),
       };
     }
-    const resolved = new URL(raw, `https://local.invalid/${currentHashDir()}`);
+    // Catalog links like "ganzenbord/" are site-root paths, not relative to the
+    // current game folder (which would become ganzenbord/ganzenbord/).
+    const isDirRelative = raw.startsWith(".");
+    const baseDir = isDirRelative ? currentHashDir() : "";
+    const resolved = new URL(raw.replace(/^\//, ""), `https://local.invalid/${baseDir}`);
     return {
       path: toHashPath(resolved.pathname.replace(/^\//, "")),
       params: Object.fromEntries(resolved.searchParams),
@@ -407,7 +411,11 @@ export function bindShellClicks(root = document) {
       const parsed = parseShellHref(href);
       if (!parsed) return;
       event.preventDefault();
-      event.stopPropagation();
+      // stopImmediatePropagation: the Netlify hash-shell also binds a capture
+      // click listener. stopPropagation alone does not block same-target
+      // listeners — without this, hrefs like "ganzenbord/" get resolved twice
+      // (second time against #ganzenbord/…) → ganzenbord/ganzenbord/index.html.
+      event.stopImmediatePropagation();
       navigateInShell(parsed.path, parsed.params);
     },
     true,

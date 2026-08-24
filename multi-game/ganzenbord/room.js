@@ -20,7 +20,9 @@ import {
   cloneState,
   createEmptyLobby,
   createLobbyState,
+  normalizeColors,
   removePlayer,
+  returnToLobby,
   rollDice,
   startGame,
   GAME_ID,
@@ -31,6 +33,7 @@ import {
   replayGanzenbord,
   seatsFromLog,
 } from "./log.js";
+import { getCharacter } from "../js/core/storage.js";
 
 /**
  * Host-authoritative lobby + ganzenbord. P2P progress lives in an event log.
@@ -84,13 +87,17 @@ export class Room {
 
     if (this.isLocal) {
       this.log = createEventLog(GAME_ID);
-      this.state = createLobbyState(this.playerId, this.localName);
+      this.state = createLobbyState(
+        this.playerId,
+        this.localName,
+        getCharacter(),
+      );
       this.state.players[0].isHost = true;
       this.#emit();
       return;
     }
 
-    this.#claimSeat(this.playerId, this.localName);
+    this.#claimSeat(this.playerId, this.localName, getCharacter());
     this.#markTransportHost();
     this.#replay();
     this.#persist();
@@ -103,6 +110,7 @@ export class Room {
     this.session.sendHello({
       name: this.localName,
       playerId: this.playerId,
+      colors: getCharacter() || normalizeColors(null, 0),
       log: encodeSyncPacket(this.log),
     });
   }
@@ -110,7 +118,7 @@ export class Room {
   onReconnected() {
     if (this.isLocal) return;
     if (this.session.role === "host") {
-      this.#claimSeat(this.playerId, this.localName);
+      this.#claimSeat(this.playerId, this.localName, getCharacter());
       this.#markTransportHost();
       this.#replay();
       this.#persist();
@@ -130,11 +138,14 @@ export class Room {
       return { ok: false, reason: "Alleen in local-lobby" };
     }
     const id = `local_${Math.random().toString(36).slice(2, 8)}`;
+    const idx = this.state.players.length;
     const result = addPlayer(this.state, {
       id,
       name: (name || "Speler").trim().slice(0, 20) || "Speler",
       isHost: false,
       peerId: null,
+      // Extra hotseat-spelers: Geheugen-kleuren voor #1, daarna fallback-palet
+      colors: idx === 0 ? normalizeColors(getCharacter(), 0) : normalizeColors(null, idx),
     });
     if (!result.ok) return result;
     this.state = result.state;
@@ -161,6 +172,33 @@ export class Room {
       };
     }
     this.#appendAndBroadcast("start", null);
+    return { ok: true };
+  }
+
+  /** Rematch with same seats after a finished game. */
+  tryRematch() {
+    if (this.state.phase !== "finished") {
+      return { ok: false, reason: "Partij is nog niet afgelopen" };
+    }
+    return this.tryStart();
+  }
+
+  /** Keep seats; return to lobby (host only). */
+  tryToLobby() {
+    if (this.session.role !== "host") {
+      return { ok: false, reason: "Alleen de host kan terug naar lobby" };
+    }
+    if (this.isLocal) {
+      const result = returnToLobby(this.state);
+      if (!result.ok) return result;
+      this.state = result.state;
+      this.#emit();
+      return { ok: true };
+    }
+    if (this.state.phase !== "finished" && this.state.phase !== "playing") {
+      return { ok: false, reason: "Niet in een partij" };
+    }
+    this.#appendAndBroadcast("to_lobby", null);
     return { ok: true };
   }
 
@@ -277,8 +315,9 @@ export class Room {
   /**
    * @param {string} playerId
    * @param {string} name
+   * @param {import('./game.js').CharacterColors | null | undefined} [colors]
    */
-  #claimSeat(playerId, name) {
+  #claimSeat(playerId, name, colors) {
     const id = String(playerId || "");
     const nm = String(name || "").trim().slice(0, 20) || "Speler";
     if (!id) return;
@@ -286,7 +325,8 @@ export class Room {
     const matched = matchSeat(seats, id, nm);
     const seatId = matched || id;
     const cur = seats.find((s) => s.playerId === seatId);
-    if (cur && cur.name === nm && seatId === id) {
+    const tint = normalizeColors(colors ?? getCharacter(), seats.length);
+    if (cur && cur.name === nm && seatId === id && colors == null) {
       if (id === this.playerId) this.localId = id;
       return seatId;
     }
@@ -294,6 +334,7 @@ export class Room {
     const added = appendEvent(this.log, "seat", {
       playerId: seatId,
       name: nm,
+      colors: tint,
     });
     if (added.ok) this.log = added.log;
     if (id === this.playerId) this.localId = seatId;
@@ -324,15 +365,16 @@ export class Room {
     switch (msg.type) {
       case TransportType.HELLO: {
         if (this.session.role !== "host" || !from) break;
-        const payload = /** @type {{ name?: string, playerId?: string, log?: unknown }} */ (
+        const payload = /** @type {{ name?: string, playerId?: string, colors?: unknown, log?: unknown }} */ (
           msg.payload || {}
         );
         this.#adoptRemoteLog(payload.log);
-        this.#claimSeat(this.playerId, this.localName);
+        this.#claimSeat(this.playerId, this.localName, getCharacter());
 
         const guestId = String(payload.playerId || "");
         const guestName = String(payload.name || "Speler").slice(0, 20);
         const seats = seatsFromLog(this.log);
+        const guestColors = normalizeColors(payload.colors, seats.length);
         let youAre = matchSeat(seats, guestId, guestName);
 
         if (!youAre) {
@@ -348,9 +390,14 @@ export class Room {
             });
             break;
           }
-          youAre = this.#claimSeat(guestId || `p_${Date.now().toString(36)}`, guestName);
+          youAre = this.#claimSeat(
+            guestId || `p_${Date.now().toString(36)}`,
+            guestName,
+            guestColors,
+          );
         } else {
-          this.#claimSeat(youAre, guestName);
+          // Refresh colors for returning seat
+          this.#claimSeat(youAre, guestName, guestColors);
         }
 
         if (!youAre) {

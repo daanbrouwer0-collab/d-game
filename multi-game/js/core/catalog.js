@@ -28,7 +28,7 @@ export const GAMES = [
     path: "ganzenbord/",
     minPlayers: 2,
     maxPlayers: 6,
-    blurb: "Lobby tot 6 spelers — P2P-deellink of QR-scan.",
+    blurb: "Klassiek spiraalbord (63) — lobby tot 6, P2P of dit apparaat.",
     tags: ["bordspel", "lobby"],
   },
   {

@@ -1,4 +1,32 @@
-import { BOARD_SIZE, MAX_PLAYERS, MIN_PLAYERS, canStart } from "./game.js";
+import {
+  BANKJE_SQUARES,
+  BOARD_SIZE,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  SPECIAL,
+  canStart,
+  normalizeColors,
+  squareInfo,
+} from "./game.js";
+
+/**
+ * @param {import('./game.js').CharacterColors | undefined} colors
+ * @param {number} index
+ * @param {string} [title]
+ */
+function goosePawnHtml(colors, index, title = "") {
+  const c = normalizeColors(colors, index);
+  const safe = (title || "").replace(/"/g, "&quot;");
+  return `<svg class="goose-pawn-svg" viewBox="0 0 40 40" role="img" aria-label="${safe}">
+    <ellipse cx="14" cy="33" rx="3.2" ry="4" fill="${c.legs}"/>
+    <ellipse cx="22" cy="33" rx="3.2" ry="4" fill="${c.legs}"/>
+    <ellipse cx="16" cy="24" rx="11" ry="8.5" fill="${c.body}"/>
+    <circle cx="27" cy="14" r="7.5" fill="${c.head}"/>
+    <ellipse cx="33.5" cy="15" rx="3.2" ry="1.6" fill="#f0a050"/>
+    <circle cx="29.5" cy="12.5" r="1.15" fill="#1a1f2e"/>
+    <path d="M18 18 Q12 10 8 14" fill="none" stroke="${c.head}" stroke-width="2.2" stroke-linecap="round"/>
+  </svg>`;
+}
 
 export class UI {
   constructor() {
@@ -38,13 +66,19 @@ export class UI {
     this.logLabel = document.getElementById("log-label");
     this.positionsEl = document.getElementById("positions");
     this.btnRoll = document.getElementById("btn-roll");
+    this.btnRematch = document.getElementById("btn-rematch");
+    this.btnToLobby = document.getElementById("btn-to-lobby");
+    this.winActions = document.getElementById("win-actions");
     this.boardTrack = document.getElementById("board-track");
+    this.legendEl = document.getElementById("goose-legend");
     this.recentSetup = document.getElementById("recent-setup");
     this.recentSetupList = document.getElementById("recent-setup-list");
     this.recentLobbyList = document.getElementById("recent-lobby-list");
     this.switchCode = document.getElementById("switch-code");
     this.btnSwitchJoin = document.getElementById("btn-switch-join");
     this.btnSwitchNew = document.getElementById("btn-switch-new");
+    document.documentElement.classList.add("page-ganzenbord");
+    this.#renderLegend();
   }
 
   playerName() {
@@ -113,7 +147,6 @@ export class UI {
   showInvite(code, shareUrl, isHost, opts = {}) {
     const local = Boolean(opts.local);
     this.roomCodeEl.textContent = local ? "Dit apparaat" : code;
-    // Guests must not see the host invite QR (empty canvas looks white).
     if (this.inviteBox) {
       this.inviteBox.classList.toggle("hidden", local || !isHost);
     }
@@ -146,17 +179,17 @@ export class UI {
     );
     this.lobbyCount.textContent = `${state.players.length} / ${MAX_PLAYERS} spelers`;
     this.playerList.innerHTML = "";
-    for (const p of state.players) {
+    state.players.forEach((p, i) => {
       const li = document.createElement("li");
-      li.className = "player-row";
+      li.className = "player-row player-row-goose";
       const you = p.id === localId ? " (jij)" : "";
       const host = p.isHost ? " · host" : "";
       const online = onlineMap.has(p.id) ? onlineMap.get(p.id) : true;
       const status = local ? "" : online ? "" : " · offline";
-      li.textContent = `${p.name}${you}${host}${status}`;
+      li.innerHTML = `${goosePawnHtml(p.colors, i, p.name)}<span>${p.name}${you}${host}${status}</span>`;
       if (!online && !local) li.classList.add("is-offline");
       this.playerList.appendChild(li);
-    }
+    });
 
     if (isHost) {
       const ready = canStart(state);
@@ -185,11 +218,12 @@ export class UI {
   /**
    * @param {import('./game.js').GameState} state
    * @param {string} localId
-   * @param {{ local?: boolean, youName?: string, connected?: boolean, online?: { id: string, online: boolean }[] }} [opts]
+   * @param {{ local?: boolean, youName?: string, connected?: boolean, online?: { id: string, online: boolean }[], isHost?: boolean }} [opts]
    */
   renderGame(state, localId, opts = {}) {
     const local = Boolean(opts.local);
     const connected = opts.connected !== false;
+    const isHost = Boolean(opts.isHost ?? local);
     const current = state.players[state.turnIndex];
     const myTurn =
       state.phase === "playing" &&
@@ -199,23 +233,39 @@ export class UI {
     if (this.youLabel) {
       const me = state.players.find((p) => p.id === localId);
       const nm = me?.name || opts.youName || "";
-      this.youLabel.textContent = nm ? `Jij · ${nm}` : "";
+      const idx = me ? state.players.indexOf(me) : 0;
+      this.youLabel.innerHTML = nm
+        ? `${goosePawnHtml(me?.colors, idx, nm)} <span>Jij · ${nm}</span>`
+        : "";
+      this.youLabel.classList.add("you-label-goose");
     }
 
-    if (state.phase === "finished") {
+    const finished = state.phase === "finished";
+    if (finished) {
       const winner = state.players.find((p) => p.id === state.winnerId);
       this.turnLabel.textContent = winner
         ? `${winner.name} heeft gewonnen!`
         : "Afgelopen";
       this.btnRoll.disabled = true;
+      this.btnRoll.classList.remove("is-pulse");
     } else {
+      const inSloot = state.trapped?.[current?.id] === "sloot";
       this.turnLabel.textContent = myTurn
         ? local
-          ? `Beurt: ${current?.name || "…"} — gooi`
-          : "Jouw beurt — gooi de dobbelsteen"
+          ? inSloot
+            ? `Beurt: ${current?.name || "…"} — sloot: gooi 4 of 5`
+            : `Beurt: ${current?.name || "…"} — gooi`
+          : inSloot
+            ? "Jouw beurt — sloot: gooi 4 of 5 om eruit te komen"
+            : "Jouw beurt — gooi de dobbelsteen"
         : `Beurt: ${current?.name || "…"}`;
       this.btnRoll.disabled = !myTurn || (!local && !connected);
+      this.btnRoll.classList.toggle("is-pulse", Boolean(myTurn && !this.btnRoll.disabled));
     }
+
+    this.winActions?.classList.toggle("hidden", !finished || !isHost);
+    if (this.btnRematch) this.btnRematch.disabled = !finished || !isHost;
+    if (this.btnToLobby) this.btnToLobby.disabled = !finished || !isHost;
 
     this.logLabel.textContent = state.lastLog || "";
 
@@ -225,17 +275,26 @@ export class UI {
     );
 
     this.positionsEl.innerHTML = "";
-    for (const p of state.players) {
+    state.players.forEach((p, i) => {
       const row = document.createElement("div");
       row.className = "pos-row";
+      if (current && p.id === current.id && state.phase === "playing") {
+        row.classList.add("is-turn");
+      }
       const pos = state.positions[p.id] ?? 0;
       const online = onlineMap.has(p.id) ? onlineMap.get(p.id) : true;
       const off = !local && !online ? " · offline" : "";
-      row.innerHTML = `<strong>${p.name}</strong> <span>vak ${pos} / ${BOARD_SIZE}${off}</span>`;
+      const trap = state.trapped?.[p.id];
+      const trapLabel = trap === "sloot" ? " · sloot" : "";
+      const skips = state.skipTurns?.[p.id] || 0;
+      const skipLabel = skips > 0 ? ` · overslaan (${skips})` : "";
+      const onBankje = BANKJE_SQUARES.includes(pos);
+      const bankLabel = onBankje && !trap ? " · bankje" : "";
+      row.innerHTML = `<span class="pos-name">${goosePawnHtml(p.colors, i, p.name)}<strong>${p.name}</strong></span> <span>vak ${pos} / ${BOARD_SIZE}${trapLabel}${skipLabel}${bankLabel}${off}</span>`;
       this.positionsEl.appendChild(row);
-    }
+    });
 
-    this.#renderTrack(state);
+    this.#renderSpiral(state);
   }
 
   /**
@@ -301,21 +360,102 @@ export class UI {
     }
   }
 
+  #renderLegend() {
+    if (!this.legendEl) return;
+    const items = [
+      { id: "bankje", label: "Bankje — worp ×½" },
+      { id: "bridge", label: "Brug — +12" },
+      { id: "deka", label: "Deka — 1 overslaan" },
+      { id: "sloot", label: "Sloot — gooi 4/5" },
+      { id: "park", label: "Park — naar 30" },
+      { id: "prison", label: "Gevangenis — 5 overslaan" },
+      { id: "knockout", label: "Knockout — start" },
+    ];
+    this.legendEl.innerHTML = items
+      .map(
+        (it) =>
+          `<span class="goose-legend-item"><i class="goose-legend-swatch is-${it.id}"></i>${it.label}</span>`,
+      )
+      .join("");
+  }
+
   /**
+   * Spiral board: 0 (start) → 63 (finish).
    * @param {import('./game.js').GameState} state
    */
-  #renderTrack(state) {
+  #renderSpiral(state) {
     if (!this.boardTrack) return;
+    this.boardTrack.className = "goose-board";
+    this.boardTrack.setAttribute("aria-label", "Ganzenbord spiraal");
+    this.boardTrack.removeAttribute("aria-hidden");
     this.boardTrack.innerHTML = "";
-    // Compact: show finish line markers every 5
-    for (let i = 0; i <= BOARD_SIZE; i += 5) {
+
+    const wrap = document.createElement("div");
+    wrap.className = "goose-spiral";
+
+    const n = BOARD_SIZE + 1;
+    const cx = 50;
+    const cy = 50;
+    const turns = 3.35;
+    const angle0 = -Math.PI / 2;
+    const rMin = 6;
+    const rMax = 46;
+
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      const angle = angle0 + turns * 2 * Math.PI * t;
+      const r = rMin + (rMax - rMin) * t;
+      const x = cx + r * Math.cos(angle);
+      const y = cy + r * Math.sin(angle);
+
       const cell = document.createElement("div");
-      cell.className = "track-cell";
+      cell.className = "goose-cell";
+      const info = squareInfo(i);
+      if (info) cell.classList.add(`is-${info.id}`);
+      if (BANKJE_SQUARES.includes(i)) cell.classList.add("is-bankje");
+      if (SPECIAL[i]) cell.classList.add(`is-${SPECIAL[i].id}`);
+      if (i === 0) cell.classList.add("is-start");
+      if (i === BOARD_SIZE) cell.classList.add("is-finish");
+
+      cell.style.left = `${x}%`;
+      cell.style.top = `${y}%`;
+      cell.title = info ? `${i}: ${info.label}` : `Vak ${i}`;
+
+      const num = document.createElement("span");
+      num.className = "goose-num";
+      num.textContent = String(i);
+      cell.appendChild(num);
+
+      if (
+        info &&
+        info.id !== "start" &&
+        info.id !== "finish" &&
+        info.id !== "bankje"
+      ) {
+        const tag = document.createElement("span");
+        tag.className = "goose-tag";
+        tag.textContent = info.label[0] || "";
+        cell.appendChild(tag);
+      }
+
       const here = state.players.filter((p) => (state.positions[p.id] ?? 0) === i);
-      cell.textContent = here.length
-        ? `${i}:${here.map((p) => p.name[0] || "?").join("")}`
-        : String(i);
-      this.boardTrack.appendChild(cell);
+      if (here.length) {
+        const pawns = document.createElement("div");
+        pawns.className = "goose-pawns";
+        here.forEach((p) => {
+          const idx = state.players.findIndex((pl) => pl.id === p.id);
+          const wrapPawn = document.createElement("span");
+          wrapPawn.className = "goose-pawn";
+          wrapPawn.title = p.name;
+          wrapPawn.innerHTML = goosePawnHtml(p.colors, idx, p.name);
+          pawns.appendChild(wrapPawn);
+        });
+        cell.appendChild(pawns);
+      }
+
+      wrap.appendChild(cell);
     }
+
+    this.boardTrack.appendChild(wrap);
   }
 }

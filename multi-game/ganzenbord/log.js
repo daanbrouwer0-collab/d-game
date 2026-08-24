@@ -3,29 +3,36 @@ import {
   applyRoll,
   cloneState,
   createEmptyLobby,
+  normalizeColors,
+  returnToLobby,
   startGame,
 } from "./game.js";
 
 /**
  * Ordered unique seats from seat events (first appearance keeps order).
  * @param {import('../js/sync/event-log.js').EventLog} log
- * @returns {{ playerId: string, name: string }[]}
+ * @returns {{ playerId: string, name: string, colors?: import('./game.js').CharacterColors }[]}
  */
 export function seatsFromLog(log) {
-  /** @type {Map<string, { playerId: string, name: string }>} */
+  /** @type {Map<string, { playerId: string, name: string, colors?: import('./game.js').CharacterColors }>} */
   const byId = new Map();
   /** @type {string[]} */
   const order = [];
   for (const ev of log.events || []) {
     if (ev.type !== "seat") continue;
-    const p = /** @type {{ playerId?: string, name?: string }} */ (
+    const p = /** @type {{ playerId?: string, name?: string, colors?: unknown }} */ (
       ev.payload || {}
     );
     const playerId = String(p.playerId || "");
     const name = String(p.name || "").trim() || "Speler";
     if (!playerId) continue;
     if (!byId.has(playerId)) order.push(playerId);
-    byId.set(playerId, { playerId, name });
+    const prev = byId.get(playerId);
+    byId.set(playerId, {
+      playerId,
+      name,
+      colors: p.colors != null ? normalizeColors(p.colors, order.length - 1) : prev?.colors,
+    });
   }
   return order.map((id) => byId.get(id)).filter(Boolean);
 }
@@ -58,17 +65,21 @@ export function replayGanzenbord(log) {
   let state = createEmptyLobby();
   for (const ev of log.events || []) {
     if (ev.type === "seat") {
-      const p = /** @type {{ playerId?: string, name?: string }} */ (
+      const p = /** @type {{ playerId?: string, name?: string, colors?: unknown }} */ (
         ev.payload || {}
       );
       const playerId = String(p.playerId || "");
       const name = String(p.name || "").trim().slice(0, 20) || "Speler";
       if (!playerId) continue;
+      const colors = normalizeColors(p.colors, state.players.length);
       const existing = state.players.find((pl) => pl.id === playerId);
       if (existing) {
         const next = cloneState(state);
         const seat = next.players.find((pl) => pl.id === playerId);
-        if (seat) seat.name = name;
+        if (seat) {
+          seat.name = name;
+          if (p.colors != null) seat.colors = colors;
+        }
         state = next;
         continue;
       }
@@ -78,6 +89,7 @@ export function replayGanzenbord(log) {
         name,
         isHost: false,
         peerId: null,
+        colors,
       });
       if (added.ok) state = added.state;
       continue;
@@ -85,6 +97,11 @@ export function replayGanzenbord(log) {
     if (ev.type === "start") {
       const started = startGame(state);
       if (started.ok) state = started.state;
+      continue;
+    }
+    if (ev.type === "to_lobby") {
+      const back = returnToLobby(state);
+      if (back.ok) state = back.state;
       continue;
     }
     if (ev.type !== "roll") continue;
