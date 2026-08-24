@@ -10,7 +10,7 @@ import {
 } from "../js/core/storage.js";
 import { parseP2pInvite } from "../js/shell/p2p-invite.js";
 import { showHostInviteCard } from "../js/shell/p2p-invite-ui.js";
-import { openQrScanner } from "../js/shell/qr-scanner.js";
+import { openQrScanner, closeQrScanner } from "../js/shell/qr-scanner.js";
 import { mountRoomStrip, mountShellNav } from "../js/shell/nav.js";
 import {
   readHostIntentFromUrl,
@@ -335,7 +335,15 @@ async function switchToGuest(code) {
 
 async function leaveAll() {
   clearRoom();
+  try {
+    await closeQrScanner();
+  } catch {
+    /* ignore */
+  }
   await teardown({ clearUrl: true });
+  lastShellKey = `${readRoomFromUrl() || ""}:${readHostIntentFromUrl() ? "host" : "join"}`;
+  if (ui.inviteBox) ui.inviteBox.classList.add("hidden");
+  if (ui.inviteQrCanvas) ui.inviteQrCanvas.innerHTML = "";
   ui.showSetup();
   ui.setConnectionStatus("idle");
   ui.setReconnectVisible(false);

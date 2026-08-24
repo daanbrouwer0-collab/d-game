@@ -144,15 +144,23 @@ export function navigateInShell(gamePath, params = {}) {
     try {
       const win = shellWindow();
       const hash = `#${path}${search}`;
+      const prev = win.location.hash || "";
       win.history.pushState({ path, search }, "", hash);
+      // Prefer the shell's real loader (synthetic popstate is flaky on mobile).
+      if (typeof win.__dgameNavigate === "function") {
+        win.__dgameNavigate(path);
+        return;
+      }
+      if (prev !== hash) {
+        try {
+          win.dispatchEvent(new HashChangeEvent("hashchange"));
+        } catch {
+          /* older browsers */
+        }
+      }
       win.dispatchEvent(
         new PopStateEvent("popstate", { state: { path, search } }),
       );
-      try {
-        win.dispatchEvent(new HashChangeEvent("hashchange"));
-      } catch {
-        /* older browsers */
-      }
       return;
     } catch {
       /* fall through */

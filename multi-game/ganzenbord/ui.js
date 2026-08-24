@@ -113,8 +113,12 @@ export class UI {
   showInvite(code, shareUrl, isHost, opts = {}) {
     const local = Boolean(opts.local);
     this.roomCodeEl.textContent = local ? "Dit apparaat" : code;
+    // Guests must not see the host invite QR (empty canvas looks white).
     if (this.inviteBox) {
-      this.inviteBox.classList.toggle("hidden", local);
+      this.inviteBox.classList.toggle("hidden", local || !isHost);
+    }
+    if (!isHost && this.inviteQrCanvas) {
+      this.inviteQrCanvas.innerHTML = "";
     }
     if (shareUrl) {
       this.shareUrlEl.textContent = shareUrl;
@@ -125,7 +129,7 @@ export class UI {
     }
     this.hostControls.classList.toggle("hidden", !isHost);
     this.localAdd?.classList.toggle("hidden", !local || !isHost);
-    this.guestWaiting.classList.toggle("hidden", isHost);
+    this.guestWaiting.classList.toggle("hidden", isHost || local);
   }
 
   /**
