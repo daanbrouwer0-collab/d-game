@@ -448,9 +448,10 @@
   <script src="js/robotrally-ui.js"></script>
   <script type="module">
     import { getUrlParams } from "../js/shell/site-url.js";
+    import { redirectLegacyGameRoomToShell } from "../js/shell/room-only-multiplayer.js";
     if (getUrlParams().get("embedded") === "1") {
       await import("./js/embedded.js");
-    } else {
+    } else if (!redirectLegacyGameRoomToShell()) {
       await new Promise((resolve, reject) => {
         const s = document.createElement("script");
         s.src = "js/main.js";

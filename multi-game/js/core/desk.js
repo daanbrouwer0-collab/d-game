@@ -3,7 +3,6 @@ import { loadEventLog, saveEventLog } from "./storage.js";
 import {
   coerceEventLog,
   createEventLog,
-  tipSeq,
 } from "../sync/event-log.js";
 import {
   roomLogKey as p2pRoomLogKey,
@@ -128,60 +127,34 @@ export function forgetDeskRoom(gameId, code) {
 export function listDeskCards(base = "") {
   const root = base.endsWith("/") || base === "" ? base : `${base}/`;
   return listAllRecent().map((r) => {
+    const code = r.code;
+    const q = `room=${encodeURIComponent(code)}`;
+    const roomHref = `${root}${ROOM_PATH}?${q}`;
+    const n = r.memberCount || 0;
     const activeGameId = r.activeGameId || r.gameId || "";
     const game = activeGameId ? getGame(activeGameId) : null;
-    const isRoomShell = r.isRoomShell || (!activeGameId && !game);
-    const q = `room=${encodeURIComponent(r.code)}`;
-
-    let title;
+    let title = `Room ${code}`;
     let summary = r.summary || "";
-    let seq = r.seq || 0;
-
-    if (isRoomShell || !game) {
-      const n = r.memberCount || 0;
-      title = `Room ${r.code}`;
-      if (!summary) {
-        summary = n ? `${n} speler${n === 1 ? "" : "s"}` : "Lobby";
-      }
-      const roomHref = `${root}${ROOM_PATH}?${q}`;
-      return {
-        gameId: activeGameId,
-        code: r.code,
-        role: r.role,
-        title,
-        summary,
-        seq,
-        lastSeen: r.lastSeen || 0,
-        memberCount: r.memberCount,
-        activeGameId: r.activeGameId,
-        isRoomShell: true,
-        openHref: roomHref,
-        hostHref: `${roomHref}&as=host`,
-        joinHref: roomHref,
-      };
-    }
-
-    const folder = (game.path || `${activeGameId}/`).replace(/^\//, "");
-    const href = `${root}${folder}`;
-    const log = loadRoomLog(activeGameId, r.code);
-    seq = r.seq || tipSeq(log);
     if (!summary) {
-      summary = seq ? `${seq} zetten in de keten` : "Nog geen zetten";
+      summary = n ? `${n} speler${n === 1 ? "" : "s"}` : "Lobby";
+    }
+    if (game && r.activeGameId) {
+      title = `Room ${code} · ${game.title}`;
     }
     return {
       gameId: activeGameId,
-      code: r.code,
+      code,
       role: r.role,
-      title: game.title,
+      title,
       summary,
-      seq,
+      seq: r.seq || 0,
       lastSeen: r.lastSeen || 0,
       memberCount: r.memberCount,
       activeGameId: r.activeGameId,
-      isRoomShell: false,
-      openHref: `${href}?${q}`,
-      hostHref: `${href}?${q}&as=host`,
-      joinHref: `${href}?${q}`,
+      isRoomShell: true,
+      openHref: roomHref,
+      hostHref: `${roomHref}&as=host`,
+      joinHref: roomHref,
     };
   });
 }
@@ -205,17 +178,8 @@ export function deskHashHref(card, intent = "open") {
  * @param {'open'|'host'|'join'} [intent]
  */
 export function navigateDeskCard(card, intent = "open") {
-  if (card.isRoomShell) {
-    /** @type {Record<string, string>} */
-    const params = { room: card.code };
-    if (intent === "host") params.as = "host";
-    navigateInShell(ROOM_PATH, params);
-    return;
-  }
-  const game = getGame(card.gameId);
-  const path = game?.path || `${card.gameId}/`;
   /** @type {Record<string, string>} */
   const params = { room: card.code };
   if (intent === "host") params.as = "host";
-  navigateInShell(path, params);
+  navigateInShell(ROOM_PATH, params);
 }

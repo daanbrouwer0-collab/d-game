@@ -1,6 +1,7 @@
 import { createRoom, transportFromUrl } from "../js/core/room.js";
 import { getDisplayName, playerLabel, saveRoom, setDisplayName } from "../js/core/storage.js";
 import { mountRoomStrip, mountShellNav } from "../js/shell/nav.js";
+import { mountRoomMultiplayerBanner } from "../js/shell/room-only-multiplayer.js";
 import { parseP2pInvite } from "../js/shell/p2p-invite.js";
 import { openQrScanner } from "../js/shell/qr-scanner.js";
 import { showHostInviteCard } from "../js/shell/p2p-invite-ui.js";
@@ -16,6 +17,7 @@ import { UI } from "./ui.js";
 
 mountShellNav({ active: "games", base: "../" });
 mountRoomStrip({ base: "../", currentGameId: GAME_ID });
+mountRoomMultiplayerBanner();
 
 const GAME_PATH = "/tic-tac-toe/";
 

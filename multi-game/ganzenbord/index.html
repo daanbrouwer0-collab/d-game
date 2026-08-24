@@ -203,9 +203,10 @@
 
     <script type="module">
       import { getUrlParams } from "../js/shell/site-url.js";
+      import { redirectLegacyGameRoomToShell } from "../js/shell/room-only-multiplayer.js";
       if (getUrlParams().get("embedded") === "1") {
         import("./embedded.js");
-      } else {
+      } else if (!redirectLegacyGameRoomToShell()) {
         import("./main.js");
       }
     </script>

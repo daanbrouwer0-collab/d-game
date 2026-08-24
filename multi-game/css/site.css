@@ -1137,6 +1137,38 @@ html.page-ganzenbord body {
   color: var(--accent);
 }
 
+.game-info-list .game-info-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+}
+
+.game-info-list .game-info-body {
+  flex: 1 1 12rem;
+}
+
+.game-info-list strong {
+  display: block;
+  font-size: 1.1rem;
+}
+
+.game-info-list span {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.room-multiplayer-banner {
+  margin-bottom: 1rem;
+}
+
 .local-add {
   margin-bottom: 0.85rem;
 }

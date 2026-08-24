@@ -65,13 +65,35 @@ export function mountRoomChat(rootEl, opts) {
     }
   });
 
-  /** @type {{ messages: unknown[], localPlayerId: string, chatSeq: number } | null} */
+  /** @type {{ messages: { messageId: string, playerId: string, name: string, text: string, seq: number }[], localPlayerId: string, chatSeq: number } | null} */
   let lastRender = null;
 
-  function renderLast() {
-    if (lastRender) {
-      render(lastRender);
+  /**
+   * @param {{ messages: { messageId: string, playerId: string, name: string, text: string, seq: number }[], localPlayerId: string, chatSeq: number }} data
+   */
+  function paintChat(data) {
+    lastRender = data;
+    shell.dataset.chatSeq = String(data.chatSeq || 0);
+    const visible = data.messages.slice(-maxVisible);
+    list.innerHTML = visible
+      .map((m) => {
+        const mine = m.playerId === data.localPlayerId ? " is-mine" : "";
+        return `<li class="room-chat-msg${mine}"><strong>${esc(m.name)}</strong> <span>${esc(m.text)}</span></li>`;
+      })
+      .join("");
+    list.scrollTop = list.scrollHeight;
+
+    if (mode === "open" || mode === "expanded") {
+      lastReadSeq = Math.max(lastReadSeq, data.chatSeq || 0);
     }
+    const unread = Math.max(0, (data.chatSeq || 0) - lastReadSeq);
+    const showBadge = mode === "collapsed" && unread > 0;
+    badge.classList.toggle("hidden", !showBadge);
+    badge.textContent = String(unread);
+  }
+
+  function renderLast() {
+    if (lastRender) paintChat(lastRender);
   }
 
   form.addEventListener("submit", (e) => {
@@ -94,25 +116,8 @@ export function mountRoomChat(rootEl, opts) {
     /**
      * @param {{ messages: { messageId: string, playerId: string, name: string, text: string, seq: number }[], localPlayerId: string, chatSeq: number }} data
      */
-    render({ messages, localPlayerId, chatSeq }) {
-      lastRender = { messages, localPlayerId, chatSeq };
-      shell.dataset.chatSeq = String(chatSeq || 0);
-      const visible = messages.slice(-maxVisible);
-      list.innerHTML = visible
-        .map((m) => {
-          const mine = m.playerId === localPlayerId ? " is-mine" : "";
-          return `<li class="room-chat-msg${mine}"><strong>${esc(m.name)}</strong> <span>${esc(m.text)}</span></li>`;
-        })
-        .join("");
-      list.scrollTop = list.scrollHeight;
-
-      if (mode === "open" || mode === "expanded") {
-        lastReadSeq = Math.max(lastReadSeq, chatSeq || 0);
-      }
-      const unread = Math.max(0, (chatSeq || 0) - lastReadSeq);
-      const showBadge = mode === "collapsed" && unread > 0;
-      badge.classList.toggle("hidden", !showBadge);
-      badge.textContent = String(unread);
+    render(data) {
+      paintChat(data);
     },
     destroy() {
       rootEl.innerHTML = "";

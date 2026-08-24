@@ -12,6 +12,7 @@ import { parseP2pInvite } from "../js/shell/p2p-invite.js";
 import { showHostInviteCard } from "../js/shell/p2p-invite-ui.js";
 import { openQrScanner, closeQrScanner } from "../js/shell/qr-scanner.js";
 import { mountRoomStrip, mountShellNav } from "../js/shell/nav.js";
+import { mountRoomMultiplayerBanner } from "../js/shell/room-only-multiplayer.js";
 import {
   readHostIntentFromUrl,
   readRoomFromUrl,
@@ -23,6 +24,7 @@ import { UI } from "./ui.js";
 
 mountShellNav({ active: "games", base: "../" });
 mountRoomStrip({ base: "../", currentGameId: GAME_ID });
+mountRoomMultiplayerBanner();
 
 const GAME_PATH = "/ganzenbord/";
 

@@ -6,7 +6,7 @@
     <title>D-Game — Games</title>
     <meta
       name="description"
-      content="Sandbox voor simpele games met verschillende multiplayer-communicatie."
+      content="D-Game — spellen catalogus en multiplayer via room."
     />
     <link rel="stylesheet" href="css/site.css" />
   </head>
@@ -15,68 +15,119 @@
       <header class="header">
         <h1 class="brand">D-Game</h1>
         <p class="tagline">
-          Multiplayer-sandbox: simpele games, wisselende communicatie.
+          Kies een spel in je room — multiplayer speel je altijd samen via één room.
         </p>
       </header>
 
       <main>
         <p id="pref-hint" class="pref-hint"></p>
+        <div id="room-continue-banner"></div>
+
         <section class="panel">
-          <h2>Multiplayer</h2>
+          <h2>Room</h2>
           <p class="lede">
-            Start een room voor je groep — daarna kies je samen een spel.
+            Start een room voor je groep, nodig iedereen uit, en stem daarna op een spel.
+            Spelen gebeurt <strong>in de room</strong>, niet op losse spelpagina&apos;s.
           </p>
-          <div class="actions" style="margin-bottom: 1.5rem">
+          <div class="actions">
             <a href="room/" class="btn btn-primary">Start / join room</a>
-            <a href="handleiding/" class="btn btn-ghost" style="margin-left: 0.5rem">Hoe werkt multiplayer?</a>
+            <a href="handleiding/" class="btn btn-ghost">Hoe werkt multiplayer?</a>
           </div>
         </section>
+
+        <section id="mijn-rooms" class="panel">
+          <h2>Mijn rooms</h2>
+          <p class="lede">Recente rooms op dit apparaat — open om verder te gaan.</p>
+          <ul id="home-room-list" class="lobby-list"></ul>
+          <p id="home-room-empty" class="hint hidden">Nog geen rooms — start er een hierboven.</p>
+        </section>
+
         <section class="panel">
           <h2>Spellen</h2>
           <p class="lede">
-            Solo of hotseat per spel. Multiplayer met vrienden via een room.
+            Overzicht van beschikbare spellen. Multiplayer: start een room en stem op een titel.
+            Hotseat/solo: open het spel via &quot;Op dit apparaat&quot;.
           </p>
-          <ul id="game-list" class="game-list"></ul>
+          <ul id="game-list" class="game-list game-info-list"></ul>
         </section>
       </main>
     </div>
 
     <script type="module">
       import { GAMES } from "./js/core/catalog.js";
-      import { getPreferredTransport, listTransportMeta } from "./js/core/prefs.js";
+      import { listDeskCards, navigateDeskCard } from "./js/core/desk.js";
       import { loadActiveRoom } from "./js/p2p/room-memory.js";
       import { mountRoomStrip, mountShellNav } from "./js/shell/nav.js";
+      import { isRoomPlayable } from "./js/bridge/embedded-contract.js";
 
       mountShellNav({ active: "games", base: "" });
       mountRoomStrip({ base: "" });
 
       const active = loadActiveRoom();
-      if (active?.code && active.isRoomShell) {
-        const main = document.querySelector("main");
-        const banner = document.createElement("section");
-        banner.className = "panel room-continue-banner";
-        banner.innerHTML = `
-          <p>Je was in room <strong>${active.code}</strong>.</p>
-          <a href="room/?room=${encodeURIComponent(active.code)}${active.role === "host" ? "&as=host" : ""}" class="btn btn-primary">Ga verder in room</a>`;
-        main?.prepend(banner);
+      const bannerRoot = document.getElementById("room-continue-banner");
+      if (active?.code && active.isRoomShell && bannerRoot) {
+        bannerRoot.innerHTML = `
+          <section class="panel room-continue-banner">
+            <p>Je was in room <strong>${active.code}</strong>.</p>
+            <a href="room/?room=${encodeURIComponent(active.code)}${active.role === "host" ? "&as=host" : ""}" class="btn btn-primary">Ga verder in room</a>
+          </section>`;
       }
 
-      const pref = getPreferredTransport();
-      const meta = listTransportMeta().find((t) => t.id === pref);
-      document.getElementById("pref-hint").innerHTML =
-        `Multiplayer via room — transport: <strong>${meta?.label || "P2P"}</strong>.`;
+      document.getElementById("pref-hint").textContent =
+        "Multiplayer loopt via room — geen losse P2P-lobby per spel meer.";
+
+      const roomList = document.getElementById("home-room-list");
+      const roomEmpty = document.getElementById("home-room-empty");
+
+      function renderRooms() {
+        const items = listDeskCards("");
+        roomEmpty.classList.toggle("hidden", items.length > 0);
+        roomList.innerHTML = "";
+        for (const item of items) {
+          const li = document.createElement("li");
+          li.className = "lobby-card";
+          const role = item.role === "host" ? "Jij was host" : "Jij was gast";
+          li.innerHTML = `
+            <div class="meta">
+              <strong>${item.title}</strong>
+              <p class="room-code-line">${item.code}</p>
+              <p class="hint">${role} · ${item.summary}</p>
+            </div>
+            <div class="actions">
+              <button type="button" class="btn btn-primary" data-go="open">Open</button>
+              <button type="button" class="btn btn-ghost" data-go="host">Host opnieuw</button>
+            </div>`;
+          roomList.appendChild(li);
+          li.querySelectorAll("[data-go]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              navigateDeskCard(
+                item,
+                /** @type {'open'|'host'} */ (btn.getAttribute("data-go") || "open"),
+              );
+            });
+          });
+        }
+      }
+      renderRooms();
 
       const list = document.getElementById("game-list");
-      list.innerHTML = GAMES.map(
-        (g) => `
-        <li>
-          <a href="${g.path}">
+      list.innerHTML = GAMES.map((g) => {
+        const roomOk = isRoomPlayable(g.embedded);
+        const roomLine = roomOk
+          ? "Speelbaar in room"
+          : "Room-modus volgt";
+        return `
+        <li class="game-info-card">
+          <div class="game-info-body">
             <strong>${g.title}</strong>
             <span>${g.blurb}</span>
-            <span class="game-meta-line">${g.minPlayers}–${g.maxPlayers} spelers · solo/hotseat</span>
-          </a>
-        </li>`,
-      ).join("");
+            <span class="game-meta-line">${g.minPlayers}–${g.maxPlayers} spelers · ${roomLine}</span>
+          </div>
+          <div class="actions">
+            <a href="${g.path}" class="btn btn-ghost">Hotseat / solo</a>
+          </div>
+        </li>`;
+      }).join("");
     </script>
   </body>
 </html>
