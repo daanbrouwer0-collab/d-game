@@ -613,8 +613,10 @@ html.has-shell-nav.has-room-strip body {
   background: var(--bg-panel);
   color: var(--text);
   text-decoration: none;
+  font: inherit;
   font-size: 0.8rem;
   white-space: nowrap;
+  cursor: pointer;
 }
 
 .room-chip.is-current {

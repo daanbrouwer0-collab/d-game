@@ -1,10 +1,9 @@
-import { listDeskCards, deskHashHref } from "../core/desk.js";
-import { isHashShell, readRoomFromUrl } from "./site-url.js";
+import { listDeskCards, navigateDeskCard } from "../core/desk.js";
+import { readRoomFromUrl } from "./site-url.js";
 
 /**
  * Inject shared bottom tab navigation for the D-Game sandbox shell.
  * @param {{ active: 'games'|'lobby'|'friends'|'netwerk'|'geheugen', base?: string }} opts
- *   base: relative path prefix to site root, e.g. "" or "../" or "../../"
  */
 export function mountShellNav({ active, base = "" }) {
   const root = base.endsWith("/") || base === "" ? base : `${base}/`;
@@ -69,23 +68,28 @@ export function mountRoomStrip(opts = {}) {
   }
   const code = currentCode || readRoomFromUrl() || "";
   strip.innerHTML = `<span class="room-strip-label">Mijn rooms</span>${cards
-    .map((c) => {
+    .map((c, i) => {
       const here = c.gameId === currentGameId && code && c.code === code;
       const role = c.role === "host" ? "host" : "gast";
-      const link = isHashShell() ? deskHashHref(c, "open") : c.openHref;
-      return `<a class="room-chip${here ? " is-current" : ""}" href="${link}" title="${c.summary}">
+      return `<button type="button" class="room-chip${here ? " is-current" : ""}" data-desk-idx="${i}" title="${c.summary}">
         <strong>${c.title}</strong>
         <span>${c.code}</span>
         <span class="room-chip-role">${role}</span>
-      </a>`;
+      </button>`;
     })
     .join("")}`;
+  strip.querySelectorAll("[data-desk-idx]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.getAttribute("data-desk-idx"));
+      const card = cards[idx];
+      if (card) navigateDeskCard(card, "open");
+    });
+  });
   document.documentElement.classList.add("has-room-strip");
 }
 
 /**
- * Resolve base path from a script or page depth.
- * Call from pages under /lobby/ with base "../"
+ * @param {number} [depth]
  */
 export function shellBaseFromDepth(depth = 0) {
   if (depth <= 0) return "";

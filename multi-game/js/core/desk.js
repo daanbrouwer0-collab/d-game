@@ -10,7 +10,7 @@ import {
   pushRecent,
   removeRecent,
 } from "../p2p/room-memory.js";
-import { toHashPath } from "../shell/site-url.js";
+import { navigateInShell, toHashPath } from "../shell/site-url.js";
 
 /**
  * @param {string} gameId
@@ -125,4 +125,18 @@ export function deskHashHref(card, intent = "open") {
   params.set("room", card.code);
   if (intent === "host") params.set("as", "host");
   return `#${path}?${params.toString()}`;
+}
+
+/**
+ * Open / join / host a desk room without hitting the jsDelivr <base> URL.
+ * @param {DeskCard} card
+ * @param {'open'|'host'|'join'} [intent]
+ */
+export function navigateDeskCard(card, intent = "open") {
+  const game = getGame(card.gameId);
+  const path = game?.path || `${card.gameId}/`;
+  /** @type {Record<string, string>} */
+  const params = { room: card.code };
+  if (intent === "host") params.as = "host";
+  navigateInShell(path, params);
 }

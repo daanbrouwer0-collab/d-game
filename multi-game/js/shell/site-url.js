@@ -127,6 +127,45 @@ export function readHostIntentFromUrl(search = getUrlSearch()) {
 }
 
 /**
+ * Navigate inside the Netlify hash shell (parent) or locally.
+ * Never follow jsDelivr <base> links — that opens the CDN in the iframe.
+ * @param {string} gamePath e.g. "tic-tac-toe/" or "/tic-tac-toe/"
+ * @param {Record<string, string>} [params]
+ */
+export function navigateInShell(gamePath, params = {}) {
+  const path = toHashPath(gamePath);
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params || {})) {
+    if (value != null && value !== "") searchParams.set(key, String(value));
+  }
+  const search = searchParams.toString() ? `?${searchParams.toString()}` : "";
+
+  if (isHashShell()) {
+    try {
+      const win = shellWindow();
+      const hash = `#${path}${search}`;
+      win.history.pushState({ path, search }, "", hash);
+      win.dispatchEvent(
+        new PopStateEvent("popstate", { state: { path, search } }),
+      );
+      return;
+    } catch {
+      /* fall through */
+    }
+  }
+
+  let target;
+  try {
+    const basePath = location.pathname.replace(/[^/]+$/, "");
+    target = new URL(String(gamePath || "").replace(/^\/+/, ""), `${location.origin}${basePath}`);
+  } catch {
+    target = new URL(`/${String(gamePath || "").replace(/^\/+/, "")}`, location.origin);
+  }
+  searchParams.forEach((value, key) => target.searchParams.set(key, value));
+  location.assign(`${target.pathname}${target.search}`);
+}
+
+/**
  * Build invite URL for QR / share.
  * Production (hash shell / d-game.nl): https://www.d-game.nl/#game/index.html?room=CODE
  * Local static server: http://localhost:8080/game/?room=CODE
