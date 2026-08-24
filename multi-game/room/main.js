@@ -132,9 +132,22 @@ function getGameTitle(gameId) {
 function syncHostInvite() {
   const card = document.getElementById("invite-card");
   if (!card) return;
-  const show =
-    session?.role === "host" && Boolean(shareUrl || session?.roomCode);
-  card.classList.toggle("hidden", !show);
+  if (session?.role !== "host") {
+    card.classList.add("hidden");
+    return;
+  }
+  card.classList.remove("hidden");
+  const code = session.roomCode || "";
+  const codeEl = document.getElementById("invite-code");
+  if (codeEl && code && !codeEl.textContent) codeEl.textContent = code;
+  const urlEl = /** @type {HTMLAnchorElement | null} */ (
+    document.getElementById("invite-url")
+  );
+  const url = shareUrl || (code ? buildRoomShareUrl(code) : "");
+  if (urlEl && url) {
+    urlEl.textContent = url;
+    urlEl.href = url;
+  }
 }
 
 function renderRoster() {
@@ -789,6 +802,10 @@ async function startHost() {
   if (hostStartInFlight) return;
   hostStartInFlight = true;
   setError("");
+  if (session) {
+    await session.destroy();
+    session = null;
+  }
   showPanel("lobby");
   document.getElementById("invite-card")?.classList.remove("hidden");
 
@@ -837,7 +854,7 @@ async function startHost() {
 
     await showHostInviteCard({
       card: document.getElementById("invite-card"),
-      canvas: document.getElementById("invite-qr"),
+      canvas: document.getElementById("invite-qr-host"),
       codeEl: document.getElementById("invite-code"),
       urlEl: /** @type {HTMLAnchorElement} */ (document.getElementById("invite-url")),
       code,
@@ -937,12 +954,33 @@ btnStartVoted?.addEventListener("click", startVotedGame);
 btnBackLobby?.addEventListener("click", () => endGame("back_to_lobby"));
 document.getElementById("btn-leave-room")?.addEventListener("click", leaveRoom);
 
+document.getElementById("btn-copy-invite")?.addEventListener("click", async () => {
+  const url =
+    shareUrl ||
+    (session?.roomCode ? buildRoomShareUrl(session.roomCode) : "");
+  if (!url) return;
+  try {
+    await navigator.clipboard.writeText(url);
+    setError("");
+    const btn = document.getElementById("btn-copy-invite");
+    if (btn) {
+      const prev = btn.textContent;
+      btn.textContent = "Gekopieerd!";
+      setTimeout(() => {
+        btn.textContent = prev;
+      }, 2000);
+    }
+  } catch {
+    setError("Kon link niet kopiëren — selecteer de link hierboven.");
+  }
+});
+
 guardRoomNavigation({
   isConnected: () => sessionConnected,
 });
 
 const urlRoom = readRoomFromUrl();
-if (urlRoom) {
+if (urlRoom && !hostStartInFlight) {
   const mem = loadActiveRoom();
   const resumeHost =
     readHostIntentFromUrl() ||

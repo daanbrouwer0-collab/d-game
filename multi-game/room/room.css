@@ -147,6 +147,24 @@
   border: 1px solid var(--border, #ddd);
 }
 
+.invite-qr-wrap {
+  min-height: 280px;
+  min-width: 280px;
+  margin: 0.75rem auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.invite-card .share-url {
+  word-break: break-all;
+  font-size: 0.85rem;
+}
+
+.invite-card .share-actions {
+  margin-top: 0.75rem;
+}
+
 .invite-card canvas {
   display: block;
   margin: 0.75rem auto;

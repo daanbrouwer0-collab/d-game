@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="../css/site.css" />
     <link rel="stylesheet" href="./room.css" />
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   </head>
   <body>
     <div class="app app-room">
@@ -60,8 +61,18 @@
           <div id="invite-card" class="invite-card hidden">
             <h2>Uitnodigen</h2>
             <p class="room-code-line">Code: <strong id="invite-code"></strong></p>
-            <canvas id="invite-qr" width="280" height="280"></canvas>
-            <p><a id="invite-url" href="#" target="_blank" rel="noopener"></a></p>
+            <div
+              id="invite-qr-host"
+              class="invite-qr-host invite-qr-wrap"
+              role="img"
+              aria-label="QR-code"
+            ></div>
+            <p><a id="invite-url" class="share-url" href="#" target="_blank" rel="noopener"></a></p>
+            <div class="actions share-actions">
+              <button type="button" id="btn-copy-invite" class="btn btn-primary">
+                Kopieer link
+              </button>
+            </div>
           </div>
 
           <h2>Stem op een spel</h2>

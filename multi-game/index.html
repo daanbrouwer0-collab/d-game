@@ -57,7 +57,7 @@
         banner.className = "panel room-continue-banner";
         banner.innerHTML = `
           <p>Je was in room <strong>${active.code}</strong>.</p>
-          <a href="room/?room=${encodeURIComponent(active.code)}" class="btn btn-primary">Ga verder in room</a>`;
+          <a href="room/?room=${encodeURIComponent(active.code)}${active.role === "host" ? "&as=host" : ""}" class="btn btn-primary">Ga verder in room</a>`;
         main?.prepend(banner);
       }
 
