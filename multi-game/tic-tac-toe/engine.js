@@ -1,9 +1,6 @@
 import { TransportType } from "../js/core/room.js";
-import {
-  loadRoomLog,
-  saveRoomLog,
-  touchDeskRoom,
-} from "../js/core/desk.js";
+import { loadRoomLog, saveRoomLog, touchDeskRoom } from "../js/core/desk.js";
+import { getPlayerId, listAllRecentRooms, playerLabel } from "../js/core/storage.js";
 import {
   appendEvent,
   coerceEventLog,
@@ -14,10 +11,11 @@ import {
   tipSeq,
 } from "../js/sync/event-log.js";
 import { GAME_ID, GameMsg, applyMove, cloneState, createInitialState } from "./game.js";
-import { replayTtt, tttSummary } from "./log.js";
+import { markForPlayer, replayTtt, seatsFromLog, tttSummary } from "./log.js";
 
 /**
  * Host-authoritative tic-tac-toe. Moves live in a light event chain.
+ * X/O stays on the player (id + name), not on who currently hosts.
  */
 export class GameEngine {
   /**
@@ -31,6 +29,8 @@ export class GameEngine {
     /** @type {ReturnType<typeof createInitialState>} */
     this.state = createInitialState();
     this.log = createEventLog(GAME_ID);
+    this.playerId = getPlayerId();
+    this.playerName = playerLabel();
     /** @type {((state: typeof this.state) => void) | null} */
     this.onState = null;
     /** @type {((mark: 'X'|'O'|null) => void) | null} */
@@ -49,7 +49,8 @@ export class GameEngine {
 
   startAsHost() {
     this.hotseat = false;
-    this.localMark = "X";
+    this.playerName = playerLabel();
+    this.localMark = this.#claimSeat(this.playerId, this.playerName);
     this.#replay();
     this.#persist();
     this.onReady?.(this.localMark);
@@ -67,26 +68,42 @@ export class GameEngine {
 
   startAsGuest() {
     this.hotseat = false;
-    this.localMark = null;
+    this.playerName = playerLabel();
+    this.localMark = markForPlayer(
+      seatsFromLog(this.log),
+      this.playerId,
+      this.playerName,
+    );
     this.#replay();
-    this.session.sendHello({ log: encodeSyncPacket(this.log) });
+    this.session.sendHello({
+      log: encodeSyncPacket(this.log),
+      playerId: this.playerId,
+      name: this.playerName,
+    });
   }
 
   onPeerConnected() {
     if (this.session.role !== "host" || this.hotseat) return;
-    this.localMark = "X";
+    this.playerName = playerLabel();
+    this.localMark = this.#claimSeat(this.playerId, this.playerName);
     this.#replay();
-    this.#sendLogWelcome();
+    this.#persist();
     this.onReady?.(this.localMark);
     this.onState?.(cloneState(this.state));
   }
 
   onReconnected() {
     if (this.hotseat) return;
+    this.playerName = playerLabel();
     if (this.session.role === "host") {
+      this.localMark = this.#claimSeat(this.playerId, this.playerName);
       this.#sendLogWelcome();
     } else {
-      this.session.sendHello({ log: encodeSyncPacket(this.log) });
+      this.session.sendHello({
+        log: encodeSyncPacket(this.log),
+        playerId: this.playerId,
+        name: this.playerName,
+      });
     }
   }
 
@@ -164,10 +181,11 @@ export class GameEngine {
       gameId: GAME_ID,
       code,
       role,
-      name: role,
+      name: this.playerName || role,
       summary: tttSummary(this.state),
       seq: tipSeq(this.log),
     });
+    this.#storeMark(code, this.localMark);
   }
 
   /**
@@ -185,16 +203,123 @@ export class GameEngine {
 
   /**
    * @param {string} [peerId]
+   * @param {'X'|'O'|null} [youAre]
    */
-  #sendLogWelcome(peerId) {
+  #sendLogWelcome(peerId, youAre = null) {
     this.session.sendWelcome(
       {
-        youAre: "O",
+        youAre,
         log: encodeSyncPacket(this.log),
         state: this.state,
+        seats: seatsFromLog(this.log),
       },
       peerId,
     );
+  }
+
+  /**
+   * @param {string} playerId
+   * @param {string} name
+   * @param {{ otherThan?: 'X'|'O'|null }} [opts]
+   * @returns {'X'|'O'}
+   */
+  #claimSeat(playerId, name, opts = {}) {
+    const seats = seatsFromLog(this.log);
+    const id = String(playerId || "");
+    let mark = markForPlayer(seats, id, name);
+    const local = id && id === this.playerId;
+    if (!mark && local) {
+      const saved = this.#savedMark() || this.#deskHintMark(seats);
+      if (
+        saved &&
+        saved !== opts.otherThan &&
+        (!seats[saved] ||
+          seats[saved].playerId === id ||
+          !seats[saved].playerId)
+      ) {
+        mark = saved;
+      }
+    }
+    if (!mark) {
+      const order =
+        opts.otherThan === "X"
+          ? /** @type {const} */ (["O", "X"])
+          : /** @type {const} */ (["X", "O"]);
+      mark =
+        order.find((m) => !seats[m]) ||
+        (id ? order.find((m) => seats[m]?.playerId === id) : undefined) ||
+        order.find((m) => !seats[m]?.playerId) ||
+        order[0];
+    }
+    this.#recordSeat(mark, id, name);
+    if (local) {
+      this.localMark = mark;
+      const code = this.session.roomCode;
+      if (code) this.#storeMark(code, mark);
+    }
+    return mark;
+  }
+
+  /**
+   * Old rooms had no seat events: host was always X. Use last desk role once.
+   * @param {ReturnType<typeof seatsFromLog>} seats
+   * @returns {'X'|'O'|null}
+   */
+  #deskHintMark(seats) {
+    if (seats.X || seats.O) return null;
+    const code = this.session.roomCode;
+    if (!code) return null;
+    const rec = listAllRecentRooms().find(
+      (r) => r.gameId === GAME_ID && r.code === code,
+    );
+    if (rec?.role === "guest") return "O";
+    if (rec?.role === "host") return "X";
+    return null;
+  }
+
+  /**
+   * @param {'X'|'O'} mark
+   * @param {string} playerId
+   * @param {string} name
+   */
+  #recordSeat(mark, playerId, name) {
+    const seats = seatsFromLog(this.log);
+    const cur = seats[mark];
+    const id = String(playerId || "");
+    const nm = String(name || "").trim();
+    if (!id && !nm) return;
+    if (cur && cur.playerId === id && cur.name === nm) return;
+    const added = appendEvent(this.log, "seat", {
+      mark,
+      playerId: id,
+      name: nm,
+    });
+    if (added.ok) this.log = added.log;
+  }
+
+  /** @returns {'X'|'O'|null} */
+  #savedMark() {
+    const code = this.session.roomCode;
+    if (!code) return null;
+    try {
+      const raw = localStorage.getItem(`dgame.ttt.mark.${code}`);
+      return raw === "X" || raw === "O" ? raw : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * @param {string} code
+   * @param {'X'|'O'|null} mark
+   */
+  #storeMark(code, mark) {
+    if (!code || (mark !== "X" && mark !== "O")) return;
+    try {
+      localStorage.setItem(`dgame.ttt.mark.${code}`, mark);
+    } catch {
+      /* ignore */
+    }
   }
 
   /**
@@ -222,9 +347,20 @@ export class GameEngine {
     switch (msg.type) {
       case TransportType.HELLO:
         if (this.session.role === "host") {
-          const payload = /** @type {{ log?: unknown }} */ (msg.payload || {});
+          const payload = /** @type {{ log?: unknown, playerId?: string, name?: string }} */ (
+            msg.payload || {}
+          );
           this.#adoptRemoteLog(payload.log);
-          this.#sendLogWelcome(msg.fromPeerId || undefined);
+          this.playerName = playerLabel();
+          this.localMark = this.#claimSeat(this.playerId, this.playerName);
+          const guestMark = this.#claimSeat(
+            String(payload.playerId || ""),
+            String(payload.name || ""),
+            { otherThan: this.localMark },
+          );
+          this.#persist();
+          this.onReady?.(this.localMark);
+          this.#sendLogWelcome(msg.fromPeerId || undefined, guestMark);
         }
         break;
 
@@ -232,14 +368,26 @@ export class GameEngine {
         const payload = /** @type {{ youAre?: string, log?: unknown, state?: typeof this.state }} */ (
           msg.payload || {}
         );
-        if (payload.youAre === "X" || payload.youAre === "O") {
-          this.localMark = payload.youAre;
-          this.onReady?.(this.localMark);
-        }
         if (payload.log) this.#adoptRemoteLog(payload.log);
         else if (payload.state) {
           this.state = cloneState(payload.state);
           this.onState?.(cloneState(this.state));
+        }
+        if (payload.youAre === "X" || payload.youAre === "O") {
+          this.localMark = payload.youAre;
+          const code = this.session.roomCode;
+          if (code) this.#storeMark(code, payload.youAre);
+          this.onReady?.(this.localMark);
+        } else {
+          const guessed = markForPlayer(
+            seatsFromLog(this.log),
+            this.playerId,
+            this.playerName,
+          );
+          if (guessed) {
+            this.localMark = guessed;
+            this.onReady?.(this.localMark);
+          }
         }
         break;
       }
@@ -254,13 +402,13 @@ export class GameEngine {
         const payload = /** @type {{ index?: number, mark?: string }} */ (
           msg.payload || {}
         );
-        if (payload.mark !== "O" || typeof payload.index !== "number") break;
-        const result = applyMove(this.state, payload.index, "O");
+        const mark = payload.mark === "X" || payload.mark === "O" ? payload.mark : null;
+        if (!mark || mark === this.localMark || typeof payload.index !== "number") {
+          break;
+        }
+        const result = applyMove(this.state, payload.index, mark);
         if (!result.ok) break;
-        this.#appendAndBroadcast("move", {
-          index: payload.index,
-          mark: "O",
-        });
+        this.#appendAndBroadcast("move", { index: payload.index, mark });
         this.onState?.(cloneState(this.state));
         break;
       }

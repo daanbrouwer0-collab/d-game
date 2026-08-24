@@ -27,6 +27,7 @@ export class UI {
     this.btnLeave = document.getElementById("btn-leave");
     this.btnReconnect = document.getElementById("btn-reconnect");
     this.joinCode = document.getElementById("join-code");
+    this.nameInput = document.getElementById("player-name");
 
     /** @type {HTMLButtonElement[]} */
     this.cells = [];
@@ -110,9 +111,17 @@ export class UI {
 
   /**
    * @param {'X'|'O'|null} mark
+   * @param {string} [name]
    */
-  setRole(mark) {
-    this.roleLabel.textContent = mark ? `Jij speelt: ${mark}` : "";
+  setRole(mark, name) {
+    if (!mark) {
+      this.roleLabel.textContent = "";
+      return;
+    }
+    const label = String(name || "").trim();
+    this.roleLabel.textContent = label
+      ? `Jij speelt: ${mark} · ${label}`
+      : `Jij speelt: ${mark}`;
   }
 
   /**

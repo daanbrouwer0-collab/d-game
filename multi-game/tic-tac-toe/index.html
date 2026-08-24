@@ -25,7 +25,18 @@
           <h2>Lobby</h2>
           <p class="lede">
             Start een P2P-room: er verschijnt een QR. Laat de ander die scannen om te joinen.
+            X en O blijven aan jouw naam, ook als de ander later host.
           </p>
+
+          <label class="field-label" for="player-name">Jouw naam</label>
+          <input
+            id="player-name"
+            class="field"
+            type="text"
+            maxlength="20"
+            placeholder="bijv. Sam"
+            autocomplete="nickname"
+          />
 
           <div class="actions">
             <button type="button" id="btn-local" class="btn btn-ghost">Op dit apparaat</button>

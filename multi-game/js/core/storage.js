@@ -22,12 +22,38 @@ const RECENT_KEY = "dgame.rooms.recent";
 /**
  * @returns {string}
  */
+const PLAYER_ID_KEY = "dgame.playerId";
+
 export function getDisplayName() {
   try {
     return (localStorage.getItem(NAME_KEY) || "").trim();
   } catch {
     return "";
   }
+}
+
+/**
+ * Stable id for this browser — used to keep X/O when host switches.
+ * @returns {string}
+ */
+export function getPlayerId() {
+  try {
+    let id = localStorage.getItem(PLAYER_ID_KEY) || "";
+    if (!id) {
+      id = `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      localStorage.setItem(PLAYER_ID_KEY, id);
+    }
+    return id;
+  } catch {
+    return `p_${Math.random().toString(36).slice(2, 10)}`;
+  }
+}
+
+/**
+ * @returns {string}
+ */
+export function playerLabel() {
+  return getDisplayName() || "Speler";
 }
 
 /**

@@ -1,5 +1,5 @@
 import { createRoom, transportFromUrl } from "../js/core/room.js";
-import { saveRoom } from "../js/core/storage.js";
+import { getDisplayName, playerLabel, saveRoom, setDisplayName } from "../js/core/storage.js";
 import { mountRoomStrip, mountShellNav } from "../js/shell/nav.js";
 import { parseP2pInvite } from "../js/shell/p2p-invite.js";
 import { openQrScanner } from "../js/shell/qr-scanner.js";
@@ -19,6 +19,19 @@ mountRoomStrip({ base: "../", currentGameId: GAME_ID });
 const GAME_PATH = "/tic-tac-toe/";
 
 const ui = new UI();
+
+if (ui.nameInput) {
+  ui.nameInput.value = getDisplayName();
+  ui.nameInput.addEventListener("change", () => {
+    setDisplayName(ui.nameInput.value);
+  });
+}
+
+function rememberName() {
+  if (!ui.nameInput) return playerLabel();
+  setDisplayName(ui.nameInput.value);
+  return playerLabel();
+}
 
 /** @type {ReturnType<typeof createRoom> | null} */
 let session = null;
@@ -113,7 +126,7 @@ function wireEngine() {
       ui.setRole(null);
       ui.roleLabel.textContent = "Hotseat — wissel om de beurt";
     } else {
-      ui.setRole(mark);
+      ui.setRole(mark, engine.playerName || playerLabel());
     }
     syncBoard();
   };
@@ -130,6 +143,7 @@ ui.onCellClick((index) => {
 
 ui.btnLocal.addEventListener("click", async () => {
   ui.setLobbyError("");
+  rememberName();
   ui.btnLocal.disabled = true;
   try {
     await teardown({ clearUrl: true });
@@ -150,6 +164,7 @@ ui.btnLocal.addEventListener("click", async () => {
 
 ui.btnHost.addEventListener("click", async () => {
   ui.setLobbyError("");
+  rememberName();
   ui.btnHost.disabled = true;
   ui.showHostInvite("…", "");
   ui.lobbyHint.textContent = "Kamer wordt aangemaakt… even wachten.";
@@ -245,6 +260,7 @@ async function joinFromInput() {
  */
 async function joinRoom(code) {
   ui.setLobbyError("");
+  rememberName();
   ui.btnJoin.disabled = true;
   try {
     await teardown({ clearUrl: false });
@@ -372,6 +388,7 @@ function humanizePeerError(err) {
 async function resumeAsHost(code) {
   const normalized = code.trim().toUpperCase();
   ui.setLobbyError("");
+  rememberName();
   ui.btnHost.disabled = true;
   ui.showHostInvite(normalized, "");
   ui.lobbyHint.textContent = "Room opnieuw hosten…";
