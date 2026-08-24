@@ -123,6 +123,10 @@ const P2pSessionController = {
     }
   },
 
+  getLocalPeerId() {
+    return this.session?.peerId || this.session?.roomCode || null;
+  },
+
   wireSession() {
     const s = this.session;
     if (!s) return;
@@ -137,8 +141,9 @@ const P2pSessionController = {
       }
     };
 
-    s.onPeerJoin = (peerId) => {
-      if (!this.isHost()) return;
+    s.onPeerJoin = () => {
+      if (!this.isHost() || !this.lobby) return;
+      this.broadcastLobby();
       this.renderLobbyUi();
     };
 
@@ -203,8 +208,10 @@ const P2pSessionController = {
       maxGuests,
     });
     this.wireSession();
-    const code = await this.session.host();
-    this.localPeerId = code;
+    const code = settings.roomCode
+      ? await this.session.hostWithCode(String(settings.roomCode).trim().toUpperCase())
+      : await this.session.host();
+    this.localPeerId = this.getLocalPeerId() || code;
 
     const hubChar = StorageManager.loadCharacter();
     this.lobby = {
@@ -267,7 +274,10 @@ const P2pSessionController = {
       this.wireSession();
       await this.session.join(code);
 
-      this.localPeerId = `guest_${Math.random().toString(36).slice(2, 10)}`;
+      this.localPeerId = this.getLocalPeerId();
+      if (!this.localPeerId) {
+        throw new Error("Geen peer-id na join. Probeer opnieuw.");
+      }
       this.lobby = {
         hostId: code,
         roomCode: code,
@@ -277,7 +287,7 @@ const P2pSessionController = {
       };
 
       const hubChar = StorageManager.loadCharacter();
-      this.send("rr_seat_join", {
+      const joinPayload = {
         userId: this.localPeerId,
         profile: {
           name: hubChar.name,
@@ -285,7 +295,15 @@ const P2pSessionController = {
           colors: hubChar.colors,
           style: hubChar.style,
         },
-      });
+      };
+      let sent = this.send("rr_seat_join", joinPayload);
+      for (let i = 0; !sent && i < 8; i++) {
+        await new Promise((r) => setTimeout(r, 80));
+        sent = this.send("rr_seat_join", joinPayload);
+      }
+      if (!sent) {
+        throw new Error("Kon join-bericht niet sturen. Host moet online blijven.");
+      }
 
       const session = StorageManager.createSession(
         "RobotRun",
@@ -319,14 +337,13 @@ const P2pSessionController = {
         await this.createHostLobby({
           name: "RobotRun",
           seed: Date.now() >>> 0,
+          roomCode: saved.roomCode,
         });
-        if (this.session && saved.roomCode) {
-          await this.session.hostWithCode(saved.roomCode);
-        }
+        if (saved.localSessionId) this.localSessionId = saved.localSessionId;
       } else {
         await this.joinRoom(saved.roomCode);
+        if (saved.localSessionId) this.localSessionId = saved.localSessionId;
       }
-      if (this.localSessionId) this.localSessionId = saved.localSessionId;
       Toast.show("P2P-lobby hervat");
       return true;
     } catch {
@@ -625,7 +642,8 @@ const P2pSessionController = {
     }
 
     if (type === "rr_seat_join" && this.isHost()) {
-      const { userId, profile } = payload;
+      const userId = msg.fromPeerId || payload.userId;
+      const { profile } = payload;
       if (!userId) return;
       if ((this.lobby.seats || []).some((s) => s.userId === userId)) return;
       if ((this.lobby.seats || []).length >= (CONFIG.P2P?.MAX_PLAYERS || 5)) return;

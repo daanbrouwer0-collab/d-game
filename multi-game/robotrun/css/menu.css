@@ -362,6 +362,28 @@
   background: rgba(248, 113, 113, 0.1);
 }
 
+.invite-kicker {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5eead4;
+}
+
+.invite-title {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.invite-wait {
+  margin: 0.4rem 0 0.6rem;
+  font-weight: 600;
+  color: #99f6e4;
+}
+
 .invite-qr-wrap,
 .qr-canvas-wrap {
   display: flex;
@@ -372,8 +394,9 @@
   border-radius: 8px;
 }
 
+.invite-qr-wrap canvas,
 .qr-canvas-wrap canvas {
   display: block;
-  max-width: 100%;
+  width: min(280px, 72vw);
   height: auto;
 }

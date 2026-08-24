@@ -51,6 +51,10 @@ export class P2PTransport {
     return this.session.status;
   }
 
+  get peerId() {
+    return this.session.peerId;
+  }
+
   guestCount() {
     return this.session.guestCount();
   }

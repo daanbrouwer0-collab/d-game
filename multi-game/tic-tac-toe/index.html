@@ -24,34 +24,36 @@
         <section id="lobby" class="panel">
           <h2>Lobby</h2>
           <p class="lede">
-            Speel op dit apparaat, of start P2P en laat de ander je QR scannen.
+            Start een P2P-room: er verschijnt een QR. Laat de ander die scannen om te joinen.
           </p>
 
           <div class="actions">
             <button type="button" id="btn-local" class="btn btn-ghost">Op dit apparaat</button>
-            <button type="button" id="btn-host" class="btn btn-primary">Start P2P</button>
+            <button type="button" id="btn-host" class="btn btn-primary">Maak room + toon QR</button>
           </div>
 
-          <div id="host-info" class="host-info hidden">
+          <div id="host-info" class="host-info invite-card hidden">
+            <p class="invite-kicker">Jouw room</p>
+            <p class="invite-title">Laat de ander deze QR scannen</p>
+            <div class="invite-qr-wrap qr-canvas-wrap">
+              <canvas id="invite-qr-canvas" width="280" height="280"></canvas>
+            </div>
             <p>Kamercode</p>
             <p id="room-code" class="room-code"></p>
-            <p class="share-label">Scan deze QR om te joinen (P2P)</p>
-            <div class="invite-qr-wrap qr-canvas-wrap">
-              <canvas id="invite-qr-canvas" width="220" height="220"></canvas>
-            </div>
-            <p class="share-label">Deellink</p>
+            <p class="invite-wait">Wachten tot iemand scant of de link opent…</p>
+            <p class="share-label">Of deel de link</p>
             <a id="share-url" class="share-url" href="#"></a>
             <div class="actions share-actions">
-              <button type="button" id="btn-share-whatsapp" class="btn btn-primary">
-                Deel via WhatsApp
+              <button type="button" id="btn-copy-link" class="btn btn-primary">Kopieer link</button>
+              <button type="button" id="btn-share-whatsapp" class="btn btn-ghost">
+                WhatsApp
               </button>
               <button type="button" id="btn-share" class="btn btn-ghost">Andere apps…</button>
-              <button type="button" id="btn-copy-link" class="btn btn-ghost">Kopieer link</button>
             </div>
           </div>
 
           <div class="join-row">
-            <label for="join-code">Join P2P</label>
+            <label for="join-code">Of join: scan de QR van de host</label>
             <div class="join-controls">
               <input
                 id="join-code"

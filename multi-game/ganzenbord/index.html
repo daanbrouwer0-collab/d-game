@@ -27,7 +27,7 @@
         <section id="setup" class="panel">
           <h2>Meedoen</h2>
           <p class="lede">
-            Tot 6 spelers. Speel op dit apparaat, of deel een link zodat anderen joinen.
+            Tot 6 spelers. Maak een P2P-room: er verschijnt een QR. Anderen scannen die om te joinen.
           </p>
 
           <label class="field-label" for="player-name">Jouw naam</label>
@@ -45,12 +45,12 @@
               Speel hier
             </button>
             <button type="button" id="btn-host" class="btn btn-primary">
-              Uitnodigen
+              Maak room + toon QR
             </button>
           </div>
 
           <div class="join-row">
-            <label for="join-code">Of join met code</label>
+            <label for="join-code">Of join: scan de QR van de host</label>
             <div class="join-controls">
               <input
                 id="join-code"
@@ -85,19 +85,21 @@
 
           <ul id="player-list" class="player-list"></ul>
 
-          <div class="invite-box">
-            <p>Kamercode: <strong id="room-code"></strong></p>
-            <p class="share-label">Scan om te joinen (P2P)</p>
+          <div class="invite-box invite-card">
+            <p class="invite-kicker">Jouw room</p>
+            <p class="invite-title">Laat anderen deze QR scannen</p>
             <div class="invite-qr-wrap qr-canvas-wrap">
-              <canvas id="invite-qr-canvas" width="220" height="220"></canvas>
+              <canvas id="invite-qr-canvas" width="280" height="280"></canvas>
             </div>
+            <p>Kamercode: <strong id="room-code"></strong></p>
+            <p class="invite-wait">Wachten tot spelers joinen… houd dit tabblad open.</p>
             <a id="share-url" class="share-url" href="#"></a>
             <div class="actions share-actions">
-              <button type="button" id="btn-share-whatsapp" class="btn btn-primary">
-                Deel via WhatsApp
+              <button type="button" id="btn-copy-link" class="btn btn-primary">Kopieer link</button>
+              <button type="button" id="btn-share-whatsapp" class="btn btn-ghost">
+                WhatsApp
               </button>
               <button type="button" id="btn-share" class="btn btn-ghost">Andere apps…</button>
-              <button type="button" id="btn-copy-link" class="btn btn-ghost">Kopieer link</button>
             </div>
           </div>
 

@@ -375,13 +375,15 @@
           <ul id="p2p-seat-list" class="matrix-lobby-list"></ul>
 
           <div id="p2p-host-controls" class="menu-field-stack">
-            <label class="menu-label">Deel uitnodiging</label>
-            <p class="menu-helper">Laat anderen scannen of open de link. Start als er genoeg spelers Ready zijn.</p>
+            <p class="invite-kicker">Jouw room</p>
+            <p class="invite-title">Laat anderen deze QR scannen</p>
             <div class="invite-qr-wrap qr-canvas-wrap">
-              <canvas id="p2p-invite-qr" width="200" height="200"></canvas>
+              <canvas id="p2p-invite-qr" width="280" height="280"></canvas>
             </div>
+            <p>Kamercode: <strong id="p2p-room-code"></strong></p>
+            <p class="invite-wait">Wachten tot spelers joinen… houd dit tabblad open.</p>
             <div class="share-actions">
-              <button type="button" class="btn alt" id="btn-p2p-share-copy">Kopieer link</button>
+              <button type="button" class="btn success" id="btn-p2p-share-copy">Kopieer link</button>
             </div>
             <input id="p2p-share-link" class="input" readonly aria-label="Uitnodigingslink">
             <button type="button" class="btn success" id="btn-p2p-start">Start race</button>

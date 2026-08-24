@@ -152,7 +152,7 @@ export class UI {
         this.setHint(
           ready
             ? "Je kunt starten, of wachten op meer spelers (max 6)."
-            : `Nog ${MIN_PLAYERS - state.players.length} speler(s) nodig. Deel de link.`,
+            : `Nog ${MIN_PLAYERS - state.players.length} speler(s) nodig. Deel QR of link.`,
         );
       }
     } else {

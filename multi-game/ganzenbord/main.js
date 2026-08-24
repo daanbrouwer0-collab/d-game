@@ -9,8 +9,8 @@ import {
   setDisplayName,
 } from "../js/core/storage.js";
 import { parseP2pInvite } from "../js/shell/p2p-invite.js";
+import { showHostInviteCard } from "../js/shell/p2p-invite-ui.js";
 import { openQrScanner } from "../js/shell/qr-scanner.js";
-import { drawQr } from "../js/shell/qr-ui.js";
 import { GAME_ID, MAX_PLAYERS } from "./game.js";
 import { Room } from "./room.js";
 import { UI } from "./ui.js";
@@ -133,7 +133,6 @@ ui.btnHost.addEventListener("click", async () => {
   ui.btnHost.disabled = true;
   try {
     await startHost({ name: ui.playerName(), transport: "p2p" });
-    await shareInvite();
   } catch (err) {
     ui.setError(humanizePeerError(err));
   } finally {
@@ -228,7 +227,6 @@ ui.btnSwitchNew?.addEventListener("click", async () => {
     await teardown({ clearUrl: true });
     clearRoom();
     await startHost({ name: ui.playerName(), transport: "p2p" });
-    await shareInvite();
   } catch (err) {
     ui.setError(humanizePeerError(err));
   }
@@ -320,7 +318,14 @@ async function startHost({
   r.beginAsHost();
   ui.showInvite(roomCode, shareUrl, true, { local });
   if (shareUrl && ui.inviteQrCanvas) {
-    await drawQr(ui.inviteQrCanvas, shareUrl);
+    await showHostInviteCard({
+      card: ui.inviteBox,
+      canvas: ui.inviteQrCanvas,
+      codeEl: ui.roomCodeEl,
+      urlEl: ui.shareUrlEl,
+      code: roomCode,
+      url: shareUrl,
+    });
   }
   ui.showLobby();
   ui.renderLobby(r.state, r.localId, true, { local });
@@ -332,7 +337,7 @@ async function startHost({
       "Je bent terug in je lobby. Anderen moeten de link opnieuw openen als ze weg waren.",
     );
   } else {
-    ui.setHint("Deel de link. Houd dit tabblad open.");
+    ui.setHint("Laat de ander jouw QR scannen of deel de link.");
   }
   refreshRecent();
   return roomCode;

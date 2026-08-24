@@ -68,7 +68,7 @@ export class UI {
     this.shareUrlEl.textContent = shareUrl;
     this.shareUrlEl.href = shareUrl;
     this.lobbyHint.textContent =
-      "Houd dit tabblad open tot je vriend joinet.";
+      "Houd dit tabblad open. De ander scant jouw QR of opent de link.";
   }
 
   hideHostInvite() {

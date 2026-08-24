@@ -4,6 +4,7 @@ import { mountShellNav } from "../js/shell/nav.js";
 import { parseP2pInvite } from "../js/shell/p2p-invite.js";
 import { openQrScanner } from "../js/shell/qr-scanner.js";
 import { drawQr } from "../js/shell/qr-ui.js";
+import { showHostInviteCard } from "../js/shell/p2p-invite-ui.js";
 import { GAME_ID } from "./game.js";
 import { GameEngine } from "./engine.js";
 import { UI } from "./ui.js";
@@ -41,10 +42,15 @@ function ensureSession(transport) {
   return session;
 }
 
-async function showInviteQr(url) {
-  if (ui.inviteQrCanvas && url) {
-    await drawQr(ui.inviteQrCanvas, url);
-  }
+async function showInviteQr(url, code) {
+  await showHostInviteCard({
+    card: ui.hostInfo,
+    canvas: ui.inviteQrCanvas,
+    codeEl: ui.roomCodeEl,
+    urlEl: ui.shareUrlEl,
+    code: code || "",
+    url,
+  });
 }
 
 function wireSession() {
@@ -148,9 +154,8 @@ ui.btnHost.addEventListener("click", async () => {
       role: "host",
     });
     ui.showHostInvite(code, shareUrl);
-    await showInviteQr(shareUrl);
+    await showInviteQr(shareUrl, code);
     engine.startAsHost();
-    await shareInvite({ preferWhatsApp: false });
   } catch (err) {
     ui.setLobbyError(humanizePeerError(err));
   } finally {

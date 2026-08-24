@@ -6,23 +6,25 @@
 /**
  * @param {HTMLCanvasElement} canvas
  * @param {string} text
+ * @param {{ width?: number }} [opts]
  */
-export async function drawQr(canvas, text) {
+export async function drawQr(canvas, text, opts = {}) {
+  const width = opts.width || 280;
   const QR = window.QRCode;
   if (QR && typeof QR.toCanvas === "function") {
     await QR.toCanvas(canvas, text, {
-      width: 220,
+      width,
       margin: 1,
       errorCorrectionLevel: "M",
     });
     return true;
   }
   const ctx = canvas.getContext("2d");
-  canvas.width = 220;
-  canvas.height = 220;
+  canvas.width = width;
+  canvas.height = width;
   if (ctx) {
     ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, 220, 220);
+    ctx.fillRect(0, 0, width, width);
     ctx.fillStyle = "#111";
     ctx.font = "11px monospace";
     const lines = text.match(/.{1,28}/g) || [];

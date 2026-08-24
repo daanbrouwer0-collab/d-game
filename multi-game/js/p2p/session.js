@@ -103,6 +103,10 @@ export class Session {
     return this.net.status;
   }
 
+  get peerId() {
+    return this.net.peer?.id || this.net.roomCode || null;
+  }
+
   guestCount() {
     return this.net.guestCount();
   }

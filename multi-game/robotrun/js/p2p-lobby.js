@@ -54,7 +54,20 @@ const P2pLobbyUi = {
     const canvas = document.getElementById("p2p-invite-qr");
     const url = P2pSessionController.buildShareUrl();
     if (!canvas || !url || !window.RobotRunP2P?.drawQr) return;
-    await window.RobotRunP2P.drawQr(canvas, url);
+    const codeEl = document.getElementById("p2p-room-code");
+    if (window.RobotRunP2P?.showHostInviteCard) {
+      await window.RobotRunP2P.showHostInviteCard({
+        card: document.getElementById("p2p-host-controls"),
+        canvas,
+        codeEl,
+        urlEl: null,
+        code: P2pSessionController.lobby?.roomCode || "",
+        url,
+      });
+      return;
+    }
+    if (codeEl) codeEl.textContent = P2pSessionController.lobby?.roomCode || "";
+    await window.RobotRunP2P.drawQr(canvas, url, { width: 280 });
   },
 
   async onShareCopy() {
