@@ -189,12 +189,16 @@ Zonder P0 is “goede documentatie” cosmetisch: de code spreekt die regels teg
 
 ---
 
-## Documentatiestructuur (nu)
+## Documentatiestructuur (2026-08-24)
 
 | Doc | Rol |
 |-----|-----|
-| [p2p-multiplayer.md](./p2p-multiplayer.md) | Beschrijvend: hoe het **nu** werkt |
-| [multiplayer-bouwregels.md](./multiplayer-bouwregels.md) | Normatief: wat je **moet** doen bij een nieuw spel |
-| **Dit rapport** | Kritisch: wat kapot/zwak is en waarom “waterdicht” nog niet klopt |
+| [speler-handleiding.md](./speler-handleiding.md) | Spelers: room, link, host-tab |
+| [p2p-multiplayer.md](./p2p-multiplayer.md) | Beschrijvend: transport, twee log-lagen, room shell |
+| [multiplayer-bouwregels.md](./multiplayer-bouwregels.md) | Normatief: R1–R24 |
+| [p2p-fundamenten.md](./p2p-fundamenten.md) | Canon, rangschikking |
+| **Dit rapport** | Kritisch: gaten + P0–P3 |
+| [docs/README.md](./README.md) | Index |
+| [superpowers/specs/README.md](./superpowers/specs/README.md) | Actueel vs historische specs |
 
-Oude specs onder `superpowers/specs/` zijn deels historisch; bij conflict wint **code** + deze drie docs.
+**Room shell (2026-08-24):** `room/` + twee log-lagen zijn gebouwd; TTT embedded werkt; ganzenbord/RobotRun embedded zijn stubs. Legacy per-spel P2P blijft parallel — vergroot het oppervlak voor dezelfde P0-bugs tot legacy is uitgefaseerd.

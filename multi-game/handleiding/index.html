@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Multiplayer — D-Game</title>
+    <link rel="stylesheet" href="../css/site.css" />
+  </head>
+  <body>
+    <div class="app app-home">
+      <header class="header">
+        <p class="nav"><a href="../">← Games</a></p>
+        <h1 class="brand">Multiplayer</h1>
+        <p class="tagline">Room starten, link delen, samen spelen.</p>
+      </header>
+      <main>
+        <section class="panel">
+          <h2>In het kort</h2>
+          <ol class="lede">
+            <li>Iemand <strong>start een room</strong> (host).</li>
+            <li>Iedereen opent de <strong>zelfde link</strong>.</li>
+            <li>De host <strong>kiest een spel</strong>.</li>
+            <li>Na afloop terug naar de lobby voor een volgend spel.</li>
+            <li>De <strong>host houdt een tab open</strong>.</li>
+          </ol>
+          <p class="actions">
+            <a href="../room/" class="btn btn-primary">Naar room</a>
+          </p>
+        </section>
+        <section class="panel">
+          <h2>Host</h2>
+          <p class="lede">
+            Ga naar <strong>Room</strong> → <strong>Start room</strong> → deel QR of link.
+            Jij kiest daarna het spel (grijs = past niet bij jullie aantal spelers).
+          </p>
+        </section>
+        <section class="panel">
+          <h2>Gast</h2>
+          <p class="lede">
+            Open de link van de host, of ga naar Room en vul de <strong>roomcode</strong> in.
+          </p>
+        </section>
+        <section class="panel">
+          <h2>Belangrijk</h2>
+          <ul class="lede">
+            <li>Geen account nodig — alles in de browser.</li>
+            <li>Host-tab dicht = verbinding weg. Host opnieuw via tab <strong>Lobby</strong>.</li>
+            <li>Solo: open een spel → <strong>Op dit apparaat</strong> (hotseat).</li>
+          </ul>
+        </section>
+      </main>
+    </div>
+    <script type="module">
+      import { mountShellNav } from "../js/shell/nav.js";
+      mountShellNav({ active: "games", base: "../" });
+    </script>
+  </body>
+</html>

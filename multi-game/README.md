@@ -1,20 +1,21 @@
 # D-Game — multiplayer sandbox (`multi-game/`)
 
-Statische HTML/JS/CSS. Geen database. **Sandbox** om simpele games te koppelen aan multiplayer: **P2P (PeerJS)**, hotseat op één apparaat, Matrix later.
+Statische HTML/JS/CSS. Geen database. **Sandbox** voor simpele games met multiplayer via **P2P (PeerJS)**, hotseat, en (later) Matrix.
 
-> **Architectuur (Netlify-router ↔ GitHub, P2P):** zie de [README in de repo-root](../README.md).  
-> Spelcode hoort **hier**. De map `multi-game-netlify/` is alleen de Netlify hash-shell en mag niet als plek voor features dienen.
+> **Architectuur (Netlify ↔ GitHub):** [README repo-root](../README.md)  
+> Spelcode hoort **hier**. `multi-game-netlify/` is alleen de hash-shell.
 
 ## Live
 
-Productie: [https://www.d-game.nl/#index.html](https://www.d-game.nl/#index.html)
+[https://www.d-game.nl/#index.html](https://www.d-game.nl/#index.html)
 
-Uitnodigingen gebruiken hash-routes, bijvoorbeeld:
+**Multiplayer (voorkeur):**  
+`https://www.d-game.nl/#room/?room=AB7K2M`
 
-`https://www.d-game.nl/#tic-tac-toe/index.html?room=AB7K2M`  
-`https://www.d-game.nl/#ganzenbord/index.html?room=AB7K2M`
+**Legacy per spel:**  
+`https://www.d-game.nl/#tic-tac-toe/index.html?room=AB7K2M`
 
-Na `git push` naar `main` laadt de shell deze map via jsDelivr (geen Netlify-herupload nodig voor game-wijzigingen).
+Na `git push` naar `main` laadt jsDelivr de nieuwe commit (geen Netlify-herupload voor game-wijzigingen).
 
 ## Starten (lokaal)
 
@@ -23,66 +24,70 @@ cd multi-game
 python3 -m http.server 8080
 ```
 
-Open [http://localhost:8080](http://localhost:8080). Lokaal blijven path-URL’s (`/tic-tac-toe/?room=…`) werken.
+Open [http://localhost:8080](http://localhost:8080).
 
 ## Tabs
 
-| Tab | Pad (lokaal) | Hash (d-game.nl) | Inhoud |
-|-----|--------------|------------------|--------|
-| Games | `/` | `#index.html` | Spelcatalogus |
-| Lobby | `/lobby/` | `#lobby/index.html` | Recente rooms |
-| Friends | `/friends/` | `#friends/index.html` | Lokale vrienden |
-| Netwerk | `/netwerk/` | `#netwerk/index.html` | P2P-lab (host, QR-scan, echo) |
-| Geheugen | `/geheugen/` | `#geheugen/index.html` | Profiel + wissen |
+| Tab | Pad | Inhoud |
+|-----|-----|--------|
+| Games | `/` | Catalogus + link naar room |
+| **Handleiding** | `/handleiding/` | Multiplayer uitleg voor spelers |
+| **Room** | `/room/` | **Multiplayer: start/join, picker, embedded spellen** |
+| Lobby | `/lobby/` | Recente rooms (hervatten) |
+| Friends | `/friends/` | Lokale vrienden |
+| Netwerk | `/netwerk/` | P2P-lab (echo, QR) |
+| Geheugen | `/geheugen/` | Profiel, logs wissen |
 
-## Frame
+## Multiplayer — twee paden
+
+| Pad | Wanneer |
+|-----|---------|
+| **`room/`** | Groep, meerdere spellen, één link — **voorkeur** |
+| **Per-spel P2P** | Legacy; `#tic-tac-toe/?room=` etc. — wordt uitgefaseerd |
+| **`local` hotseat** | Eén apparaat, geen netwerk |
+
+### Room flow (kort)
+
+1. Host: `#room/` → Start room → deel link/QR  
+2. Gasten joinen → roster  
+3. Host kiest spel (filter op aantal spelers)  
+4. Spel in iframe; P2P blijft in room-shell  
+5. Terug naar picker voor volgend spel  
+
+**Spelers:** [handleiding/index.html](../handleiding/index.html) · [docs/speler-handleiding.md](docs/speler-handleiding.md)
+
+## Frame (code)
 
 ```
-js/core/room.js        createRoom({ gameId, transport })
-js/core/prefs.js       preferred transport (P2P)
-js/core/storage.js     naam, vrienden, rooms, event-logs
-js/sync/event-log.js   append-only keten (host sync / QR)
-js/transport/          local (hotseat) | p2p | qr | matrix(stub)
-js/shell/nav.js        tab-navigatie
-js/shell/site-url.js   hash-shell, share-URL’s, veilige navigatie
-js/shell/qr-scanner.js camera QR-scan (P2P invite)
+room/main.js              Room shell UI + P2P alive
+js/p2p/room-session.js    Game-agnostische P2P
+js/sync/room-log.js       Room log (room.* events)
+js/sync/event-log.js      Session / legacy game logs
+js/bridge/                Embedded spel ↔ shell
+js/core/room.js           createRoomSession() + createRoom() legacy
+js/shell/site-url.js      #room/?room=, embedded URLs
 ```
-
-### P2P kort
-
-1. Host: `createRoom({ gameId, transport: "p2p" })` → kamercode + QR + `#…?room=CODE`.
-2. Gast opent deellink of joint met code; `hello`/`welcome` checken `gameId`.
-3. Lobby-spellen (ganzenbord): host schrijft events in de log; peers **replayen** de log voor state. Na elke actie ook een **STATE**-snapshot als backup.
-4. Hotseat: `transport: "local"` — zelfde UI, geen PeerJS.
-
-**Uitgebreid (situaties, beurten, data per spel):**  
-[docs/p2p-multiplayer.md](docs/p2p-multiplayer.md)
-
-Kort in de repo-root: [../README.md](../README.md#p2p-in-games).
-
-## Netwerk-lab
-
-Op **Netwerk** test je echte P2P-multiplayer:
-
-- **Host** — start room, toon invite-QR en deellink
-- **Join** — kamercode of **Scan QR** (zelfde flow als spellen)
-- **Echo** — ping/pong na `connected` (“P2P werkt”)
-- **Matrix** — stub (verwacht “niet geïmplementeerd”)
-
-Hotseat (“Op dit apparaat”) staat alleen in spellen, niet op Netwerk.
 
 ## Spellen
 
-- **Tic Tac Toe:** Op dit apparaat · Start P2P · Scan QR
-- **Ganzenbord:** Klassiek bord (63) · lobby tot 6 · P2P of hotseat · QR-deellink
-- **RobotRun:** Hotseat / solo vs AI · P2P lobby (2–5 spelers, QR-deellink)
+| Spel | Room embedded | Standalone P2P | Hotseat |
+|------|---------------|----------------|---------|
+| Tic-tac-toe | Ja | Ja | Ja |
+| Ganzenbord | Stub | Ja | Ja |
+| RobotRun | Stub | Ja | Ja |
 
-## Design
+## Documentatie
 
-- **[P2P fundamenten](docs/p2p-fundamenten.md)** — canon, rangschikking, keuzes A/B/C
-- **[P2P multiplayer — hoe het werkt](docs/p2p-multiplayer.md)**
-- **[Bouwregels multiplayer](docs/multiplayer-bouwregels.md)** — verplicht bij nieuwe spellen
-- **[Kritisch P2P-rapport](docs/p2p-kritisch-rapport.md)** — gaten, hotspots, pad naar waterdicht
-- [Sandbox shell](docs/superpowers/specs/2026-08-24-d-game-sandbox-shell-design.md)
-- [Frame Room API](docs/superpowers/specs/2026-08-24-d-game-frame-design.md)
-- [P2P event-log rooms (verkenning / niet = productie)](docs/superpowers/specs/2026-08-24-p2p-event-log-rooms.md)
+| Doc | |
+|-----|--|
+| [docs/README.md](docs/README.md) | **Start hier** — index |
+| [Spelerhandleiding](docs/speler-handleiding.md) | Room gebruiken |
+| [P2P multiplayer](docs/p2p-multiplayer.md) | Technisch: log, sync, transport |
+| [Bouwregels](docs/multiplayer-bouwregels.md) | Nieuw spel toevoegen |
+| [Kritisch rapport](docs/p2p-kritisch-rapport.md) | Bekende gaten |
+| [Fundamenten](docs/p2p-fundamenten.md) | Canon & keuzes |
+| [Specs index](docs/superpowers/specs/README.md) | Actueel vs historisch |
+
+## Netwerk-lab
+
+Tab **Netwerk**: host, join, QR, echo — P2P testen zonder spel.

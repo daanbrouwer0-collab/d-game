@@ -8,6 +8,7 @@ import {
   parseSyncPacket,
   adoptHostPacket,
   replaceFromHostPacket,
+  coerceEventLog,
   tipEventId,
   tipSeq,
 } from "../js/sync/event-log.js";
@@ -95,10 +96,48 @@ export class GameEngine {
       this.playerName,
     );
     this.#replay();
+    if (this.session.transport === "bridge") {
+      this.onReady?.(this.localMark);
+      this.onState?.(cloneState(this.state));
+      return;
+    }
     this.session.sendHello({
       playerId: this.playerId,
       name: this.playerName,
     });
+  }
+
+  /**
+   * Embedded in room shell — log and role come from SESSION_INIT.
+   * @param {{ role: 'host'|'guest', log?: unknown }} init
+   */
+  bootstrapEmbedded(init) {
+    this.hotseat = false;
+    this.playerName = playerLabel();
+    if (init.log) {
+      const packet = /** @type {import('../js/sync/event-log.js').SyncPacket} */ (
+        init.log
+      );
+      if (packet?.v === 1 && Array.isArray(packet.events)) {
+        const replaced = replaceFromHostPacket(GAME_ID, packet);
+        if (replaced.ok) this.log = replaced.log;
+      } else {
+        const coerced = coerceEventLog(init.log, GAME_ID);
+        if (coerced) this.log = coerced;
+      }
+    }
+    if (init.role === "host") {
+      this.startAsHost();
+    } else {
+      this.localMark = markForPlayer(
+        seatsFromLog(this.log),
+        this.playerId,
+        this.playerName,
+      );
+      this.#replay();
+      this.onReady?.(this.localMark);
+      this.onState?.(cloneState(this.state));
+    }
   }
 
   onPeerConnected() {
@@ -273,6 +312,7 @@ export class GameEngine {
   }
 
   #persist() {
+    if (this.session.transport === "bridge") return;
     const code = this.session.roomCode;
     if (!code || this.hotseat) return;
     saveRoomLog(GAME_ID, code, this.log);

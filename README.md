@@ -54,61 +54,69 @@ Config in de shell (niet lichtzinnig wijzigen): `repo`, `branch`, `subpath: "mul
 
 ## P2P in games
 
-Spellen praten niet rechtstreeks met PeerJS in de UI. Ze gebruiken een gemeenschappelijke **Room API** en optioneel een **event-log** (host-authoritative state).
+Spellen praten niet rechtstreeks met PeerJS in de UI. Ze gebruiken een **Room API**, een **event-log** (host-authoritative), en sinds 2026-08-24 een **room shell** voor game-agnostische multiplayer.
 
-**Volledige documentatie:**
+**Documentatie (start):** [`multi-game/docs/README.md`](multi-game/docs/README.md)
 
-- [`multi-game/docs/p2p-multiplayer.md`](multi-game/docs/p2p-multiplayer.md) — hoe het werkt  
-- [`multi-game/docs/multiplayer-bouwregels.md`](multi-game/docs/multiplayer-bouwregels.md) — regels voor nieuwe spellen  
-- [`multi-game/docs/p2p-kritisch-rapport.md`](multi-game/docs/p2p-kritisch-rapport.md) — kritisch audit / wat nog niet waterdicht is  
+| Doc | Voor wie |
+|-----|----------|
+| [`speler-handleiding.md`](multi-game/docs/speler-handleiding.md) | Spelers |
+| [`p2p-multiplayer.md`](multi-game/docs/p2p-multiplayer.md) | Ontwikkelaars |
+| [`multiplayer-bouwregels.md`](multi-game/docs/multiplayer-bouwregels.md) | Nieuw spel |
+| [`p2p-kritisch-rapport.md`](multi-game/docs/p2p-kritisch-rapport.md) | Audit / P0–P3 |
+
+### Multiplayer-paden
+
+| Pad | URL | Beschrijving |
+|-----|-----|--------------|
+| **Room shell (voorkeur)** | `#room/?room=CODE` | Eén link per groep; host kiest spel; P2P blijft open |
+| **Legacy per spel** | `#tic-tac-toe/?room=CODE` | Oud: P2P + log per spel in de game-lobby |
+| **Hotseat** | Spel → “Op dit apparaat” | Geen netwerk |
+
+Deellink voorbeeld (room):  
+`https://www.d-game.nl/#room/?room=AB7K2M`
 
 ### Transporten
 
-`createRoom({ gameId, transport, maxGuests })` in `multi-game/js/core/room.js`:
+`createRoom({ gameId, transport, maxGuests })` — legacy per spel.  
+`createRoomSession({ maxGuests: 5 })` — room shell.
 
 | `transport` | Gebruik |
 |-------------|---------|
-| **`p2p`** | PeerJS WebRTC. Host opent een room; gasten joinen via kamercode / QR / deellink (`?room=CODE`). |
-| **`local`** | Hotseat op één apparaat (geen netwerk). |
-| **`qr`** | Event-log sync via QR (zwaarder; lab/legacy). |
-| **`matrix`** | Stub / later. |
+| **`p2p`** | PeerJS WebRTC (ster: host + gasten) |
+| **`local`** | Hotseat op één apparaat |
+| **`qr`** | Log via QR (lab) |
+| **`matrix`** | Stub |
 
-Voorkeur-transport voor “echte” multiplayer: **P2P**.
+### Log (twee lagen in room shell)
 
-### Typische P2P-flow
+| Laag | Key | Inhoud |
+|------|-----|--------|
+| Room | `p2p:room:CODE` | Leden, welk spel actief |
+| Session | `p2p:session:CODE:sid:gameId` | Zetten, worpen, … → `replay(log)` |
+| Legacy | `p2p:gameId:CODE` | Standalone per-spel P2P |
 
-1. Speler kiest **Maak room + toon QR** (host) of **Join** / scan QR (gast).
-2. Host krijgt een PeerJS-id; de **kamercode** en share-URL (`#<game>/index.html?room=…`) worden getoond.
-3. Gast opent die URL (of typt de code). De shell laadt het spel; het spel leest `room` uit de hash-query.
-4. Handshake: `hello` / `welcome` met **`gameId`** (bijv. `"ganzenbord"`). Verkeerd spel → duidelijke fout, geen gemengde state.
-5. Verdere berichten: game-intents (`move`, `roll`, …) en sync (`LOG` + vaak `STATE`-snapshot).
-
-### Host + event-log (ganzenbord, tic-tac-toe, …)
-
-- De **host** is authoritative: zetten/worpen worden op de host toegepast en als events in een **append-only log** gezet.
-- Die log wordt naar peers gebroadcast / gemerged (`js/sync/event-log.js`); vaak volgt een **STATE**-snapshot als backup.
-- State = **replay van de log** (deterministisch: RNG-uitkomsten zitten in het event-payload).
-- Stoelen hangen aan **`playerId`**, niet aan “wie nu de PeerJS-host is”.
-- Desk / recente rooms onthouden code + rol; openen via hash-shell (`?as=host` voor host-wissel).
+Host append events; gasten **adoptHostPacket** + replay. Stoelen = **`playerId`** in localStorage.
 
 ### Wat P2P wél en niet is
 
-- **Wel:** browser-to-browser via PeerJS-broker + WebRTC data channels; deellink/QR; host-tab moet bereikbaar blijven (of iemand neemt host over).
-- **Niet:** centrale gameserver; geen account-database in deze sandbox.
-- Offline host → gasten kunnen niet doorzetten tot er weer een host is met dezelfde roomcode + log.
+- **Wel:** browser-to-browser; één deellink per avond (room); host-tab open houden
+- **Niet:** gameserver; accounts; anti-cheat tegen kwaadaardige host
 
 ### Belangrijke bestanden
 
 ```
-multi-game/js/core/room.js       createRoom / transportFromUrl
-multi-game/js/transport/p2p.js   PeerJS-transport
-multi-game/js/p2p/session.js     share-URL, hello/welcome, ping
-multi-game/js/sync/event-log.js  append-only keten + merge
-multi-game/js/shell/site-url.js  hash-shell navigatie, share-URL’s, QR-safe clicks
-multi-game/<spel>/               game.js (regels) · room.js · main.js · ui.js
+multi-game/room/                 Room shell (voorkeur multiplayer)
+multi-game/js/p2p/room-session.js
+multi-game/js/sync/room-log.js
+multi-game/js/sync/event-log.js
+multi-game/js/bridge/
+multi-game/js/core/room.js       createRoomSession + createRoom
+multi-game/js/shell/site-url.js
+multi-game/<spel>/embedded.js    Spel in room-iframe
 ```
 
-Test P2P zonder volledig spel: tab **Netwerk** (`#netwerk/index.html`) — host, join, echo.
+Test P2P zonder spel: tab **Netwerk** (`#netwerk/index.html`).
 
 ---
 
@@ -124,7 +132,9 @@ Meer detail over tabs en spellen: [multi-game/README.md](multi-game/README.md).
 
 ## Design-docs
 
-- **Huidige P2P-werking:** [`multi-game/docs/p2p-multiplayer.md`](multi-game/docs/p2p-multiplayer.md)
+- **Index:** [`multi-game/docs/README.md`](multi-game/docs/README.md)
+- **Spelers:** [`multi-game/docs/speler-handleiding.md`](multi-game/docs/speler-handleiding.md)
+- **P2P werking:** [`multi-game/docs/p2p-multiplayer.md`](multi-game/docs/p2p-multiplayer.md)
 - **Bouwregels:** [`multi-game/docs/multiplayer-bouwregels.md`](multi-game/docs/multiplayer-bouwregels.md)
 - **Kritisch rapport:** [`multi-game/docs/p2p-kritisch-rapport.md`](multi-game/docs/p2p-kritisch-rapport.md)
-- Historische / ontwerpnotities: `multi-game/docs/superpowers/specs/`
+- Specs (actueel vs historisch): [`multi-game/docs/superpowers/specs/README.md`](multi-game/docs/superpowers/specs/README.md)

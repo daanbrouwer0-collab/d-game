@@ -29,7 +29,7 @@ function render() {
         <button type="button" class="btn btn-primary" data-go="open">Open</button>
         <button type="button" class="btn btn-ghost" data-go="host">Host opnieuw</button>
         <button type="button" class="btn btn-ghost" data-go="join">Join</button>
-        <button type="button" class="btn btn-ghost" data-remove="${item.gameId}|${item.code}">Wis</button>
+        <button type="button" class="btn btn-ghost" data-remove="${item.isRoomShell ? "" : item.gameId}|${item.code}">Wis</button>
       </div>`;
     listEl.appendChild(li);
     li.querySelectorAll("[data-go]").forEach((btn) => {

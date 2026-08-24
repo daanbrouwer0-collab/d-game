@@ -1,0 +1,245 @@
+.app-room .room-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.room-chrome {
+  margin-bottom: 0.75rem;
+}
+
+.room-chrome.hidden {
+  display: none;
+}
+
+.room-roster-bar {
+  margin-bottom: 0;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.room-roster-bar .lobby-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.room-roster-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.room-roster-list .player-row.is-you {
+  border-color: var(--accent, #2563eb);
+}
+
+.room-roster-list .player-row.is-host {
+  background: color-mix(in srgb, var(--accent, #2563eb) 8%, var(--cell, #fff));
+}
+
+.room-join {
+  margin-top: 1.5rem;
+}
+
+.room-join label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.join-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.join-row input {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--border, #ccc);
+}
+
+.room-error {
+  color: var(--danger, #c0392b);
+  margin-top: 0.75rem;
+}
+
+.game-picker {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.game-picker li {
+  margin: 0;
+}
+
+.game-picker .game-vote-card {
+  width: 100%;
+  text-align: left;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--line, #ddd);
+  background: var(--cell, #fff);
+  cursor: pointer;
+  font: inherit;
+  display: block;
+}
+
+.game-picker .game-vote-card:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.game-picker .game-vote-card:not(:disabled):hover {
+  border-color: var(--accent, #2563eb);
+}
+
+.game-picker .game-vote-card.is-voted {
+  border-color: var(--accent, #2563eb);
+  box-shadow: 0 0 0 1px var(--accent, #2563eb);
+}
+
+.game-picker .game-vote-card.is-leading:not(:disabled) {
+  border-color: var(--accent, #2563eb);
+}
+
+.game-picker .vote-meta {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.9rem;
+  color: var(--muted, #666);
+}
+
+.panel-playing {
+  padding: 0;
+}
+
+.playing-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border, #e8e8e8);
+}
+
+.game-frame {
+  width: 100%;
+  min-height: 60vh;
+  border: 0;
+  display: block;
+  background: var(--bg, #fafafa);
+}
+
+.invite-card {
+  margin-bottom: 1.25rem;
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border, #ddd);
+}
+
+.invite-card canvas {
+  display: block;
+  margin: 0.75rem auto;
+  max-width: 100%;
+}
+
+.room-code-line {
+  font-size: 1.1rem;
+}
+
+.room-chat-root {
+  margin-top: 0.5rem;
+}
+
+.room-chat {
+  padding: 0.75rem 1rem;
+}
+
+.room-chat-body.hidden {
+  display: none;
+}
+
+.room-chat[data-mode="expanded"] .room-chat-body.is-drawer {
+  position: fixed;
+  inset: auto 0 0 0;
+  max-height: 45vh;
+  z-index: 20;
+  background: var(--cell, #fff);
+  border-top: 1px solid var(--border, #ddd);
+  box-shadow: 0 -4px 24px rgb(0 0 0 / 12%);
+  padding: 0.75rem 1rem;
+  display: block;
+}
+
+.room-chat-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line, #ddd);
+  border-radius: 8px;
+  background: var(--cell, #fff);
+  font: inherit;
+  cursor: pointer;
+}
+
+.room-chat-badge {
+  min-width: 1.25rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: var(--accent, #2563eb);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.room-chat-badge.hidden {
+  display: none;
+}
+
+.room-chat-messages {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  max-height: 10rem;
+  overflow-y: auto;
+}
+
+.room-chat[data-mode="open"] .room-chat-messages {
+  max-height: 10rem;
+}
+
+.room-chat-msg {
+  margin-bottom: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.room-chat-msg.is-mine strong {
+  color: var(--accent, #2563eb);
+}
+
+.room-chat-form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.room-chat-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border, #ccc);
+}

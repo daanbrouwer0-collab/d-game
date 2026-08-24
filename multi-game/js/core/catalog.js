@@ -49,3 +49,12 @@ export const GAMES = [
 export function getGame(id) {
   return GAMES.find((g) => g.id === id);
 }
+
+/**
+ * @param {number} count
+ * @returns {GameEntry[]}
+ */
+export function gamesForPlayerCount(count) {
+  const n = Math.max(0, Math.floor(count));
+  return GAMES.filter((g) => n >= g.minPlayers && n <= g.maxPlayers);
+}

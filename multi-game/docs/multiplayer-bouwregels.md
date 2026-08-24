@@ -2,7 +2,7 @@
 
 **Status:** normatief (moeten / niet doen)  
 **Laatst bijgewerkt:** 2026-08-24  
-**Lees ook:** [p2p-multiplayer.md](./p2p-multiplayer.md) · [p2p-kritisch-rapport.md](./p2p-kritisch-rapport.md)
+**Lees ook:** [speler-handleiding.md](./speler-handleiding.md) · [p2p-multiplayer.md](./p2p-multiplayer.md) · [p2p-kritisch-rapport.md](./p2p-kritisch-rapport.md)
 
 Dit zijn de regels voor een **correct** multiplayer-spel in deze sandbox.  
 Waar de huidige code een regel schendt, is dat een **bekend defect** — kopieer die fout niet.
@@ -54,17 +54,24 @@ Alleen gasten mergen host-LOG / passen host-STATE toe.
 Envelope: `{ type, seq, payload, ts }`.  
 Game-types: kort en duidelijk (`move`, `roll`, `timeout`, …) of geprefixed (`rr_intent_commit`).
 
+### R6 — Room shell vs session log
+
+- **Room log** (`__room__`): leden, sessie-start/stop — nooit game-events.
+- **Session log** (per spel-id): bestaande replay-keten — nooit `room.*` events.
+- Embedded spellen (`?embedded=1`): **geen eigen P2P** — alleen bridge naar `room/`.
+- Spelersflow: [speler-handleiding.md](./speler-handleiding.md).
+
 ---
 
 ## 2. Identity & stoelen
 
-### R6 — Claim seats via host, met `playerId`
+### R7 — Claim seats via host, met `playerId`
 
 - Gast stuurt in hello: `playerId`, `name`, optioneel cosmetics.
 - Host wijst of herkent stoel; stuurt `youAre` (of seat-id) in welcome.
 - **Nooit** een bezette stoel overschrijven met “fallback eerste vrije mark”.
 
-### R7 — Bind verbinding → stoel
+### R8 — Bind verbinding → stoel
 
 Houd `peerId → playerId` bij join.  
 Bij elke intent:
@@ -75,9 +82,9 @@ assert payload.actorId === seat
 assert seat mag deze actie nu
 ```
 
-Zonder R7 is multi-player spoofbaar.
+Zonder R8 is multi-player spoofbaar.
 
-### R8 — Mid-game join beleid expliciet
+### R9 — Mid-game join beleid expliciet
 
 Kies en documenteer in het spel:
 
@@ -87,7 +94,7 @@ Kies en documenteer in het spel:
 
 Implementeer met `REJECT` + reden, niet stil `return`.
 
-### R9 — Peer leave ≠ seat wissen
+### R10 — Peer leave ≠ seat wissen
 
 Markeer offline; houd stoel voor reconnect op zelfde `playerId`.
 
@@ -95,31 +102,31 @@ Markeer offline; houd stoel voor reconnect op zelfde `playerId`.
 
 ## 3. Beurten & acties
 
-### R10 — Gast stuurt intent, host past rules toe
+### R11 — Gast stuurt intent, host past rules toe
 
 ```text
 Gast:  { type: "roll", playerId }     // geen dobbelsteen-waarde
 Host:  value = rng(); append { type:"roll", playerId, value }; broadcast
 ```
 
-### R11 — Alle RNG in het host-event-payload
+### R12 — Alle RNG in het host-event-payload
 
 Blocked cells, dobbel, timeout-cel, shuffle — alles in de log/snapshot van de host.  
 Replay/clients **nooit** opnieuw `Math.random()` voor dezelfde gebeurtenis.
 
-### R12 — Valideer beurt op de host alsof de gast liegt
+### R13 — Valideer beurt op de host alsof de gast liegt
 
 Checks minimaal: fase, beurt, actor, cel/actie legaal, niet al beeindigd.  
 Bij fail: **REJECT of STATE/LOG opnieuw**, geen stille drop zonder feedback.
 
-### R13 — Timers: één eigenaar + idempotent
+### R14 — Timers: één eigenaar + idempotent
 
 **Aanbevolen:** alleen de host laat de beurt-timer expireren.  
 Als gast ook mag “nudgen”: host behandelt timeout met `turnKey`; tweede request = no-op + ACK.
 
 Documenteer per spel wat timeout doet: **skip** vs **forced action**.
 
-### R14 — Host mag door als gast offline is (optioneel)
+### R15 — Host mag door als gast offline is (optioneel)
 
 Als je dat toelaat: host blijft zetten; gast synct bij reconnect.  
 UI mag niet alle host-acties disablen alleen omdat `isConnected()` false is (1v1 flap).
@@ -128,28 +135,28 @@ UI mag niet alle host-acties disablen alleen omdat `isConnected()` false is (1v1
 
 ## 4. Sync & persistatie
 
-### R15 — Na elke commit: broadcast waarheid
+### R16 — Na elke commit: broadcast waarheid
 
 Log-model: `LOG` (packet) + bij voorkeur `STATE` (snapshot backup).  
 Snapshot-model: nieuwe snapshot na elke geaccepteerde intent / fasewissel.
 
-### R16 — Incrementeel syncen (doel), full dump alleen bij welcome/resync
+### R17 — Incrementeel syncen (doel), full dump alleen bij welcome/resync
 
 Ideaal: `encodeSyncPacket(log, peerTipSeq)`.  
 Gap → host stuurt resync vanaf 0 of vanaf tip.  
 *(Huidige code dump’t vaak alles — bij lange games plannen op resync.)*
 
-### R17 — Fork-policy: host wint
+### R18 — Fork-policy: host wint
 
 Bij conflict: host-log is canoniek; gast reset naar host-welcome.  
 Niet stil `mergeLogs` preferred=local op de gast laten “winnen” zonder UI-resync.
 
-### R18 — Persist alleen host-commit
+### R19 — Persist alleen host-commit
 
 `saveRoomLog` na succesvolle append op de host.  
 Gast mag cachen voor snelle UI, maar reconnect vertrouwt host-welcome.
 
-### R19 — Desk / `?as=host`
+### R20 — Desk / `?as=host`
 
 Host-wissel: zelfde roomcode + geladen log.  
 Bij `unavailable-id`: niet stiekem nieuwe code maken.
@@ -158,20 +165,20 @@ Bij `unavailable-id`: niet stiekem nieuwe code maken.
 
 ## 5. UI / UX-regels (voorkomen “vast”-bugs)
 
-### R20 — Toon duidelijk wiens beurt
+### R21 — Toon duidelijk wiens beurt
 
 Naam + mark/stoel + “jouw beurt” vs “wacht op …”. Visuele state op het bord.
 
-### R21 — Optimistic UI alleen met pending + timeout
+### R22 — Optimistic UI alleen met pending + timeout
 
 Of: wacht op LOG/STATE.  
 Nooit `{ ok: true }` alleen omdat `send()` true terugbracht zonder host-bevestiging.
 
-### R22 — Reconnect zichtbaar en automatisch (gasten)
+### R23 — Reconnect zichtbaar en automatisch (gasten)
 
 Max N pogingen; knop blijft beschikbaar; fouttekst op het **spelscherm**, niet alleen lobby.
 
-### R23 — Einde partij: restart-pad voor host zonder guest-link
+### R24 — Einde partij: restart-pad voor host zonder guest-link
 
 Host moet opnieuw kunnen starten als de gast even weg is.
 
@@ -183,8 +190,8 @@ Gebruik dit vóór je “klaar” zegt:
 
 ### Transport & handshake
 
-- [ ] `createRoom` + unieke `gameId`
-- [ ] hello/welcome met gameId, playerId, name
+- [ ] Embedded: `BridgeTransport` + geen PeerJS in spel; legacy: `createRoom` + `gameId`
+- [ ] hello/welcome met playerId, name; legacy ook gameId
 - [ ] welcome bevat log en/of state + seat mapping
 - [ ] mid-game join: REJECT of allow — getest
 
@@ -259,7 +266,7 @@ onMessage(msg):
 
 Rules (`reducer`) blijven per spel; **netwerkdiscipline is gedeeld**.
 
-Zolang die pipeline niet in `js/` als module bestaat, is elk spel verantwoordelijk om R1–R23 zelf te handhaven — en faalt dat in de praktijk (zie kritisch rapport).
+Zolang die pipeline niet in `js/` als module bestaat, is elk spel verantwoordelijk om R1–R24 zelf te handhaven — en faalt dat in de praktijk (zie kritisch rapport).
 
 ---
 

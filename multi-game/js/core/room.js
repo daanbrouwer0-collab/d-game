@@ -1,5 +1,6 @@
 import { LocalTransport } from "../transport/local.js";
 import { P2PTransport } from "../transport/p2p.js";
+import { RoomP2PTransport } from "../transport/room-p2p.js";
 import { MatrixTransport } from "../transport/matrix.js";
 import { QrTransport } from "../transport/qr.js";
 import { TransportType } from "../p2p/protocol.js";
@@ -35,6 +36,17 @@ export function createRoom({ gameId, transport = "p2p", maxGuests = 1 }) {
     default:
       throw new Error(`Onbekend transport: ${transport}`);
   }
+}
+
+/**
+ * Game-agnostic room session (multi-game lobby).
+ * @param {{ transport?: 'p2p', maxGuests?: number }} [options]
+ */
+export function createRoomSession({ transport = "p2p", maxGuests = 5 } = {}) {
+  if (transport !== "p2p") {
+    throw new Error("Room session ondersteunt alleen p2p");
+  }
+  return new RoomP2PTransport({ maxGuests });
 }
 
 /**

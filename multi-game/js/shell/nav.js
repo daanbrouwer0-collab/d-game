@@ -124,3 +124,38 @@ export function shellBaseFromDepth(depth = 0) {
   if (depth <= 0) return "";
   return "../".repeat(depth);
 }
+
+/**
+ * Waarschuw bij navigatie weg uit een actieve room (P2P valt weg).
+ * @param {{ isConnected: () => boolean, onConfirmLeave?: () => void }} opts
+ */
+export function guardRoomNavigation(opts) {
+  const { isConnected, onConfirmLeave } = opts;
+  document.addEventListener(
+    "click",
+    (e) => {
+      if (!isConnected()) return;
+      const target = /** @type {HTMLElement} */ (e.target);
+      const tab = target.closest?.(".shell-tab[data-tab]");
+      const link = target.closest?.("a[href]");
+      if (!tab && !link) return;
+
+      const href = link ? String(link.getAttribute("href") || "") : "";
+      const leavingTab = tab && tab.getAttribute("data-tab") !== "lobby";
+      const leavingLink = link && !href.includes("room");
+      if (!leavingTab && !leavingLink) return;
+
+      if (
+        !confirm(
+          "Room verlaten? De verbinding met je groep wordt verbroken.",
+        )
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      onConfirmLeave?.();
+    },
+    true,
+  );
+}

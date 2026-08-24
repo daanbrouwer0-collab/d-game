@@ -22,9 +22,19 @@
       <main>
         <p id="pref-hint" class="pref-hint"></p>
         <section class="panel">
+          <h2>Multiplayer</h2>
+          <p class="lede">
+            Start een room voor je groep — daarna kies je samen een spel.
+          </p>
+          <div class="actions" style="margin-bottom: 1.5rem">
+            <a href="room/" class="btn btn-primary">Start / join room</a>
+            <a href="handleiding/" class="btn btn-ghost" style="margin-left: 0.5rem">Hoe werkt multiplayer?</a>
+          </div>
+        </section>
+        <section class="panel">
           <h2>Spellen</h2>
           <p class="lede">
-            Kies een spel. Multiplayer test je op het tabblad Netwerk (P2P).
+            Solo of hotseat per spel. Multiplayer met vrienden via een room.
           </p>
           <ul id="game-list" class="game-list"></ul>
         </section>
@@ -34,15 +44,27 @@
     <script type="module">
       import { GAMES } from "./js/core/catalog.js";
       import { getPreferredTransport, listTransportMeta } from "./js/core/prefs.js";
+      import { loadActiveRoom } from "./js/p2p/room-memory.js";
       import { mountRoomStrip, mountShellNav } from "./js/shell/nav.js";
 
       mountShellNav({ active: "games", base: "" });
       mountRoomStrip({ base: "" });
 
+      const active = loadActiveRoom();
+      if (active?.code && active.isRoomShell) {
+        const main = document.querySelector("main");
+        const banner = document.createElement("section");
+        banner.className = "panel room-continue-banner";
+        banner.innerHTML = `
+          <p>Je was in room <strong>${active.code}</strong>.</p>
+          <a href="room/?room=${encodeURIComponent(active.code)}" class="btn btn-primary">Ga verder in room</a>`;
+        main?.prepend(banner);
+      }
+
       const pref = getPreferredTransport();
       const meta = listTransportMeta().find((t) => t.id === pref);
       document.getElementById("pref-hint").innerHTML =
-        `Multiplayer: <strong>${meta?.label || "P2P"}</strong> — test op Netwerk.`;
+        `Multiplayer via room — transport: <strong>${meta?.label || "P2P"}</strong>.`;
 
       const list = document.getElementById("game-list");
       list.innerHTML = GAMES.map(
@@ -51,7 +73,7 @@
           <a href="${g.path}">
             <strong>${g.title}</strong>
             <span>${g.blurb}</span>
-            <span class="game-meta-line">${g.minPlayers}–${g.maxPlayers} spelers</span>
+            <span class="game-meta-line">${g.minPlayers}–${g.maxPlayers} spelers · solo/hotseat</span>
           </a>
         </li>`,
       ).join("");

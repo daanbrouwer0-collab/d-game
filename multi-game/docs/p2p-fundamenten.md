@@ -2,7 +2,16 @@
 
 **Datum:** 2026-08-24  
 **Doel:** geen “fallback-therapie”, wel: wat is structureel sterk/zwak, hoe data & beurten geordend zijn, wat overbodig is, welke **echte** oplossingen er zijn.  
-**Leeswijzer:** [p2p-multiplayer.md](./p2p-multiplayer.md) · [p2p-kritisch-rapport.md](./p2p-kritisch-rapport.md) · [multiplayer-bouwregels.md](./multiplayer-bouwregels.md)
+**Documentatieset P2P:**
+
+| Doc | Rol |
+|-----|-----|
+| [speler-handleiding.md](./speler-handleiding.md) | Spelers: room, link, host |
+| [p2p-multiplayer.md](./p2p-multiplayer.md) | Beschrijvend: transport, log, room shell |
+| [multiplayer-bouwregels.md](./multiplayer-bouwregels.md) | Normatief: R1–R24 |
+| **Dit bestand** | Fundamenten: canon, geen fallbacks |
+| [p2p-kritisch-rapport.md](./p2p-kritisch-rapport.md) | Gaten, P0–P3 |
+| [README.md](./README.md) | Documentatie-index |
 
 ---
 

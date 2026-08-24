@@ -9,10 +9,14 @@ const MAX_RECENT = 16;
 
 /**
  * @typedef {{
- *   gameId: string,
+ *   gameId?: string,
  *   role: 'host'|'guest',
  *   code: string,
  *   name: string,
+ *   isRoomShell?: boolean,
+ *   memberCount?: number,
+ *   activeGameId?: string | null,
+ *   activeSessionId?: string | null,
  * }} RoomMemory
  *
  * @typedef {RoomMemory & {
@@ -35,7 +39,7 @@ export function saveRoom(data) {
 }
 
 /**
- * @param {string} gameId
+ * @param {string} [gameId]
  * @returns {RoomMemory | null}
  */
 export function loadRoom(gameId) {
@@ -43,11 +47,17 @@ export function loadRoom(gameId) {
     const raw = sessionStorage.getItem(ACTIVE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    if (!data || data.gameId !== gameId || !data.code || !data.role) return null;
+    if (!data || !data.code || !data.role) return null;
+    if (gameId && data.gameId && data.gameId !== gameId) return null;
     return data;
   } catch {
     return null;
   }
+}
+
+/** @returns {RoomMemory | null} */
+export function loadActiveRoom() {
+  return loadRoom();
 }
 
 /** Clears only the active room (not recent history). */
@@ -64,20 +74,23 @@ export function clearRoom() {
  */
 export function pushRecent(data) {
   try {
-    const extra = /** @type {{ summary?: string, seq?: number }} */ (data);
-    const list = listRecent(data.gameId).filter((r) => r.code !== data.code);
-    list.unshift({
-      gameId: data.gameId,
-      code: data.code,
+    const extra = /** @type {RecentRoom} */ (data);
+    const code = String(data.code || "").trim().toUpperCase();
+    const all = readAllRecent().filter((r) => r.code !== code);
+    all.unshift({
+      gameId: data.gameId || "",
+      code,
       role: data.role,
       name: data.name,
       lastSeen: Date.now(),
       summary: extra.summary || "",
       seq: extra.seq || 0,
+      memberCount: extra.memberCount ?? 0,
+      activeGameId: extra.activeGameId ?? null,
+      activeSessionId: extra.activeSessionId ?? null,
+      isRoomShell: extra.isRoomShell ?? false,
     });
-    const trimmed = list.slice(0, MAX_RECENT);
-    const all = readAllRecent().filter((r) => r.gameId !== data.gameId);
-    localStorage.setItem(RECENT_KEY, JSON.stringify([...trimmed, ...all]));
+    localStorage.setItem(RECENT_KEY, JSON.stringify(all.slice(0, MAX_RECENT)));
   } catch {
     /* ignore */
   }
@@ -98,7 +111,7 @@ export function listRecent(gameId) {
  */
 export function listAllRecent() {
   return readAllRecent()
-    .filter((r) => r.gameId && r.code)
+    .filter((r) => r.code)
     .sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
 }
 
@@ -119,9 +132,23 @@ function readAllRecent() {
  */
 export function removeRecent(gameId, code) {
   try {
+    const c = String(code || "").trim().toUpperCase();
     const next = readAllRecent().filter(
-      (r) => !(r.gameId === gameId && r.code === code),
+      (r) => !(r.gameId === gameId && r.code === c),
     );
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * @param {string} code
+ */
+export function removeRecentByCode(code) {
+  try {
+    const c = String(code || "").trim().toUpperCase();
+    const next = readAllRecent().filter((r) => r.code !== c);
     localStorage.setItem(RECENT_KEY, JSON.stringify(next));
   } catch {
     /* ignore */

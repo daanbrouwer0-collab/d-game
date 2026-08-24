@@ -1,0 +1,900 @@
+import { createRoomSession } from "../js/core/room.js";
+import { gamesForPlayerCount, getGame } from "../js/core/catalog.js";
+import {
+  loadRoomLogByCode,
+  saveRoomLogByCode,
+  loadSessionLog,
+  saveSessionLog,
+  touchDeskRoom,
+} from "../js/core/desk.js";
+import { getPlayerId, playerLabel } from "../js/core/storage.js";
+import { saveRoom, clearRoom } from "../js/p2p/room-memory.js";
+import { mountRoomStrip, mountShellNav, guardRoomNavigation } from "../js/shell/nav.js";
+import { showHostInviteCard } from "../js/shell/p2p-invite-ui.js";
+import { mountRoomChat } from "../js/shell/room-chat.js";
+import {
+  renderRoomRoster,
+  tallyVotes,
+  pickWinningGame,
+} from "../js/shell/room-roster.js";
+import {
+  readHostIntentFromUrl,
+  readRoomFromUrl,
+  buildGameEmbeddedUrl,
+  buildRoomShareUrl,
+} from "../js/shell/site-url.js";
+import { TransportType } from "../js/p2p/protocol.js";
+import {
+  adoptHostPacket,
+  encodeSyncPacket,
+  tipSeq,
+} from "../js/sync/event-log.js";
+import {
+  RoomEvent,
+  replayRoom,
+  newSessionId,
+  commitRoomEvent,
+} from "../js/sync/room-log.js";
+import { createRoomHostCommit } from "../js/sync/room-host.js";
+import { RoomMsg } from "../js/sync/room-msg.js";
+import { mountGameBridge } from "../js/bridge/game-bridge.js";
+import { createSessionHost } from "../js/bridge/session-host.js";
+import { SyncMsg } from "../js/sync/sync-msg.js";
+
+mountShellNav({ active: "lobby", base: "../" });
+mountRoomStrip({ base: "../" });
+
+const panelIdle = document.getElementById("panel-idle");
+const panelLobby = document.getElementById("panel-lobby");
+const panelPlaying = document.getElementById("panel-playing");
+const roomChrome = document.getElementById("room-chrome");
+const roomStatus = document.getElementById("room-status");
+const roomError = document.getElementById("room-error");
+const rosterList = document.getElementById("roster-list");
+const rosterCount = document.getElementById("roster-count");
+const gamePicker = document.getElementById("game-picker");
+const pickerHint = document.getElementById("picker-hint");
+const voteStatus = document.getElementById("vote-status");
+const btnStartVoted = document.getElementById("btn-start-voted");
+const gameFrame = /** @type {HTMLIFrameElement} */ (
+  document.getElementById("game-frame")
+);
+const playingLabel = document.getElementById("playing-label");
+const btnBackLobby = document.getElementById("btn-back-lobby");
+const joinInput = /** @type {HTMLInputElement} */ (
+  document.getElementById("join-code")
+);
+
+/** @type {ReturnType<typeof createRoomSession> | null} */
+let session = null;
+/** @type {ReturnType<typeof createRoomHostCommit> | null} */
+let roomHost = null;
+/** @type {import('../js/sync/event-log.js').EventLog} */
+let roomLog = null;
+/** @type {ReturnType<typeof createSessionHost> | null} */
+let sessionHost = null;
+/** @type {ReturnType<typeof mountGameBridge> | null} */
+let gameBridge = null;
+
+/** @type {{ sessionId: string, gameId: string } | null} */
+let activeSession = null;
+/** @type {string | null} */
+let shareUrl = null;
+/** @type {Map<string, string>} */
+const peerToPlayer = new Map();
+/** @type {ReturnType<typeof mountRoomChat> | null} */
+let roomChat = null;
+let sessionConnected = false;
+
+const playerId = getPlayerId();
+const roomCommit = createRoomHostCommit();
+
+function setError(msg) {
+  if (!msg) {
+    roomError.classList.add("hidden");
+    roomError.textContent = "";
+    return;
+  }
+  roomError.textContent = msg;
+  roomError.classList.remove("hidden");
+}
+
+function setStatus(text) {
+  roomStatus.textContent = text;
+}
+
+function showPanel(name) {
+  panelIdle.classList.toggle("hidden", name !== "idle");
+  panelLobby.classList.toggle("hidden", name !== "lobby");
+  panelPlaying.classList.toggle("hidden", name !== "playing");
+  roomChrome?.classList.toggle("hidden", name === "idle");
+}
+
+function roomState() {
+  return replayRoom(roomLog);
+}
+
+function rosterArray() {
+  return [...roomState().members.values()];
+}
+
+function memberCount() {
+  return rosterArray().length;
+}
+
+function getGameTitle(gameId) {
+  return getGame(gameId)?.title || gameId;
+}
+
+function renderRoster() {
+  const state = roomState();
+  renderRoomRoster(rosterList, rosterCount, {
+    members: rosterArray(),
+    hostPlayerId: state.hostPlayerId,
+    localPlayerId: playerId,
+    maxPlayers: 6,
+    votes: state.votes,
+    getGameTitle,
+  });
+  renderGamePicker();
+  renderChat();
+  syncChatMode();
+}
+
+function initRoomChat() {
+  const root = document.getElementById("room-chat-root");
+  if (!root || roomChat) return;
+  roomChat = mountRoomChat(root, {
+    onSend(text) {
+      sendChat(text);
+    },
+  });
+}
+
+function renderChat() {
+  if (!roomChat || !roomLog) return;
+  const state = roomState();
+  roomChat.render({
+    messages: state.chat,
+    localPlayerId: playerId,
+    chatSeq: state.chatSeq,
+  });
+}
+
+function syncChatMode() {
+  if (!roomChat) return;
+  const playing = !!roomState().activeSession || !!activeSession;
+  roomChat.setMode(playing ? "collapsed" : "open");
+  if (!playing) roomChat.markRead(roomState().chatSeq);
+}
+
+/**
+ * @param {string} authorId
+ * @param {string} text
+ */
+function commitChat(authorId, text) {
+  if (!session || !roomLog || !roomHost) return;
+  const name =
+    rosterArray().find((m) => m.playerId === authorId)?.name || "Speler";
+  const posted = roomHost.postChat(roomLog, {
+    playerId: authorId,
+    name,
+    text,
+  });
+  if (!posted.ok) return;
+  roomLog = posted.log;
+  saveRoomLogByCode(session.roomCode, roomLog);
+  broadcastRoomLog(tipSeq(roomLog) - 1);
+  renderRoster();
+  persistRoomDesk();
+}
+
+function sendChat(text) {
+  if (!session || !roomLog || !roomHost) return;
+  if (session.role === "host") {
+    const posted = roomHost.postChat(roomLog, {
+      playerId,
+      name: playerLabel(),
+      text,
+    });
+    if (!posted.ok) {
+      if (posted.reason === "rate_limit") {
+        setError("Te veel berichten — even wachten.");
+      }
+      return;
+    }
+    setError("");
+    roomLog = posted.log;
+    saveRoomLogByCode(session.roomCode, roomLog);
+    broadcastRoomLog(tipSeq(roomLog) - 1);
+    renderRoster();
+    persistRoomDesk();
+    return;
+  }
+  session.send(RoomMsg.ROOM_INTENT, {
+    kind: "chat",
+    playerId,
+    text,
+  });
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function renderGamePicker() {
+  const state = roomState();
+  const count = memberCount();
+  const playable = gamesForPlayerCount(count);
+  const playableIds = playable.map((g) => g.id);
+  const tallies = tallyVotes(state.votes);
+  const winner = pickWinningGame(tallies, playableIds);
+  const myVote = state.votes.get(playerId) || null;
+
+  pickerHint.textContent =
+    count < 2
+      ? "Wacht op minstens 2 spelers om te stemmen."
+      : `${count} speler${count === 1 ? "" : "s"} — stem op een spel hieronder.`;
+
+  gamePicker.innerHTML = "";
+  for (const g of gamesForPlayerCount(999)) {
+    const ok = count >= g.minPlayers && count <= g.maxPlayers;
+    const votes = tallies.get(g.id) || 0;
+    const isVoted = myVote === g.id;
+    const isLeading = ok && winner === g.id && votes > 0;
+    const li = document.createElement("li");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "game-vote-card";
+    if (isVoted) btn.classList.add("is-voted");
+    if (isLeading) btn.classList.add("is-leading");
+    btn.disabled = !ok || !!state.activeSession;
+    btn.dataset.game = g.id;
+    const reason = ok
+      ? `${g.minPlayers}–${g.maxPlayers} spelers`
+      : `Vereist ${g.minPlayers}–${g.maxPlayers} spelers`;
+    const voteLine =
+      votes > 0
+        ? `${votes} stem${votes === 1 ? "" : "men"}`
+        : "Nog geen stemmen";
+    btn.innerHTML = `<strong>${escapeHtml(g.title)}</strong>
+      <span class="vote-meta">${escapeHtml(reason)} · ${escapeHtml(voteLine)}</span>`;
+    btn.addEventListener("click", () => voteForGame(g.id));
+    li.appendChild(btn);
+    gamePicker.appendChild(li);
+  }
+
+  if (state.activeSession) {
+    voteStatus.textContent = "";
+    btnStartVoted?.classList.add("hidden");
+    return;
+  }
+
+  if (myVote) {
+    voteStatus.textContent = `Jij stemde op ${getGameTitle(myVote)}.`;
+  } else if (count >= 2) {
+    voteStatus.textContent = "Klik op een spel om te stemmen.";
+  } else {
+    voteStatus.textContent = "";
+  }
+
+  const isHost = session?.role === "host";
+  if (isHost && count >= 2 && winner) {
+    btnStartVoted?.classList.remove("hidden");
+    btnStartVoted.textContent = `Start ${getGameTitle(winner)}`;
+    btnStartVoted.disabled = !playable.some((g) => g.id === winner);
+  } else {
+    btnStartVoted?.classList.add("hidden");
+  }
+
+  if (!isHost && count >= 2) {
+    voteStatus.textContent = [
+      myVote ? `Jij stemde op ${getGameTitle(myVote)}.` : "Klik op een spel om te stemmen.",
+      winner
+        ? `Winnend: ${getGameTitle(winner)} (${tallies.get(winner) || 0} stemmen). Wacht op de host.`
+        : "Wacht tot iedereen stemt — de host start het winnende spel.",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+}
+
+/**
+ * @param {string} voterId
+ * @param {string} gameId
+ */
+function commitVote(voterId, gameId) {
+  if (!session || !roomLog || !roomHost) return;
+  const voted = roomHost.voteGame(roomLog, { playerId: voterId, gameId });
+  if (!voted.ok) return;
+  roomLog = voted.log;
+  saveRoomLogByCode(session.roomCode, roomLog);
+  broadcastRoomLog(tipSeq(roomLog) - 1);
+  renderRoster();
+  persistRoomDesk();
+}
+
+/**
+ * @param {string} gameId
+ */
+function voteForGame(gameId) {
+  if (!session || !roomLog || roomState().activeSession) return;
+  if (session.role === "host") {
+    commitVote(playerId, gameId);
+    return;
+  }
+  session.send(RoomMsg.ROOM_INTENT, {
+    kind: "game_vote",
+    playerId,
+    gameId,
+  });
+}
+
+function persistRoomDesk() {
+  if (!session?.roomCode) return;
+  const state = roomState();
+  touchDeskRoom({
+    code: session.roomCode,
+    role: session.role === "host" ? "host" : "guest",
+    name: playerLabel(),
+    memberCount: state.members.size,
+    activeGameId: state.activeSession?.gameId || null,
+    activeSessionId: state.activeSession?.sessionId || null,
+    summary: state.activeSession
+      ? `Speelt ${getGame(state.activeSession.gameId)?.title || state.activeSession.gameId}`
+      : `${state.members.size} speler${state.members.size === 1 ? "" : "s"}`,
+    seq: tipSeq(roomLog),
+    isRoomShell: !state.activeSession,
+  });
+}
+
+function broadcastRoomLog(fromSeq = 0) {
+  if (!session || session.role !== "host") return;
+  session.broadcast(RoomMsg.ROOM_LOG, {
+    packet: encodeSyncPacket(roomLog, fromSeq),
+  });
+}
+
+function returnToVoting() {
+  if (gameBridge) {
+    gameBridge.destroy();
+    gameBridge = null;
+  }
+  gameFrame.src = "about:blank";
+  activeSession = null;
+  sessionHost = null;
+  showPanel("lobby");
+  playingLabel.textContent = "";
+  renderRoster();
+  syncChatMode();
+  persistRoomDesk();
+}
+
+function adoptRoomPacket(packet) {
+  if (!packet) return;
+  const prevSession = activeSession;
+  const adopted = adoptHostPacket(roomLog, packet);
+  if (!adopted.ok) return;
+  roomLog = adopted.log;
+  if (session?.roomCode) saveRoomLogByCode(session.roomCode, roomLog);
+
+  const state = roomState();
+
+  if (state.activeSession && !prevSession) {
+    activeSession = state.activeSession;
+    if (session?.role === "guest") {
+      sessionHost = createSessionHost({
+        gameId: state.activeSession.gameId,
+        sessionId: state.activeSession.sessionId,
+        roomCode: session.roomCode,
+      });
+      mountActiveGame(
+        state.activeSession.gameId,
+        state.activeSession.sessionId,
+        null,
+      );
+    }
+  } else if (!state.activeSession && prevSession) {
+    returnToVoting();
+  }
+
+  renderRoster();
+  persistRoomDesk();
+}
+
+function handleRoomIntent(payload, fromPeerId) {
+  if (!session || session.role !== "host" || !roomLog || !roomHost) return;
+  const p = /** @type {{ kind?: string, playerId?: string, gameId?: string, text?: string }} */ (
+    payload || {}
+  );
+
+  if (p.kind === "game_vote") {
+    const pid = String(p.playerId || "");
+    const gameId = String(p.gameId || "");
+    if (!pid || !gameId) return;
+    if (fromPeerId && peerToPlayer.get(fromPeerId) !== pid) return;
+    if (roomState().activeSession) return;
+    commitVote(pid, gameId);
+    return;
+  }
+
+  if (p.kind === "chat") {
+    const pid = String(p.playerId || "");
+    const text = String(p.text || "");
+    if (!pid || !text) return;
+    if (fromPeerId && peerToPlayer.get(fromPeerId) !== pid) return;
+    commitChat(pid, text);
+  }
+}
+
+function bindSession(s) {
+  session = s;
+  roomHost = roomCommit;
+
+  s.onStatus = (status, detail) => {
+    const labels = {
+      idle: "Niet verbonden",
+      hosting: "Room open — wacht op spelers",
+      connecting: "Verbinden…",
+      connected: "In room",
+      disconnected: "Verbinding verbroken",
+      error: "Fout",
+    };
+    setStatus(
+      detail ? `${labels[status] || status}: ${detail}` : labels[status] || status,
+    );
+    sessionConnected = status === "hosting" || status === "connected";
+    if (status === "hosting" || status === "connected") {
+      showPanel(activeSession ? "playing" : "lobby");
+    }
+    if (status === "idle" || status === "disconnected") {
+      if (!activeSession) showPanel("idle");
+    }
+  };
+
+  s.onPeerJoin = () => {};
+
+  s.onPeerLeave = (peerId) => {
+    peerToPlayer.delete(peerId);
+    if (sessionHost) sessionHost.unbindPeer(peerId);
+  };
+
+  s.onMessage = (msg) => {
+    if (msg.type === TransportType.HELLO) {
+      handleHello(msg);
+      return;
+    }
+    if (msg.type === TransportType.WELCOME) {
+      handleWelcome(msg.payload);
+      return;
+    }
+    if (msg.type === RoomMsg.ROOM_LOG) {
+      const packet = /** @type {{ packet?: unknown }} */ (msg.payload || {})
+        .packet;
+      adoptRoomPacket(packet);
+      return;
+    }
+    if (msg.type === RoomMsg.ROOM_INTENT) {
+      handleRoomIntent(msg.payload, msg.fromPeerId || null);
+      return;
+    }
+    if (msg.type === RoomMsg.SESSION_LOG) {
+      handleSessionLog(msg.payload, msg.fromPeerId);
+      return;
+    }
+    if (msg.type === RoomMsg.SESSION_INTENT) {
+      if (s.role === "host") {
+        gameBridge?.sendGameIn(
+          SyncMsg.INTENT,
+          msg.payload,
+          msg.fromPeerId || null,
+        );
+      }
+      return;
+    }
+    if (msg.type === SyncMsg.ACK || msg.type === SyncMsg.REJECT) {
+      gameBridge?.sendGameIn(msg.type, msg.payload, msg.fromPeerId || null);
+    }
+  };
+}
+
+function handleHello(msg) {
+  if (!session || session.role !== "host" || !roomLog) return;
+  const p = /** @type {{ playerId?: string, name?: string }} */ (
+    msg.payload || {}
+  );
+  const pid = String(p.playerId || "");
+  const name = String(p.name || "").trim() || "Speler";
+  if (!pid) return;
+
+  peerToPlayer.set(String(msg.fromPeerId || ""), pid);
+  if (sessionHost) sessionHost.bindPeer(String(msg.fromPeerId || ""), pid);
+
+  const joined = roomHost.joinMember(roomLog, { playerId: pid, name });
+  if (joined.ok) {
+    roomLog = joined.log;
+    saveRoomLogByCode(session.roomCode, roomLog);
+    broadcastRoomLog(tipSeq(roomLog) - 1);
+    renderRoster();
+    persistRoomDesk();
+  }
+
+  /** @type {Record<string, unknown>} */
+  const welcome = {
+    youAre: "guest",
+    playerId: pid,
+    roomLog: encodeSyncPacket(roomLog, 0),
+  };
+  if (activeSession && sessionHost) {
+    welcome.activeSession = activeSession;
+    welcome.sessionLog = encodeSyncPacket(sessionHost.log, 0);
+  }
+  session.sendWelcome(welcome, String(msg.fromPeerId || ""));
+}
+
+function handleWelcome(payload) {
+  const p = /** @type {{
+    roomLog?: import('../js/sync/event-log.js').SyncPacket,
+    activeSession?: { sessionId: string, gameId: string },
+    sessionLog?: import('../js/sync/event-log.js').SyncPacket,
+  }} */ (payload || {});
+  if (p.roomLog) adoptRoomPacket(p.roomLog);
+  if (p.activeSession && session && !activeSession) {
+    activeSession = p.activeSession;
+    if (p.sessionLog) {
+      const local = loadSessionLog(
+        session.roomCode,
+        p.activeSession.sessionId,
+        p.activeSession.gameId,
+      );
+      const adopted = adoptHostPacket(local, p.sessionLog);
+      if (adopted.ok) {
+        saveSessionLog(
+          session.roomCode,
+          p.activeSession.sessionId,
+          p.activeSession.gameId,
+          adopted.log,
+        );
+      }
+    }
+    mountActiveGame(
+      p.activeSession.gameId,
+      p.activeSession.sessionId,
+      p.sessionLog || null,
+    );
+  }
+  renderRoster();
+}
+
+function handleSessionLog(payload, fromPeerId) {
+  const p = /** @type {{ sessionId?: string, gameId?: string, packet?: unknown }} */ (
+    payload || {}
+  );
+  if (!p.sessionId || !p.gameId || !p.packet) return;
+  if (activeSession?.sessionId !== p.sessionId) return;
+
+  if (session?.role === "host" && fromPeerId) return;
+
+  const local = loadSessionLog(session.roomCode, p.sessionId, p.gameId);
+  const adopted = adoptHostPacket(local, p.packet);
+  if (adopted.ok) {
+    saveSessionLog(session.roomCode, p.sessionId, p.gameId, adopted.log);
+    if (sessionHost) sessionHost.setLog(adopted.log);
+    gameBridge?.sendGameIn(SyncMsg.LOG, p.packet);
+  }
+}
+
+function relayGameOut(msg) {
+  if (!session || !activeSession) return;
+  const { gameType, payload } = msg;
+
+  if (gameType === "__session_ended__") {
+    endGame(
+      String(/** @type {{ reason?: string }} */ (payload || {}).reason || "finished"),
+    );
+    return;
+  }
+
+  if (gameType === SyncMsg.LOG) {
+    if (session.role === "host" && sessionHost) {
+      const packet = /** @type {import('../js/sync/event-log.js').SyncPacket} */ (
+        payload
+      );
+      const adopted = adoptHostPacket(sessionHost.log, packet);
+      if (adopted.ok) {
+        sessionHost.setLog(adopted.log);
+        session.broadcast(RoomMsg.SESSION_LOG, {
+          sessionId: activeSession.sessionId,
+          gameId: activeSession.gameId,
+          packet,
+        });
+      }
+    }
+    return;
+  }
+
+  if (gameType === SyncMsg.INTENT) {
+    if (session.role === "guest") {
+      session.send(RoomMsg.SESSION_INTENT, {
+        sessionId: activeSession.sessionId,
+        gameId: activeSession.gameId,
+        ...(/** @type {object} */ (payload || {})),
+      });
+    }
+    return;
+  }
+
+  if (gameType === SyncMsg.ACK || gameType === SyncMsg.REJECT) {
+    if (session.role === "host") {
+      session.broadcast(gameType, payload);
+    }
+    return;
+  }
+}
+
+/**
+ * @param {string} gameId
+ */
+async function startGame(gameId) {
+  if (!session || session.role !== "host" || !roomLog) return;
+  const game = getGame(gameId);
+  if (!game) return;
+
+  const members = rosterArray();
+  const playable = gamesForPlayerCount(members.length);
+  if (!playable.some((g) => g.id === gameId)) {
+    setError("Dit spel past niet bij het aantal spelers.");
+    return;
+  }
+
+  const sessionId = newSessionId();
+  const roster = members.map((m) => ({ playerId: m.playerId, name: m.name }));
+  const started = roomHost.startSession(roomLog, { sessionId, gameId, roster });
+  if (!started.ok) return;
+  roomLog = started.log;
+  saveRoomLogByCode(session.roomCode, roomLog);
+  broadcastRoomLog(tipSeq(roomLog) - 1);
+
+  activeSession = { sessionId, gameId };
+  sessionHost = createSessionHost({
+    gameId,
+    sessionId,
+    roomCode: session.roomCode,
+  });
+
+  for (const [peerId, pid] of peerToPlayer) {
+    sessionHost.bindPeer(peerId, pid);
+  }
+
+  persistRoomDesk();
+  mountActiveGame(gameId, sessionId, null);
+  syncChatMode();
+
+  session.broadcast(RoomMsg.ROOM_LOG, {
+    packet: encodeSyncPacket(roomLog, tipSeq(roomLog) - 1),
+  });
+}
+
+function startVotedGame() {
+  if (!session || session.role !== "host") return;
+  const state = roomState();
+  const playable = gamesForPlayerCount(memberCount());
+  const winner = pickWinningGame(tallyVotes(state.votes), playable.map((g) => g.id));
+  if (!winner) {
+    setError("Stem eerst op een spel.");
+    return;
+  }
+  setError("");
+  startGame(winner);
+}
+
+/**
+ * @param {string} gameId
+ * @param {string} sessionId
+ * @param {unknown} [sessionLogPacket]
+ */
+function mountActiveGame(gameId, sessionId, sessionLogPacket) {
+  const game = getGame(gameId);
+  if (!game || !session) return;
+
+  showPanel("playing");
+  playingLabel.textContent = game.title;
+  btnBackLobby.classList.toggle("hidden", session.role !== "host");
+  syncChatMode();
+
+  if (gameBridge) gameBridge.destroy();
+  gameBridge = mountGameBridge(gameFrame);
+  gameBridge.onGameOut(relayGameOut);
+
+  const src = buildGameEmbeddedUrl(game.path, {
+    room: session.roomCode,
+    session: sessionId,
+    embedded: 1,
+  });
+  gameFrame.src = src;
+
+  gameFrame.onload = () => {
+    const log =
+      sessionHost?.log ||
+      loadSessionLog(session.roomCode, sessionId, gameId);
+    gameBridge?.sendSessionInit({
+      role: session.role,
+      roomCode: session.roomCode,
+      sessionId,
+      gameId,
+      playerId,
+      name: playerLabel(),
+      roster: rosterArray().map((m) => ({
+        playerId: m.playerId,
+        name: m.name,
+      })),
+      log: sessionLogPacket || encodeSyncPacket(log, 0),
+    });
+  };
+}
+
+function endGame(reason = "back_to_lobby") {
+  if (!session || !activeSession || !roomLog) return;
+  if (session.role === "host") {
+    const ended = roomHost.endSession(roomLog, {
+      sessionId: activeSession.sessionId,
+      gameId: activeSession.gameId,
+      reason,
+    });
+    if (ended.ok) {
+      roomLog = ended.log;
+      saveRoomLogByCode(session.roomCode, roomLog);
+      broadcastRoomLog(tipSeq(roomLog) - 1);
+    }
+  }
+  returnToVoting();
+}
+
+async function startHost() {
+  setError("");
+  const s = createRoomSession({ maxGuests: 5 });
+  bindSession(s);
+
+  try {
+    const urlCode = readRoomFromUrl();
+    const resumeHost = readHostIntentFromUrl();
+    let code;
+    if (urlCode && resumeHost) {
+      code = await s.hostWithCode(urlCode);
+    } else {
+      code = await s.host();
+    }
+
+    roomLog = loadRoomLogByCode(code);
+    if (!roomLog.events.some((e) => e.type === RoomEvent.CREATED)) {
+      roomLog = commitRoomEvent(roomLog, RoomEvent.CREATED, {
+        hostPlayerId: playerId,
+        maxPlayers: 6,
+        version: 1,
+      }).log;
+    }
+    const joined = roomHost.joinMember(roomLog, {
+      playerId,
+      name: playerLabel(),
+    });
+    if (joined.ok) roomLog = joined.log;
+    saveRoomLogByCode(code, roomLog);
+
+    s.writeRoomToUrl(code);
+    shareUrl = buildRoomShareUrl(code);
+    saveRoom({
+      code,
+      role: "host",
+      name: playerLabel(),
+      isRoomShell: true,
+    });
+
+    await showHostInviteCard({
+      card: document.getElementById("invite-card"),
+      canvas: document.getElementById("invite-qr"),
+      codeEl: document.getElementById("invite-code"),
+      urlEl: /** @type {HTMLAnchorElement} */ (document.getElementById("invite-url")),
+      code,
+      url: shareUrl,
+    });
+
+    showPanel("lobby");
+    initRoomChat();
+    renderRoster();
+    persistRoomDesk();
+
+    const state = roomState();
+    if (state.activeSession) {
+      activeSession = state.activeSession;
+      sessionHost = createSessionHost({
+        gameId: state.activeSession.gameId,
+        sessionId: state.activeSession.sessionId,
+        roomCode: code,
+      });
+      mountActiveGame(
+        state.activeSession.gameId,
+        state.activeSession.sessionId,
+        null,
+      );
+    }
+  } catch (err) {
+    setError(err instanceof Error ? err.message : String(err));
+    await s.destroy();
+    session = null;
+  }
+}
+
+async function joinRoom(code) {
+  setError("");
+  const c = String(code || "")
+    .trim()
+    .toUpperCase();
+  if (!c) {
+    setError("Vul een roomcode in.");
+    return;
+  }
+
+  const s = createRoomSession({ maxGuests: 5 });
+  bindSession(s);
+
+  try {
+    s.join(c);
+    s.writeRoomToUrl(c);
+    roomLog = loadRoomLogByCode(c);
+
+    s.sendHello({ playerId, name: playerLabel() });
+
+    saveRoom({
+      code: c,
+      role: "guest",
+      name: playerLabel(),
+      isRoomShell: true,
+    });
+
+    showPanel("lobby");
+    initRoomChat();
+    renderRoster();
+  } catch (err) {
+    setError(err instanceof Error ? err.message : String(err));
+    await s.destroy();
+    session = null;
+  }
+}
+
+async function leaveRoom() {
+  if (activeSession && session?.role === "host") {
+    endGame("left");
+  } else {
+    returnToVoting();
+  }
+  if (session) await session.destroy();
+  session = null;
+  roomLog = null;
+  clearRoom();
+  showPanel("idle");
+  setStatus("Niet verbonden");
+}
+
+document.getElementById("btn-start-room")?.addEventListener("click", startHost);
+document.getElementById("btn-join-room")?.addEventListener("click", () => {
+  joinRoom(joinInput.value);
+});
+joinInput?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") joinRoom(joinInput.value);
+});
+btnStartVoted?.addEventListener("click", startVotedGame);
+btnBackLobby?.addEventListener("click", () => endGame("back_to_lobby"));
+document.getElementById("btn-leave-room")?.addEventListener("click", leaveRoom);
+
+guardRoomNavigation({
+  isConnected: () => sessionConnected,
+});
+
+const urlRoom = readRoomFromUrl();
+if (urlRoom) {
+  if (readHostIntentFromUrl()) startHost();
+  else joinRoom(urlRoom);
+}

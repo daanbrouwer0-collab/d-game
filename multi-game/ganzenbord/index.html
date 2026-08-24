@@ -201,6 +201,13 @@
       </main>
     </div>
 
-    <script type="module" src="./main.js"></script>
+    <script type="module">
+      import { getUrlParams } from "../js/shell/site-url.js";
+      if (getUrlParams().get("embedded") === "1") {
+        import("./embedded.js");
+      } else {
+        import("./main.js");
+      }
+    </script>
   </body>
 </html>

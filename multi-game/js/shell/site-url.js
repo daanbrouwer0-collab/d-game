@@ -9,6 +9,8 @@
 
 export const PUBLIC_SITE_ORIGIN = "https://www.d-game.nl";
 
+export const ROOM_PATH = "room/";
+
 /**
  * @returns {Window}
  */
@@ -224,6 +226,40 @@ export function buildShareUrl(gamePath, code, opts = {}) {
   const url = new URL(path, origin.endsWith("/") ? origin : `${origin}/`);
   params.forEach((value, key) => url.searchParams.set(key, value));
   return url.toString();
+}
+
+/**
+ * @param {string} code
+ * @param {{ origin?: string, via?: string }} [opts]
+ */
+export function buildRoomShareUrl(code, opts = {}) {
+  return buildShareUrl(`/${ROOM_PATH}`, code, opts);
+}
+
+/**
+ * @param {string} code
+ * @param {{ via?: string }} [opts]
+ */
+export function writeRoomCodeToUrl(code, opts = {}) {
+  writeRoomToUrl(`/${ROOM_PATH}`, code, opts);
+}
+
+/**
+ * Build embedded game URL inside room shell iframe.
+ * @param {string} gamePath e.g. "tic-tac-toe/"
+ * @param {{ room: string, session: string, embedded?: number|string }} params
+ */
+export function buildGameEmbeddedUrl(gamePath, params) {
+  const searchParams = new URLSearchParams();
+  searchParams.set("embedded", String(params.embedded ?? 1));
+  searchParams.set("room", String(params.room || "").trim().toUpperCase());
+  searchParams.set("session", params.session);
+  const path = toHashPath(gamePath);
+  if (isHashShell()) {
+    return `#${path}?${searchParams.toString()}`;
+  }
+  const basePath = location.pathname.replace(/[^/]+$/, "");
+  return `${basePath}${path.replace(/^\//, "")}?${searchParams.toString()}`;
 }
 
 /**

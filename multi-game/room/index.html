@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Room — D-Game</title>
+    <link rel="stylesheet" href="../css/site.css" />
+    <link rel="stylesheet" href="./room.css" />
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  </head>
+  <body>
+    <div class="app app-room">
+      <header class="header">
+        <h1 class="brand">Room</h1>
+        <p id="room-status" class="tagline">Niet verbonden</p>
+      </header>
+
+      <div id="room-chrome" class="room-chrome hidden" aria-label="Spelers in room">
+        <div class="room-roster-bar panel">
+          <div class="lobby-header">
+            <h2 class="room-roster-title">Spelers</h2>
+            <p id="roster-count" class="lobby-count">0 / 6 spelers</p>
+          </div>
+          <ul id="roster-list" class="player-list"></ul>
+        </div>
+        <div id="room-chat-root" class="room-chat-root"></div>
+      </div>
+
+      <main>
+        <section id="panel-idle" class="panel">
+          <h2>Multiplayer room</h2>
+          <p class="lede">
+            Start een room voor je groep, nodig iedereen uit met één link, en
+            stem daarna op een spel.
+          </p>
+          <div class="room-actions">
+            <button type="button" id="btn-start-room" class="btn btn-primary">
+              Start room
+            </button>
+          </div>
+          <div class="room-join">
+            <label for="join-code">Of join met code</label>
+            <div class="join-row">
+              <input
+                id="join-code"
+                type="text"
+                maxlength="12"
+                autocomplete="off"
+                placeholder="AB7K2M"
+              />
+              <button type="button" id="btn-join-room" class="btn btn-ghost">
+                Join
+              </button>
+            </div>
+          </div>
+          <p id="room-error" class="hint room-error hidden"></p>
+        </section>
+
+        <section id="panel-lobby" class="panel hidden">
+          <div id="invite-card" class="invite-card hidden">
+            <h2>Uitnodigen</h2>
+            <p class="room-code-line">Code: <strong id="invite-code"></strong></p>
+            <canvas id="invite-qr" width="280" height="280"></canvas>
+            <p><a id="invite-url" href="#" target="_blank" rel="noopener"></a></p>
+          </div>
+
+          <h2>Stem op een spel</h2>
+          <p id="picker-hint" class="hint"></p>
+          <ul id="game-picker" class="game-picker"></ul>
+          <p id="vote-status" class="hint"></p>
+          <div class="room-actions">
+            <button type="button" id="btn-start-voted" class="btn btn-primary hidden">
+              Start winnend spel
+            </button>
+            <button type="button" id="btn-leave-room" class="btn btn-ghost">
+              Room verlaten
+            </button>
+          </div>
+        </section>
+
+        <section id="panel-playing" class="panel panel-playing hidden">
+          <div class="playing-bar">
+            <p id="playing-label" class="hint"></p>
+            <button type="button" id="btn-back-lobby" class="btn btn-ghost hidden">
+              Terug naar stemmen
+            </button>
+          </div>
+          <iframe
+            id="game-frame"
+            title="Spel"
+            class="game-frame"
+            sandbox="allow-scripts allow-same-origin allow-forms"
+          ></iframe>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
