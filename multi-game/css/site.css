@@ -871,11 +871,32 @@ html.has-shell-nav body {
 }
 
 .invite-qr-wrap canvas,
-.qr-canvas-wrap canvas {
+.qr-canvas-wrap canvas,
+.invite-qr-host,
+.invite-qr-host img,
+.invite-qr-host canvas {
   display: block;
   width: 280px;
   height: 280px;
   max-width: min(280px, 72vw);
   max-height: min(280px, 72vw);
   background: #fff;
+}
+
+.invite-qr-host {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.invite-qr-host table {
+  margin: 0 !important;
+  border-collapse: collapse;
+}
+
+.qr-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.9rem;
 }

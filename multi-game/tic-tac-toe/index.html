@@ -10,7 +10,7 @@
     />
     <link rel="stylesheet" href="../css/site.css" />
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   </head>
   <body>
     <div class="app">
@@ -36,7 +36,7 @@
             <p class="invite-kicker">Jouw room</p>
             <p class="invite-title">Laat de ander deze QR scannen</p>
             <div class="invite-qr-wrap qr-canvas-wrap">
-              <canvas id="invite-qr-canvas" width="280" height="280"></canvas>
+              <div id="invite-qr-canvas" class="invite-qr-host" role="img" aria-label="QR-code"></div>
             </div>
             <p>Kamercode</p>
             <p id="room-code" class="room-code"></p>

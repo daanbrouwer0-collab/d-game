@@ -8,7 +8,7 @@ function nextFrame() {
  * Fill the shared host invite card: big QR, room code, link.
  * @param {{
  *   card?: HTMLElement | null,
- *   canvas?: HTMLCanvasElement | null,
+ *   canvas?: HTMLElement | null,
  *   codeEl?: HTMLElement | null,
  *   urlEl?: HTMLAnchorElement | null,
  *   code: string,

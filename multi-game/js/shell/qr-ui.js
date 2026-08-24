@@ -1,125 +1,106 @@
 /**
- * QR helpers: render via CDN QRCode lib (load on demand).
- * Always draw on an offscreen canvas first so hidden/0-size hosts
- * cannot produce a blank white square.
+ * QR like OUTDOOR DRINKS / voorhoorn:
+ * davidshimjs QRCode into a visible DIV (img/canvas/table), not npm toCanvas.
  */
 
-let qrLibLoading = null;
+const QRJS_SRC = "https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js";
 
-/**
- * @returns {Promise<boolean>}
- */
-async function ensureQrLib() {
-  if (window.QRCode && typeof window.QRCode.toCanvas === "function") return true;
-  if (qrLibLoading) return qrLibLoading;
+let qrJsLoading = null;
 
-  qrLibLoading = (async () => {
-    const existing = document.querySelector(
-      'script[src*="qrcode"][src$="qrcode.min.js"], script[src*="qrcode@"]',
-    );
-    if (existing) {
-      const started = Date.now();
-      while (Date.now() - started < 4000) {
-        if (window.QRCode && typeof window.QRCode.toCanvas === "function") {
-          return true;
-        }
-        await new Promise((r) => setTimeout(r, 40));
-      }
-    }
-
-    await new Promise((resolve) => {
-      const script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js";
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.head.appendChild(script);
-    });
-
-    return Boolean(window.QRCode && typeof window.QRCode.toCanvas === "function");
-  })().finally(() => {
-    qrLibLoading = null;
-  });
-
-  return qrLibLoading;
+function isShimQr(fn) {
+  return typeof fn === "function" && fn.CorrectLevel;
 }
 
 /**
- * @param {HTMLCanvasElement} canvas
- * @param {string} text
- * @param {{ width?: number }} options
- * @returns {Promise<void>}
+ * @returns {Promise<typeof QRCode | null>}
  */
-function toCanvasSafe(canvas, text, options) {
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const done = (err) => {
-      if (settled) return;
-      settled = true;
-      if (err) reject(err instanceof Error ? err : new Error(String(err)));
-      else resolve();
-    };
+async function ensureQrCodeJs() {
+  if (isShimQr(window.QRCode)) return window.QRCode;
+  if (qrJsLoading) return qrJsLoading;
 
-    try {
-      const ret = window.QRCode.toCanvas(canvas, text, options, done);
-      if (ret && typeof ret.then === "function") {
-        ret.then(() => done(), done);
-      }
-    } catch (err) {
-      done(err);
-    }
+  qrJsLoading = new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = QRJS_SRC;
+    script.onload = () => resolve(isShimQr(window.QRCode) ? window.QRCode : null);
+    script.onerror = () => resolve(null);
+    document.head.appendChild(script);
+  }).finally(() => {
+    qrJsLoading = null;
   });
+
+  return qrJsLoading;
 }
 
 /**
- * @param {HTMLCanvasElement} canvas
+ * @param {HTMLElement} target
+ * @returns {HTMLElement}
+ */
+function qrHost(target) {
+  if (target instanceof HTMLCanvasElement) {
+    const wrap = target.parentElement;
+    if (!wrap) return target;
+    let box = wrap.querySelector(".invite-qr-host");
+    if (!box) {
+      box = document.createElement("div");
+      box.className = "invite-qr-host";
+      box.setAttribute("role", "img");
+      box.setAttribute("aria-label", "QR-code");
+      target.replaceWith(box);
+    } else {
+      target.remove();
+    }
+    return box;
+  }
+  return target;
+}
+
+/**
+ * @param {HTMLElement} canvasOrBox
  * @param {string} text
  * @param {{ width?: number }} [opts]
  */
-export async function drawQr(canvas, text, opts = {}) {
+export async function drawQr(canvasOrBox, text, opts = {}) {
   const width = opts.width || 280;
   const payload = String(text || "");
-  canvas.style.background = "#ffffff";
-  canvas.style.width = `${width}px`;
-  canvas.style.height = `${width}px`;
+  const host = qrHost(canvasOrBox);
+  host.classList.add("invite-qr-host");
+  host.innerHTML = "";
 
-  const ok = await ensureQrLib();
-  if (ok && window.QRCode && typeof window.QRCode.toCanvas === "function" && payload) {
-    const tmp = document.createElement("canvas");
-    await toCanvasSafe(tmp, payload, {
+  if (!payload) {
+    host.innerHTML = `<p class="qr-error">Geen deellink om in QR te zetten.</p>`;
+    return false;
+  }
+
+  const QR = await ensureQrCodeJs();
+  if (!QR) {
+    host.innerHTML = `<p class="qr-error">QR-code kon niet worden geladen.</p>`;
+    return false;
+  }
+
+  try {
+    const options = {
+      text: payload,
       width,
-      margin: 2,
-      errorCorrectionLevel: "M",
-      color: { dark: "#111111", light: "#ffffff" },
-    });
-    canvas.width = tmp.width;
-    canvas.height = tmp.height;
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(tmp, 0, 0);
+      height: width,
+      colorDark: "#111111",
+      colorLight: "#ffffff",
+      correctLevel: QR.CorrectLevel.L,
+    };
+    try {
+      new QR(host, { ...options, typeNumber: -1 });
+    } catch {
+      host.innerHTML = "";
+      new QR(host, options);
+    }
+    if (!host.innerHTML.trim()) {
+      throw new Error("QR bleef leeg");
     }
     return true;
+  } catch (err) {
+    console.error(err);
+    host.innerHTML = `<p class="qr-error">QR-code mislukt.</p>`;
+    return false;
   }
-
-  canvas.width = width;
-  canvas.height = width;
-  const ctx = canvas.getContext("2d");
-  if (ctx) {
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, width, width);
-    ctx.strokeStyle = "#111111";
-    ctx.lineWidth = 4;
-    ctx.strokeRect(8, 8, width - 16, width - 16);
-    ctx.fillStyle = "#111111";
-    ctx.font = "14px monospace";
-    ctx.fillText("QR niet geladen", 24, 48);
-    const lines = payload.match(/.{1,22}/g) || [];
-    lines.slice(0, 12).forEach((line, i) => {
-      ctx.fillText(line, 24, 80 + i * 16);
-    });
-  }
-  return false;
 }
 
 /**

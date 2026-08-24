@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="css/hud.css">
   <link rel="stylesheet" href="css/board.css">
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script type="module" src="p2p-bridge.js"></script>
 </head>
   <body>
@@ -378,7 +378,7 @@
             <p class="invite-kicker">Jouw room</p>
             <p class="invite-title">Laat anderen deze QR scannen</p>
             <div class="invite-qr-wrap qr-canvas-wrap">
-              <canvas id="p2p-invite-qr" width="280" height="280"></canvas>
+              <div id="p2p-invite-qr" class="invite-qr-host" role="img" aria-label="QR-code"></div>
             </div>
             <p>Kamercode: <strong id="p2p-room-code"></strong></p>
             <p class="invite-wait">Wachten tot spelers joinen… houd dit tabblad open.</p>

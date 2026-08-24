@@ -193,24 +193,31 @@ function createScannerOverlay() {
       return;
     }
 
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
-        audio: false,
-      });
-      video.srcObject = stream;
-      await video.play();
-      hidePermission();
-      setStatus(activeOpts?.hint || "Richt de camera op een QR-code");
-      scanLoop();
-    } catch (err) {
-      const name =
-        err && typeof err === "object" && "name" in err
-          ? String(/** @type {{ name?: string }} */ (err).name)
-          : "";
+    const attempts = [
+      { audio: false, video: { facingMode: "environment" } },
+      { audio: false, video: true },
+      { audio: false, video: { facingMode: "user" } },
+    ];
+
+    /** @type {Error | null} */
+    let lastError = null;
+    for (const constraints of attempts) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        lastError = null;
+        break;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+      }
+    }
+
+    if (!stream) {
+      const name = lastError?.name || "";
       if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-        showPermission("Cameratoegang geweigerd. Sta camera toe in je browser.");
-        setStatus("Camera geblokkeerd. Geef toegang en probeer opnieuw.");
+        showPermission(
+          "Toegang geweigerd. Tik op Toestemming geven, of zet camera AAN in de site-instellingen.",
+        );
+        setStatus("Geef cameratoegang om te scannen");
         activeOpts?.onError?.("camera_permission_denied");
       } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
         showPermission("Geen camera gevonden op dit apparaat.", false);
@@ -221,10 +228,29 @@ function createScannerOverlay() {
         setStatus("Sluit andere camera-apps en probeer opnieuw.");
         activeOpts?.onError?.("camera_busy");
       } else {
-        showPermission("Camera kon niet starten. Probeer opnieuw.");
+        showPermission(
+          `Camera start niet (${name || "onbekend"}). Tik om opnieuw te proberen.`,
+        );
         setStatus("Camera starten mislukt.");
         activeOpts?.onError?.("camera_error");
       }
+      allowBtn.disabled = false;
+      allowBtn.textContent = "Toestemming geven";
+      return;
+    }
+
+    try {
+      video.srcObject = stream;
+      video.setAttribute("playsinline", "true");
+      video.muted = true;
+      await video.play();
+      hidePermission();
+      setStatus(activeOpts?.hint || "Richt de camera op een QR-code");
+      scanLoop();
+    } catch {
+      showPermission("Camera geopend, maar beeld start niet. Tik om opnieuw te proberen.");
+      setStatus("Tik op Toestemming geven");
+      activeOpts?.onError?.("camera_play_failed");
     } finally {
       allowBtn.disabled = false;
       allowBtn.textContent = "Toestemming geven";
@@ -245,7 +271,7 @@ function createScannerOverlay() {
       activeOpts = opts;
       root.hidden = false;
       setStatus(opts.hint || "Richt de camera op een QR-code");
-      showPermission("Camera heeft nog geen toegang.", true);
+      showPermission("Camera starten…", false);
       await startCamera();
     },
     stop,

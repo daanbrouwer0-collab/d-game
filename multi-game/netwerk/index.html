@@ -6,7 +6,7 @@
     <title>Netwerk — D-Game</title>
     <link rel="stylesheet" href="../css/site.css" />
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   </head>
   <body>
     <div class="app app-wide">
@@ -35,7 +35,7 @@
           <p id="p2p-status" class="status" data-state="idle">Niet verbonden</p>
           <p id="p2p-host-info" class="hint"></p>
           <div id="invite-wrap" class="invite-qr-wrap qr-canvas-wrap hidden">
-            <canvas id="invite-qr-canvas" width="220" height="220"></canvas>
+            <div id="invite-qr-canvas" class="invite-qr-host" role="img" aria-label="QR-code"></div>
           </div>
           <div id="host-actions" class="actions share-actions hidden">
             <button type="button" id="btn-copy-link" class="btn btn-ghost">Kopieer link</button>
