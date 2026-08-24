@@ -210,10 +210,21 @@ function createScannerOverlay() {
           : "";
       if (name === "NotAllowedError" || name === "PermissionDeniedError") {
         showPermission("Cameratoegang geweigerd. Sta camera toe in je browser.");
+        setStatus("Camera geblokkeerd. Geef toegang en probeer opnieuw.");
+        activeOpts?.onError?.("camera_permission_denied");
+      } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+        showPermission("Geen camera gevonden op dit apparaat.", false);
+        setStatus("Geen camera beschikbaar.");
+        activeOpts?.onError?.("camera_not_found");
+      } else if (name === "NotReadableError" || name === "TrackStartError") {
+        showPermission("Camera is al in gebruik door een andere app/tab.");
+        setStatus("Sluit andere camera-apps en probeer opnieuw.");
+        activeOpts?.onError?.("camera_busy");
       } else {
         showPermission("Camera kon niet starten. Probeer opnieuw.");
+        setStatus("Camera starten mislukt.");
+        activeOpts?.onError?.("camera_error");
       }
-      activeOpts?.onError?.(name || "camera_error");
     } finally {
       allowBtn.disabled = false;
       allowBtn.textContent = "Toestemming geven";

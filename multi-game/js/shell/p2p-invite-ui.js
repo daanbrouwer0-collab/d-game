@@ -20,7 +20,11 @@ export async function showHostInviteCard(opts) {
   }
   card?.classList.remove("hidden");
   if (canvas && url) {
-    await drawQr(canvas, url, { width: 280 });
+    try {
+      await drawQr(canvas, url, { width: 280 });
+    } catch (err) {
+      console.error("QR render failed", err);
+    }
   }
   card?.scrollIntoView({ behavior: "smooth", block: "center" });
 }

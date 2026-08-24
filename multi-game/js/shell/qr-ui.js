@@ -3,6 +3,23 @@
  * fallback to payload text only.
  */
 
+let qrLibLoading = null;
+
+async function ensureQrLib() {
+  if (window.QRCode && typeof window.QRCode.toCanvas === "function") return true;
+  if (qrLibLoading) return qrLibLoading;
+  qrLibLoading = new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js";
+    script.onload = () => resolve(Boolean(window.QRCode?.toCanvas));
+    script.onerror = () => resolve(false);
+    document.head.appendChild(script);
+  }).finally(() => {
+    qrLibLoading = null;
+  });
+  return qrLibLoading;
+}
+
 /**
  * @param {HTMLCanvasElement} canvas
  * @param {string} text
@@ -10,6 +27,7 @@
  */
 export async function drawQr(canvas, text, opts = {}) {
   const width = opts.width || 280;
+  await ensureQrLib();
   const QR = window.QRCode;
   if (QR && typeof QR.toCanvas === "function") {
     await QR.toCanvas(canvas, text, {

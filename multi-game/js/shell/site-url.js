@@ -128,10 +128,18 @@ export function readRoomFromUrl(search = getUrlSearch()) {
  * @param {{ origin?: string, via?: string }} [opts]
  */
 export function buildShareUrl(gamePath, code, opts = {}) {
-  const origin = opts.origin || publicSiteOrigin();
+  let origin = opts.origin || publicSiteOrigin();
+  try {
+    // Normalize potentially odd origins like "null" from srcdoc contexts.
+    if (!origin || origin === "null") origin = PUBLIC_SITE_ORIGIN;
+    // Validate origin early so URL construction below never crashes host flow.
+    origin = new URL(origin).origin;
+  } catch {
+    origin = PUBLIC_SITE_ORIGIN;
+  }
   const useHash =
     isHashShell() ||
-    /d-game\.nl$/i.test(new URL(origin.endsWith("/") ? origin : `${origin}/`).hostname);
+    /d-game\.nl$/i.test(new URL(origin).hostname);
 
   const params = new URLSearchParams();
   params.set("room", String(code || "").trim().toUpperCase());
@@ -197,7 +205,12 @@ export function clearRoomFromUrl(gamePath) {
  * @returns {string}
  */
 export function buildSiteHomeUrl() {
-  const origin = publicSiteOrigin();
+  let origin = publicSiteOrigin();
+  try {
+    origin = new URL(origin).origin;
+  } catch {
+    origin = PUBLIC_SITE_ORIGIN;
+  }
   if (isHashShell() || /d-game\.nl$/i.test(new URL(origin).hostname)) {
     return `${origin.replace(/\/$/, "")}/#index.html`;
   }
