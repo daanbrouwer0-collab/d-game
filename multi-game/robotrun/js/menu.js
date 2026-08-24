@@ -63,20 +63,31 @@ const SessionMenu = {
       window.RobotRunP2P?.readRoomFromUrl?.() ||
       new URLSearchParams(window.location.search).get("room");
     if (!room?.trim()) return;
+    const asHost = Boolean(window.RobotRunP2P?.readHostIntentFromUrl?.());
     try {
-      await P2pSessionController.joinRoom(room.trim());
+      if (asHost) {
+        await P2pSessionController.createHostLobby({
+          name: "RobotRun",
+          roomCode: room.trim().toUpperCase(),
+        });
+        P2pSessionController.wireHostAutosnapshots();
+        Toast.show("Room opnieuw gehost");
+      } else {
+        await P2pSessionController.joinRoom(room.trim());
+        Toast.show("Lobby gejoined via link");
+      }
       if (window.RobotRunP2P?.clearRoomFromUrl) {
         window.RobotRunP2P.clearRoomFromUrl("/robotrun/");
       } else {
         const params = new URLSearchParams(window.location.search);
         params.delete("room");
+        params.delete("as");
         const qs = params.toString();
         window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
       }
       this.showModal("p2p-lobby");
-      Toast.show("Lobby gejoined via link");
     } catch (err) {
-      Toast.show(err.message || "Joinen via link mislukt");
+      Toast.show(err.message || (asHost ? "Hosten via link mislukt" : "Joinen via link mislukt"));
       this.openP2pLobbyView();
     }
   },
@@ -291,17 +302,28 @@ const SessionMenu = {
     if (!session) return;
 
     if (StorageManager.isP2pSession(session) && session.p2pRoomCode) {
-      P2pSessionController.joinRoom(session.p2pRoomCode)
+      const saved = P2pSessionController.loadPersistedRoom?.();
+      const asHost =
+        saved?.roomCode === session.p2pRoomCode && saved?.role === "host";
+      const start = asHost
+        ? P2pSessionController.createHostLobby({
+            name: session.name || "RobotRun",
+            roomCode: session.p2pRoomCode,
+          }).then(() => {
+            P2pSessionController.wireHostAutosnapshots();
+          })
+        : P2pSessionController.joinRoom(session.p2pRoomCode);
+      start
         .then(() => {
           Toast.hide();
-          if (P2pSessionController.lobby?.status === 'lobby') {
-            this.showView('p2p-lobby');
+          if (P2pSessionController.lobby?.status === "lobby") {
+            this.showView("p2p-lobby");
           } else {
             this.hideModal();
           }
         })
         .catch((err) => {
-          Toast.show(err.message || 'P2P sessie laden mislukt');
+          Toast.show(err.message || "P2P sessie laden mislukt");
         });
       return;
     }

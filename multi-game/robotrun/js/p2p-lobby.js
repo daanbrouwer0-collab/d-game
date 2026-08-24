@@ -6,6 +6,8 @@ const P2pLobbyUi = {
     document.getElementById("btn-p2p-ready")?.addEventListener("click", () => this.onReadyToggle());
     document.getElementById("btn-p2p-start")?.addEventListener("click", () => this.onStart());
     document.getElementById("btn-p2p-share-copy")?.addEventListener("click", () => this.onShareCopy());
+    document.getElementById("btn-p2p-share-whatsapp")?.addEventListener("click", () => this.onShareWhatsApp());
+    document.getElementById("btn-p2p-share")?.addEventListener("click", () => this.onShareNative());
     document.getElementById("btn-p2p-scan-join")?.addEventListener("click", () => this.onScanJoin());
     document.getElementById("btn-p2p-join-code")?.addEventListener("click", () => this.onJoinCode());
     document.getElementById("btn-p2p-rejoin")?.addEventListener("click", () => this.onRejoin());
@@ -86,6 +88,40 @@ const P2pLobbyUi = {
     }
   },
 
+  onShareWhatsApp() {
+    const url = P2pSessionController.buildShareUrl();
+    if (!url) {
+      Toast.show("Geen actieve lobby");
+      return;
+    }
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(`Speel RobotRun met me: ${url}`)}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+  },
+
+  async onShareNative() {
+    const url = P2pSessionController.buildShareUrl();
+    if (!url) {
+      Toast.show("Geen actieve lobby");
+      return;
+    }
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: "RobotRun",
+          text: "Speel RobotRun met me",
+          url,
+        });
+        return;
+      } catch (err) {
+        if (err && err.name === "AbortError") return;
+      }
+    }
+    this.onShareWhatsApp();
+  },
+
   async onScanJoin() {
     if (!window.RobotRunP2P?.openQrScanner) return;
     window.RobotRunP2P.openQrScanner({
@@ -156,7 +192,11 @@ const P2pLobbyUi = {
 
     const you = document.getElementById("p2p-lobby-you");
     if (you) {
-      you.textContent = `Kamer ${controller.lobby.roomCode} · ${P2pSessionController.shortId(controller.localPeerId)}`;
+      const seat = controller.localSeat();
+      const nm = seat?.name || "Speler";
+      you.textContent = controller.isHost()
+        ? `Kamer ${controller.lobby.roomCode} · jij host · ${nm}`
+        : `Kamer ${controller.lobby.roomCode} · ${nm}`;
     }
 
     const counts = document.getElementById("p2p-lobby-counts");
@@ -164,7 +204,10 @@ const P2pLobbyUi = {
       const seats = controller.lobby.seats || [];
       const minPlayers = CONFIG.P2P?.MIN_PLAYERS || 2;
       const readyCount = seats.filter((s) => s.ready).length;
-      counts.textContent = `Spelers ${seats.length}/${CONFIG.P2P?.MAX_PLAYERS || 5} · Ready ${readyCount}/${seats.length} · Min. ${minPlayers} om te starten`;
+      const onlineCount = seats.filter((s) =>
+        controller.isSeatOnline?.(s.userId),
+      ).length;
+      counts.textContent = `Spelers ${seats.length}/${CONFIG.P2P?.MAX_PLAYERS || 5} · Online ${onlineCount} · Ready ${readyCount}/${seats.length} · Min. ${minPlayers}`;
     }
 
     const seatsEl = document.getElementById("p2p-seat-list");
@@ -173,12 +216,17 @@ const P2pLobbyUi = {
       (controller.lobby.seats || []).forEach((seat) => {
         const li = document.createElement("li");
         li.className = "matrix-lobby-item";
-        const isYou = seat.userId === controller.localPeerId;
-        const hostTag = seat.userId === controller.lobby.hostId ? " · host" : "";
+        const isYou = seat.userId === controller.playerId;
+        const isHostSeat =
+          controller.isHost() && seat.userId === controller.playerId;
+        const hostTag = isHostSeat ? " · host" : "";
+        const online = controller.isSeatOnline?.(seat.userId) !== false;
+        const offlineTag = online ? "" : " · offline";
+        if (!online) li.classList.add("is-offline");
         li.innerHTML = `
           <div class="matrix-lobby-meta">
             <strong style="color:${seat.color || "#0ff"}">${seat.name}${isYou ? " (jij)" : ""}</strong>
-            <span>${P2pSessionController.shortId(seat.userId)}${hostTag} · ${seat.ready ? "READY" : "wacht…"}</span>
+            <span>${seat.robotId || ""}${hostTag}${offlineTag} · ${seat.ready ? "READY" : "wacht…"}</span>
           </div>
         `;
         seatsEl.appendChild(li);

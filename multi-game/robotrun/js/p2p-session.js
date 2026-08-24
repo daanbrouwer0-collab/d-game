@@ -9,11 +9,19 @@ const P2pSessionController = {
   lobby: null,
   localSessionId: null,
   localPeerId: null,
+  /** Stable browser id — seat key across host switch */
+  playerId: null,
+  /** @type {Record<string, string>} */
+  peerToPlayer: {},
+  /** @type {Set<string>} */
+  onlineIds: new Set(),
+  log: null,
   connectionStatus: "idle",
   lastError: null,
   applyingSnapshot: false,
   joinInFlight: false,
   _snapTimer: null,
+  _deskSnapAt: 0,
 
   isActive() {
     return !!(this.session && this.lobby);
@@ -23,9 +31,23 @@ const P2pSessionController = {
     return this.session?.role === "host";
   },
 
+  resolvePlayerId() {
+    this.playerId =
+      window.RobotRunP2P?.getPlayerId?.() ||
+      this.playerId ||
+      `p_${Math.random().toString(36).slice(2, 10)}`;
+    return this.playerId;
+  },
+
   localSeat() {
-    if (!this.lobby?.seats || !this.localPeerId) return null;
-    return this.lobby.seats.find((s) => s.userId === this.localPeerId) || null;
+    if (!this.lobby?.seats || !this.playerId) return null;
+    return this.lobby.seats.find((s) => s.userId === this.playerId) || null;
+  },
+
+  isSeatOnline(userId) {
+    if (!userId) return false;
+    if (userId === this.playerId) return true;
+    return this.onlineIds.has(userId);
   },
 
   localRobotId() {
@@ -43,7 +65,7 @@ const P2pSessionController = {
   },
 
   persistActiveRoom() {
-    if (!this.lobby?.roomCode || !this.localPeerId) return;
+    if (!this.lobby?.roomCode || !this.playerId) return;
     try {
       localStorage.setItem(
         this.activeRoomKey(),
@@ -52,6 +74,8 @@ const P2pSessionController = {
           localSessionId: this.localSessionId,
           hostId: this.lobby.hostId,
           localPeerId: this.localPeerId,
+          playerId: this.playerId,
+          role: this.isHost() ? "host" : "guest",
           savedAt: Date.now(),
         }),
       );
@@ -77,6 +101,95 @@ const P2pSessionController = {
     }
   },
 
+  ensureLog(code) {
+    const api = window.RobotRunP2P;
+    if (!api?.loadRoomLog) {
+      this.log = { gameId: this.GAME_ID, events: [] };
+      return;
+    }
+    this.log =
+      api.loadRoomLog(this.GAME_ID, code) || api.createEventLog(this.GAME_ID);
+  },
+
+  persistDesk() {
+    const api = window.RobotRunP2P;
+    const code = this.lobby?.roomCode;
+    if (!code || !api?.saveRoomLog || !this.log) return;
+    api.saveRoomLog(this.GAME_ID, code, this.log);
+    api.touchDeskRoom?.({
+      gameId: this.GAME_ID,
+      code,
+      role: this.isHost() ? "host" : "guest",
+      name: this.localSeat()?.name || "Speler",
+      summary:
+        this.lobby?.status === "playing"
+          ? "Race bezig"
+          : this.lobby?.status === "finished"
+            ? "Afgelopen"
+            : `Lobby · ${(this.lobby?.seats || []).length} spelers`,
+      seq: api.tipSeq?.(this.log) || 0,
+    });
+  },
+
+  appendDesk(type, payload) {
+    const api = window.RobotRunP2P;
+    if (!api?.appendEvent || !this.log) return;
+    const added = api.appendEvent(this.log, type, payload);
+    if (!added.ok) return;
+    this.log = added.log;
+    this.persistDesk();
+  },
+
+  /**
+   * @param {string} code
+   * @param {object} [settings]
+   */
+  restoreFromLog(code, settings = {}) {
+    this.ensureLog(code);
+    const seats = [];
+    let boardData = null;
+    let gameState = null;
+    let status = "lobby";
+    let restoredSettings = { ...settings };
+    for (const ev of this.log.events || []) {
+      if (ev.type === "seat") {
+        const p = ev.payload || {};
+        const userId = String(p.userId || "");
+        if (!userId) continue;
+        const idx = seats.findIndex((s) => s.userId === userId);
+        const seat = {
+          userId,
+          robotId: p.robotId || `player_${seats.length + 1}`,
+          name: (p.name || "Speler").slice(0, 24),
+          color: p.color,
+          colors: p.colors,
+          style: p.style || "scout",
+          ready: false,
+        };
+        if (idx >= 0) seats[idx] = { ...seats[idx], ...seat, ready: false };
+        else seats.push(seat);
+      } else if (ev.type === "start" || ev.type === "rr_game_start") {
+        const p = ev.payload || {};
+        if (p.settings) restoredSettings = { ...restoredSettings, ...p.settings };
+        if (p.boardData) boardData = p.boardData;
+        if (p.gameState) gameState = p.gameState;
+        if (Array.isArray(p.seats) && p.seats.length) {
+          seats.length = 0;
+          for (const s of p.seats) seats.push({ ...s, ready: false });
+        }
+        status = "playing";
+      } else if (ev.type === "snap" || ev.type === "rr_state_snapshot") {
+        const p = ev.payload || {};
+        if (p.boardData) boardData = p.boardData;
+        if (p.gameState) {
+          gameState = p.gameState;
+          status = p.gameState.phase === "finished" ? "finished" : "playing";
+        }
+      }
+    }
+    return { seats, boardData, gameState, status, settings: restoredSettings };
+  },
+
   setStatus(status, errorMsg = null) {
     this.connectionStatus = status;
     this.lastError = errorMsg;
@@ -93,28 +206,25 @@ const P2pSessionController = {
     this.lobby = null;
     this.localSessionId = null;
     this.localPeerId = null;
+    this.peerToPlayer = {};
+    this.onlineIds = new Set();
+    this.log = null;
     this.connectionStatus = "idle";
     this.lastError = null;
     this.clearPersistedRoom();
   },
 
-  makeSeat(userId, index, profile) {
+  makeSeat(userId, index, profile, robotId) {
     const color = StorageManager.getPlayerColor(profile);
     return {
       userId,
-      robotId: `player_${index + 1}`,
+      robotId: robotId || `player_${index + 1}`,
       name: (profile?.name || `Speler ${index + 1}`).trim().slice(0, 24),
       color,
       colors: profile?.colors || StorageManager.makeColors(color),
       style: profile?.style || "scout",
       ready: false,
     };
-  },
-
-  renumberRobotIds() {
-    (this.lobby.seats || []).forEach((seat, index) => {
-      seat.robotId = `player_${index + 1}`;
-    });
   },
 
   ensureBridge() {
@@ -149,8 +259,9 @@ const P2pSessionController = {
 
     s.onPeerLeave = (peerId) => {
       if (!this.isHost() || !this.lobby) return;
-      this.lobby.seats = (this.lobby.seats || []).filter((seat) => seat.userId !== peerId);
-      this.renumberRobotIds();
+      const uid = this.peerToPlayer[peerId];
+      delete this.peerToPlayer[peerId];
+      if (uid) this.onlineIds.delete(uid);
       this.lobby.updatedAt = Date.now();
       this.broadcastLobby();
       this.renderLobbyUi();
@@ -201,6 +312,7 @@ const P2pSessionController = {
   async createHostLobby(settings) {
     this.ensureBridge();
     this.setStatus("connecting");
+    this.resolvePlayerId();
     const maxGuests = (CONFIG.P2P?.MAX_PLAYERS || 5) - 1;
     this.session = window.RobotRunP2P.createRoom({
       gameId: this.GAME_ID,
@@ -212,22 +324,79 @@ const P2pSessionController = {
       ? await this.session.hostWithCode(String(settings.roomCode).trim().toUpperCase())
       : await this.session.host();
     this.localPeerId = this.getLocalPeerId() || code;
+    this.peerToPlayer = {};
+    this.onlineIds = new Set([this.playerId]);
 
     const hubChar = StorageManager.loadCharacter();
+    const restored = settings.roomCode
+      ? this.restoreFromLog(code, {
+          name: settings.name || "RobotRun",
+          difficulty: settings.difficulty || "normal",
+          checkpointsCount:
+            settings.checkpointsCount || CONFIG.DEFAULT_CHECKPOINTS,
+          startingLives:
+            settings.startingLives || CONFIG.DEFAULT_STARTING_LIVES,
+          seed: settings.seed || (Date.now() >>> 0),
+        })
+      : null;
+
+    if (!restored) this.ensureLog(code);
+
+    const baseSettings = restored?.settings || {
+      name: settings.name || "RobotRun",
+      difficulty: settings.difficulty || "normal",
+      checkpointsCount:
+        settings.checkpointsCount || CONFIG.DEFAULT_CHECKPOINTS,
+      startingLives:
+        settings.startingLives || CONFIG.DEFAULT_STARTING_LIVES,
+      seed: settings.seed || (Date.now() >>> 0),
+    };
+
+    let seats = restored?.seats?.length
+      ? restored.seats.map((s) => ({ ...s, ready: false }))
+      : [];
+    const selfIdx = seats.findIndex((s) => s.userId === this.playerId);
+    if (selfIdx < 0) {
+      const seat = this.makeSeat(this.playerId, seats.length, hubChar);
+      seats.push(seat);
+      this.appendDesk("seat", {
+        userId: seat.userId,
+        robotId: seat.robotId,
+        name: seat.name,
+        color: seat.color,
+        colors: seat.colors,
+        style: seat.style,
+      });
+    } else {
+      seats[selfIdx] = {
+        ...seats[selfIdx],
+        name: hubChar.name || seats[selfIdx].name,
+        color: StorageManager.getPlayerColor(hubChar),
+        colors: hubChar.colors || seats[selfIdx].colors,
+        style: hubChar.style || seats[selfIdx].style,
+        ready: false,
+      };
+      this.appendDesk("seat", {
+        userId: seats[selfIdx].userId,
+        robotId: seats[selfIdx].robotId,
+        name: seats[selfIdx].name,
+        color: seats[selfIdx].color,
+        colors: seats[selfIdx].colors,
+        style: seats[selfIdx].style,
+      });
+    }
+
     this.lobby = {
       hostId: code,
       roomCode: code,
-      status: "lobby",
-      settings: {
-        name: settings.name || "RobotRun",
-        difficulty: settings.difficulty || "normal",
-        checkpointsCount:
-          settings.checkpointsCount || CONFIG.DEFAULT_CHECKPOINTS,
-        startingLives:
-          settings.startingLives || CONFIG.DEFAULT_STARTING_LIVES,
-        seed: settings.seed || (Date.now() >>> 0),
-      },
-      seats: [this.makeSeat(code, 0, hubChar)],
+      status:
+        restored?.status === "playing" || restored?.status === "finished"
+          ? restored.status
+          : "lobby",
+      settings: baseSettings,
+      seats,
+      boardData: restored?.boardData || null,
+      gameState: restored?.gameState || null,
       updatedAt: Date.now(),
     };
 
@@ -237,7 +406,7 @@ const P2pSessionController = {
       this.lobby.settings.difficulty,
       null,
       CONFIG.GAME_MODES.P2P,
-      1,
+      seats.length,
       this.lobby.settings.checkpointsCount,
       this.lobby.settings.startingLives,
       {
@@ -248,8 +417,25 @@ const P2pSessionController = {
     );
     this.localSessionId = session.id;
     this.persistActiveRoom();
+    this.persistDesk();
     this.setStatus("online");
     window.RobotRunP2P?.writeRoomToUrl?.(this.GAME_PATH, code);
+
+    if (
+      (this.lobby.status === "playing" || this.lobby.status === "finished") &&
+      this.lobby.boardData &&
+      this.lobby.gameState
+    ) {
+      this.applyGameSnapshot(
+        {
+          boardData: this.lobby.boardData,
+          gameState: this.lobby.gameState,
+        },
+        { enterPlay: true },
+      );
+      this.wireHostAutosnapshots();
+    }
+
     this.renderLobbyUi();
     return { roomCode: code, session, lobby: this.lobby };
   },
@@ -260,6 +446,7 @@ const P2pSessionController = {
     this.setStatus("connecting");
     try {
       this.ensureBridge();
+      this.resolvePlayerId();
       const code = String(roomCode || "")
         .trim()
         .toUpperCase();
@@ -273,6 +460,7 @@ const P2pSessionController = {
         maxGuests,
       });
       this.wireSession();
+      this.ensureLog(code);
       await this.session.join(code);
 
       this.localPeerId = this.getLocalPeerId();
@@ -289,7 +477,7 @@ const P2pSessionController = {
 
       const hubChar = StorageManager.loadCharacter();
       const joinPayload = {
-        userId: this.localPeerId,
+        userId: this.playerId,
         profile: {
           name: hubChar.name,
           color: hubChar.color,
@@ -319,6 +507,7 @@ const P2pSessionController = {
       );
       this.localSessionId = session.id;
       this.persistActiveRoom();
+      this.persistDesk();
       this.setStatus("online");
       this.renderLobbyUi();
       return { roomCode: code, session, lobby: this.lobby };
@@ -334,10 +523,13 @@ const P2pSessionController = {
     const saved = this.loadPersistedRoom();
     if (!saved?.roomCode) return false;
     try {
-      if (saved.localPeerId === saved.hostId || saved.roomCode === saved.hostId) {
+      const asHost =
+        saved.role === "host" ||
+        saved.localPeerId === saved.hostId ||
+        saved.roomCode === saved.hostId;
+      if (asHost) {
         await this.createHostLobby({
           name: "RobotRun",
-          seed: Date.now() >>> 0,
           roomCode: saved.roomCode,
         });
         if (saved.localSessionId) this.localSessionId = saved.localSessionId;
@@ -363,9 +555,17 @@ const P2pSessionController = {
     });
     if (this.isHost()) {
       this.lobby.updatedAt = Date.now();
+      this.appendDesk("seat", {
+        userId: seat.userId,
+        robotId: seat.robotId,
+        name: seat.name,
+        color: seat.color,
+        colors: seat.colors,
+        style: seat.style,
+      });
       this.broadcastLobby();
     } else {
-      this.send("rr_seat_update", { userId: this.localPeerId, seat: { ...seat } });
+      this.send("rr_seat_update", { userId: this.playerId, seat: { ...seat } });
     }
     this.renderLobbyUi();
   },
@@ -374,9 +574,21 @@ const P2pSessionController = {
     if (!this.isHost() || !this.lobby || !seat?.userId) return;
     const seats = this.lobby.seats || [];
     const idx = seats.findIndex((s) => s.userId === seat.userId);
-    if (idx >= 0) seats[idx] = { ...seats[idx], ...seat };
-    else if (seats.length < (CONFIG.P2P?.MAX_PLAYERS || 5)) seats.push(seat);
-    this.renumberRobotIds();
+    if (idx >= 0) {
+      const robotId = seats[idx].robotId;
+      seats[idx] = { ...seats[idx], ...seat, robotId };
+    } else if (seats.length < (CONFIG.P2P?.MAX_PLAYERS || 5)) {
+      if (!seat.robotId) seat.robotId = `player_${seats.length + 1}`;
+      seats.push(seat);
+      this.appendDesk("seat", {
+        userId: seat.userId,
+        robotId: seat.robotId,
+        name: seat.name,
+        color: seat.color,
+        colors: seat.colors,
+        style: seat.style,
+      });
+    }
     this.lobby.seats = seats;
     this.lobby.updatedAt = Date.now();
     this.broadcastLobby();
@@ -392,7 +604,7 @@ const P2pSessionController = {
       this.broadcastLobby();
     } else {
       this.send("rr_seat_ready", {
-        userId: this.localPeerId,
+        userId: this.playerId,
         ready: !!ready,
         seat: { ...seat },
       });
@@ -456,6 +668,13 @@ const P2pSessionController = {
     this.lobby.boardData = boardData;
     this.lobby.gameState = app.engine.exportGameState();
     this.lobby.updatedAt = Date.now();
+
+    this.appendDesk("start", {
+      settings: { ...settings },
+      seats: seats.map((s) => ({ ...s })),
+      boardData,
+      gameState: this.lobby.gameState,
+    });
 
     this.broadcast("rr_game_start", {
       boardData,
@@ -580,6 +799,13 @@ const P2pSessionController = {
     this.lobby.gameState = gameState;
     this.lobby.updatedAt = Date.now();
     this.broadcast("rr_state_snapshot", { boardData, gameState });
+    const now = Date.now();
+    if (now - this._deskSnapAt > 2500 || gameState.phase === "finished") {
+      this._deskSnapAt = now;
+      this.appendDesk("snap", { boardData, gameState });
+    } else {
+      this.persistDesk();
+    }
     if (this.localSessionId) {
       StorageManager.updateSession(this.localSessionId, { boardData, gameState });
     }
@@ -596,7 +822,7 @@ const P2pSessionController = {
     }
     this.send("rr_intent_commit", {
       robotId,
-      userId: this.localPeerId,
+      userId: this.playerId,
       registers: (registers || []).map((card) => (card ? { ...card } : null)),
     });
   },
@@ -616,7 +842,7 @@ const P2pSessionController = {
     }
     this.send("rr_intent_upgrade", {
       robotId,
-      userId: this.localPeerId,
+      userId: this.playerId,
       upgradeId,
     });
   },
@@ -643,11 +869,40 @@ const P2pSessionController = {
     }
 
     if (type === "rr_seat_join" && this.isHost()) {
-      const userId = msg.fromPeerId || payload.userId;
+      const userId = payload.userId || msg.fromPeerId;
       const { profile } = payload;
       if (!userId) return;
-      if ((this.lobby.seats || []).some((s) => s.userId === userId)) return;
+      if (msg.fromPeerId) this.peerToPlayer[msg.fromPeerId] = userId;
+      this.onlineIds.add(userId);
+      const existing = (this.lobby.seats || []).find((s) => s.userId === userId);
+      if (existing) {
+        if (profile) {
+          existing.name = profile.name || existing.name;
+          if (profile.color) existing.color = profile.color;
+          if (profile.colors) existing.colors = profile.colors;
+          if (profile.style) existing.style = profile.style;
+        }
+        this.lobby.updatedAt = Date.now();
+        this.broadcastLobby();
+        this.renderLobbyUi();
+        if (
+          this.lobby.status === "playing" &&
+          this.lobby.boardData &&
+          this.lobby.gameState &&
+          msg.fromPeerId
+        ) {
+          this.session.sendTo(msg.fromPeerId, "rr_game_start", {
+            boardData: this.lobby.boardData,
+            gameState: this.lobby.gameState,
+            lobby: this.lobby,
+          });
+        }
+        return;
+      }
       if ((this.lobby.seats || []).length >= (CONFIG.P2P?.MAX_PLAYERS || 5)) return;
+      if (this.lobby.status === "playing" || this.lobby.status === "finished") {
+        return;
+      }
       const seat = this.makeSeat(userId, this.lobby.seats.length, profile || {});
       this.hostMergeSeat(seat);
       return;
@@ -678,7 +933,7 @@ const P2pSessionController = {
     if (!this.isHost()) return;
 
     if (type === "rr_intent_commit") {
-      if (payload.userId === this.localPeerId) return;
+      if (payload.userId === this.playerId) return;
       window.RobotRallyApp.engine.commitRegistersForRobot(
         payload.robotId,
         payload.registers,
@@ -688,7 +943,7 @@ const P2pSessionController = {
     }
 
     if (type === "rr_intent_upgrade") {
-      if (payload.userId === this.localPeerId) return;
+      if (payload.userId === this.playerId) return;
       const choice = window.RobotRallyApp.engine.currentUpgradeChoice;
       if (choice && choice.robotId === payload.robotId) {
         window.RobotRallyApp.engine.chooseUpgrade(payload.upgradeId);
