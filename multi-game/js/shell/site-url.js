@@ -151,6 +151,16 @@ export function navigateInShell(gamePath, params = {}) {
         win.__dgameNavigate(path);
         return;
       }
+      if (typeof win.__dgameShell?.navigate === "function") {
+        win.__dgameShell.navigate(path, { force: true });
+        return;
+      }
+      try {
+        win.postMessage({ type: "dgame:navigate", path, search }, "*");
+        return;
+      } catch {
+        /* fall through */
+      }
       if (prev !== hash) {
         try {
           win.dispatchEvent(new HashChangeEvent("hashchange"));

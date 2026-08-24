@@ -1,0 +1,3 @@
+# SPA fallback: every path serves the hash-shell.
+# Games live in the URL hash (#ganzenbord/…), not in Netlify paths.
+/*    /index.html   200

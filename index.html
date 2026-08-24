@@ -8,6 +8,11 @@
       name="description"
       content="D-Game multiplayer sandbox — P2P games via deellink of QR."
     />
+    <!--
+      Netlify hash-shell (upload once).
+      Games/pages load from GitHub via jsDelivr — push to main updates the site
+      without re-uploading this file. Keep this shell thin: routing + iframe only.
+    -->
     <style>
       html,
       body {
@@ -24,37 +29,73 @@
         height: 100%;
         height: 100dvh;
         border: 0;
+        background: #1a1f2e;
       }
+      #site-boot,
       #site-error {
         font-family: system-ui, sans-serif;
         padding: 2rem;
         color: #e8ecf4;
+        max-width: 28rem;
+      }
+      #site-error button {
+        margin-top: 1rem;
+        font: inherit;
+        padding: 0.55rem 0.9rem;
+        border-radius: 8px;
+        border: 0;
+        background: #5b8cff;
+        color: #fff;
+        cursor: pointer;
       }
     </style>
   </head>
   <body>
-    <iframe id="site-frame" title="D-Game"></iframe>
+    <p id="site-boot">D-Game laden…</p>
+    <iframe id="site-frame" title="D-Game" hidden></iframe>
     <script>
-      (async function loadMultiGame() {
-        const repo = "daanbrouwer0-collab/d-game";
-        const subpath = "multi-game";
-        let version = "main";
+      (function () {
+        /**
+         * Stable shell config — change only if the GitHub repo moves.
+         * Game content always comes from GitHub; this file stays on Netlify.
+         */
+        const CONFIG = {
+          repo: "daanbrouwer0-collab/d-game",
+          branch: "main",
+          subpath: "multi-game",
+          /** Re-check latest commit at most this often (ms) while the tab stays open */
+          shaRefreshMs: 60_000,
+        };
 
-        try {
-          const res = await fetch(
-            `https://api.github.com/repos/${repo}/commits/main?per_page=1`,
-          );
-          if (res.ok) {
-            const data = await res.json();
-            if (data.sha) version = data.sha;
-          }
-        } catch (_) {
-          /* blijf op main als de API niet bereikbaar is */
-        }
-
-        const base = `https://cdn.jsdelivr.net/gh/${repo}@${version}/${subpath}`;
+        const bootEl = document.getElementById("site-boot");
         const frame = document.getElementById("site-frame");
         let showGen = 0;
+        let currentShown = "";
+        let cdnBase = "";
+        let resolvedSha = "";
+        let shaFetchedAt = 0;
+
+        function showBoot(msg) {
+          if (!bootEl) return;
+          bootEl.hidden = false;
+          bootEl.textContent = msg;
+          frame.hidden = true;
+        }
+
+        function showFrame() {
+          if (bootEl) bootEl.hidden = true;
+          frame.hidden = false;
+        }
+
+        function showFatal(message) {
+          document.body.innerHTML =
+            '<div id="site-error"><p>' +
+            message +
+            '</p><button type="button" id="site-retry">Opnieuw proberen</button></div>';
+          document.getElementById("site-retry")?.addEventListener("click", () => {
+            location.reload();
+          });
+        }
 
         function normalizePath(path) {
           let p = String(path || "index.html").replace(/^\/+/, "");
@@ -72,7 +113,58 @@
           return { path: normalizePath(pathPart), search };
         }
 
-        function rewriteAssetUrls(html, pagePath) {
+        function overrideVersionFromUrl() {
+          try {
+            const v = new URLSearchParams(location.search).get("v");
+            if (v && /^[a-zA-Z0-9._\-]+$/.test(v)) return v;
+          } catch (_) {
+            /* ignore */
+          }
+          try {
+            const v = localStorage.getItem("dgame.shellVersion");
+            if (v && /^[a-zA-Z0-9._\-]+$/.test(v)) return v;
+          } catch (_) {
+            /* ignore */
+          }
+          return null;
+        }
+
+        async function resolveCdnBase(force) {
+          const now = Date.now();
+          if (
+            !force &&
+            cdnBase &&
+            now - shaFetchedAt < CONFIG.shaRefreshMs
+          ) {
+            return cdnBase;
+          }
+
+          const pinned = overrideVersionFromUrl();
+          let version = pinned || CONFIG.branch;
+
+          if (!pinned) {
+            try {
+              const res = await fetch(
+                `https://api.github.com/repos/${CONFIG.repo}/commits/${CONFIG.branch}?per_page=1`,
+                { cache: "no-store" },
+              );
+              if (res.ok) {
+                const data = await res.json();
+                if (data.sha) version = data.sha;
+              }
+            } catch (_) {
+              /* keep branch tip / previous sha */
+              if (resolvedSha) version = resolvedSha;
+            }
+          }
+
+          resolvedSha = version;
+          shaFetchedAt = now;
+          cdnBase = `https://cdn.jsdelivr.net/gh/${CONFIG.repo}@${version}/${CONFIG.subpath}`;
+          return cdnBase;
+        }
+
+        function rewriteAssetUrls(html, pagePath, base) {
           const pageDir = pagePath.includes("/")
             ? pagePath.slice(0, pagePath.lastIndexOf("/") + 1)
             : "";
@@ -88,13 +180,11 @@
 
         function pathFromHref(href, currentPath) {
           if (!href || /^(mailto:|tel:|javascript:)/i.test(href)) return null;
-          if (href.startsWith("#")) {
-            return parseHash(href);
-          }
+          if (href.startsWith("#")) return parseHash(href);
           try {
             if (/^(https?:)?\/\//i.test(href)) {
               const url = new URL(href);
-              const marker = `/${subpath}/`;
+              const marker = `/${CONFIG.subpath}/`;
               const idx = url.pathname.indexOf(marker);
               if (idx < 0) return null;
               const rest = url.pathname.slice(idx + marker.length);
@@ -106,7 +196,10 @@
             const currentDir = currentPath.includes("/")
               ? currentPath.slice(0, currentPath.lastIndexOf("/") + 1)
               : "";
-            const resolved = new URL(href, `https://local.invalid/${currentDir}`);
+            const resolved = new URL(
+              href,
+              `https://local.invalid/${currentDir}`,
+            );
             return {
               path: normalizePath(resolved.pathname.replace(/^\//, "")),
               search: resolved.search || "",
@@ -133,7 +226,7 @@
                 "",
                 nextHash,
               );
-              show(next.path);
+              navigate(next.path, { force: true });
             },
             true,
           );
@@ -142,13 +235,18 @@
         async function show(path) {
           const gen = ++showGen;
           const pagePath = normalizePath(path);
-          const res = await fetch(`${base}/${pagePath}`);
+          const base = await resolveCdnBase(false);
+          if (gen !== showGen) return;
+
+          const res = await fetch(`${base}/${pagePath}`, { cache: "no-cache" });
           if (gen !== showGen) return;
           if (!res.ok) {
             throw new Error(`Pagina niet gevonden: ${pagePath}`);
           }
+
           const html =
-            rewriteAssetUrls(await res.text(), pagePath) + `<!-- r${gen} -->`;
+            rewriteAssetUrls(await res.text(), pagePath, base) +
+            `<!-- shell r${gen} ${resolvedSha.slice(0, 7)} -->`;
 
           await new Promise((resolve) => {
             const done = () => {
@@ -168,7 +266,9 @@
                 if (doc) {
                   wireNavigation(doc);
                   const title = doc.querySelector("title");
-                  if (title && title.textContent) document.title = title.textContent;
+                  if (title && title.textContent) {
+                    document.title = title.textContent;
+                  }
                 }
               } catch (_) {
                 /* ignore */
@@ -177,41 +277,83 @@
             };
             frame.srcdoc = html;
           });
+
+          currentShown = pagePath;
+          showFrame();
         }
 
-        const initial = parseHash(location.hash || "#index.html");
-        history.replaceState(
-          { path: initial.path, search: initial.search },
-          "",
-          `#${initial.path}${initial.search}`,
-        );
-        let currentShown = initial.path;
-        await show(initial.path);
-
-        window.__dgameNavigate = (path) => {
+        /**
+         * Public API for game iframes (site-url.js navigateInShell).
+         * Stable contract — keep this name when editing the shell.
+         */
+        function navigate(path, opts) {
           const pagePath = normalizePath(path);
-          if (pagePath === currentShown) return;
-          currentShown = pagePath;
-          show(pagePath).catch(() => {
-            document.body.innerHTML =
-              '<p id="site-error">Kon de D-Game-site niet laden vanaf GitHub.</p>';
+          if (!opts?.force && pagePath === currentShown) return;
+          show(pagePath).catch((err) => {
+            showFatal(
+              (err && err.message) ||
+                "Kon de D-Game-site niet laden vanaf GitHub.",
+            );
           });
+        }
+
+        window.__dgameNavigate = navigate;
+        window.__dgameShell = {
+          version: 2,
+          navigate,
+          getCdnBase: () => cdnBase,
+          getSha: () => resolvedSha,
+          refresh: () => resolveCdnBase(true),
         };
+
+        // Backup if a game cannot call parent.__dgameNavigate directly.
+        window.addEventListener("message", (event) => {
+          const data = event.data;
+          if (!data || typeof data !== "object") return;
+          if (data.type === "dgame:navigate" && data.path) {
+            const pagePath = normalizePath(data.path);
+            const search =
+              data.search && String(data.search).startsWith("?")
+                ? String(data.search)
+                : data.params
+                  ? `?${new URLSearchParams(data.params)}`
+                  : "";
+            const nextHash = `#${pagePath}${search}`;
+            if ((location.hash || "") !== nextHash) {
+              history.pushState({ path: pagePath, search }, "", nextHash);
+            }
+            navigate(pagePath, { force: true });
+          }
+        });
 
         window.addEventListener("popstate", (event) => {
           const parsed = parseHash(location.hash || "#index.html");
           const path = (event.state && event.state.path) || parsed.path;
-          window.__dgameNavigate(path);
+          navigate(path, { force: true });
         });
 
         window.addEventListener("hashchange", () => {
           const parsed = parseHash(location.hash || "#index.html");
-          window.__dgameNavigate(parsed.path);
+          navigate(parsed.path, { force: true });
         });
-      })().catch(() => {
-        document.body.innerHTML =
-          '<p id="site-error">Kon de D-Game-site niet laden vanaf GitHub.</p>';
-      });
+
+        (async function boot() {
+          showBoot("D-Game laden…");
+          await resolveCdnBase(true);
+          const initial = parseHash(location.hash || "#index.html");
+          history.replaceState(
+            { path: initial.path, search: initial.search },
+            "",
+            `#${initial.path}${initial.search}`,
+          );
+          await show(initial.path);
+        })().catch((err) => {
+          showFatal(
+            (err && err.message) ||
+              "Kon de D-Game-site niet laden vanaf GitHub.",
+          );
+        });
+      })();
     </script>
   </body>
 </html>
