@@ -112,6 +112,8 @@ document.getElementById("btn-p2p-host").addEventListener("click", async () => {
   p2pResult.textContent = "Host starten…";
   try {
     await teardown();
+    p2pHostInfo.textContent = "Kamer wordt aangemaakt…";
+    inviteWrap.classList.remove("hidden");
     const s = createRoom({ gameId: LAB_GAME_ID, transport: "p2p", maxGuests: 1 });
     bindSession(s);
     const code = await s.host();

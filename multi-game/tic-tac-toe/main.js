@@ -142,6 +142,8 @@ ui.btnLocal.addEventListener("click", async () => {
 ui.btnHost.addEventListener("click", async () => {
   ui.setLobbyError("");
   ui.btnHost.disabled = true;
+  ui.showHostInvite("…", "");
+  ui.lobbyHint.textContent = "Kamer wordt aangemaakt… even wachten.";
   try {
     await teardown({ clearUrl: true });
     ensureSession("p2p");

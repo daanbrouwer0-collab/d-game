@@ -1,5 +1,9 @@
 import { drawQr } from "./qr-ui.js";
 
+function nextFrame() {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
 /**
  * Fill the shared host invite card: big QR, room code, link.
  * @param {{
@@ -19,6 +23,9 @@ export async function showHostInviteCard(opts) {
     urlEl.href = url;
   }
   card?.classList.remove("hidden");
+  card?.scrollIntoView({ behavior: "smooth", block: "center" });
+  await nextFrame();
+  await nextFrame();
   if (canvas && url) {
     try {
       await drawQr(canvas, url, { width: 280 });
@@ -26,5 +33,4 @@ export async function showHostInviteCard(opts) {
       console.error("QR render failed", err);
     }
   }
-  card?.scrollIntoView({ behavior: "smooth", block: "center" });
 }

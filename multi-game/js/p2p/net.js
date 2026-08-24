@@ -75,9 +75,23 @@ export class Net {
   }
 
   /**
+   * @param {number} [ms]
+   */
+  async #waitForPeerJs(ms = 8000) {
+    const start = Date.now();
+    while (typeof Peer === "undefined") {
+      if (Date.now() - start > ms) {
+        throw new Error("PeerJS is niet geladen. Controleer je netwerkverbinding.");
+      }
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  }
+
+  /**
    * @returns {Promise<string>}
    */
   async host() {
+    await this.#waitForPeerJs();
     await this.destroy();
     const code = generateRoomCode();
     this.role = "host";
@@ -91,6 +105,13 @@ export class Net {
         reject(new Error("Peer kon niet worden aangemaakt"));
         return;
       }
+
+      const timer = setTimeout(() => {
+        cleanup();
+        const err = new Error("Room maken duurde te lang. Tik nog eens op Maak room.");
+        this.#setStatus("error", err.message);
+        reject(err);
+      }, 12000);
 
       const onOpen = (id) => {
         cleanup();
@@ -107,6 +128,7 @@ export class Net {
       };
 
       const cleanup = () => {
+        clearTimeout(timer);
         peer.off("open", onOpen);
         peer.off("error", onError);
       };
@@ -129,6 +151,7 @@ export class Net {
     const code = roomCode.trim().toUpperCase();
     if (!code) throw new Error("Voer een kamercode in");
 
+    await this.#waitForPeerJs();
     await this.destroy();
     this.role = "guest";
     this.roomCode = code;
@@ -143,6 +166,7 @@ export class Net {
       }
 
       let settled = false;
+      let timer = null;
 
       const fail = (err) => {
         if (settled) return;
@@ -170,9 +194,14 @@ export class Net {
       };
 
       const cleanup = () => {
+        if (timer) clearTimeout(timer);
         peer.off("open", onOpen);
         peer.off("error", onPeerError);
       };
+
+      timer = setTimeout(() => {
+        fail(new Error("Verbinden duurde te lang. Host moet online blijven."));
+      }, 12000);
 
       peer.on("open", onOpen);
       peer.on("error", onPeerError);
@@ -198,6 +227,7 @@ export class Net {
    * @returns {Promise<string>}
    */
   async hostWithCode(code) {
+    await this.#waitForPeerJs();
     await this.destroy();
     this.role = "host";
     this.roomCode = code;

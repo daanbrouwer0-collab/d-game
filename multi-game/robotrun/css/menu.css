@@ -397,6 +397,9 @@
 .invite-qr-wrap canvas,
 .qr-canvas-wrap canvas {
   display: block;
-  width: min(280px, 72vw);
-  height: auto;
+  width: 280px;
+  height: 280px;
+  max-width: min(280px, 72vw);
+  max-height: min(280px, 72vw);
+  background: #fff;
 }

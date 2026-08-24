@@ -166,38 +166,50 @@ export function writeRoomToUrl(gamePath, code, opts = {}) {
   params.set("room", String(code || "").trim().toUpperCase());
   if (opts.via) params.set("via", opts.via);
 
-  if (isHashShell()) {
-    const win = shellWindow();
-    const path = toHashPath(gamePath);
-    const next = `#${path}?${params.toString()}`;
-    win.history.replaceState({ path }, "", next);
-    return;
-  }
+  try {
+    if (isHashShell()) {
+      const win = shellWindow();
+      const path = toHashPath(gamePath);
+      const next = `#${path}?${params.toString()}`;
+      win.history.replaceState({ path }, "", next);
+      return;
+    }
 
-  const url = new URL(window.location.href);
-  params.forEach((value, key) => url.searchParams.set(key, value));
-  history.replaceState(null, "", url);
+    if (String(window.location.href).startsWith("about:")) return;
+
+    const url = new URL(window.location.href);
+    params.forEach((value, key) => url.searchParams.set(key, value));
+    history.replaceState(null, "", url);
+  } catch {
+    /* never block host/QR on URL updates */
+  }
 }
 
 /**
  * @param {string} [gamePath]
  */
 export function clearRoomFromUrl(gamePath) {
-  if (isHashShell()) {
-    const win = shellWindow();
-    let path = gamePath ? toHashPath(gamePath) : null;
-    if (!path) {
-      const raw = (win.location.hash || "#index.html").replace(/^#/, "");
-      path = raw.split("?")[0] || "index.html";
+  try {
+    if (isHashShell()) {
+      const win = shellWindow();
+      let path = gamePath ? toHashPath(gamePath) : null;
+      if (!path) {
+        const raw = (win.location.hash || "#index.html").replace(/^#/, "");
+        path = raw.split("?")[0] || "index.html";
+      }
+      win.history.replaceState({ path }, "", `#${path}`);
+      return;
     }
-    win.history.replaceState({ path }, "", `#${path}`);
-    return;
-  }
 
-  const url = new URL(window.location.href);
-  url.searchParams.delete("room");
-  url.searchParams.delete("via");
-  history.replaceState(null, "", url);
+    if (String(window.location.href).startsWith("about:")) return;
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("room");
+    url.searchParams.delete("via");
+    history.replaceState(null, "", url);
+  } catch {
+    /* ignore */
+  }
 }
 
 /**

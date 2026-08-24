@@ -308,6 +308,9 @@ async function startHost({
     maxGuests: MAX_PLAYERS - 1,
   });
   bindSession(s);
+  ui.showLobby();
+  ui.showInvite(code || "…", null, true, { local: transport === "local" });
+  ui.setHint("Kamer wordt aangemaakt… even wachten.");
   const roomCode = code ? await s.hostWithCode(code) : await s.host();
   const local = transport === "local";
   shareUrl = local ? null : s.buildShareUrl(GAME_PATH, roomCode);
@@ -318,6 +321,8 @@ async function startHost({
   bindRoom(r);
   r.beginAsHost();
   ui.showInvite(roomCode, shareUrl, true, { local });
+  ui.showLobby();
+  ui.renderLobby(r.state, r.localId, true, { local });
   if (shareUrl && ui.inviteQrCanvas) {
     await showHostInviteCard({
       card: ui.inviteBox,
@@ -328,8 +333,6 @@ async function startHost({
       url: shareUrl,
     });
   }
-  ui.showLobby();
-  ui.renderLobby(r.state, r.localId, true, { local });
   if (local) {
     ui.setHint("Voeg spelers toe op dit apparaat, daarna Start.");
     ui.setConnectionStatus("connected", "Op dit apparaat");
