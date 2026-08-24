@@ -1,0 +1,126 @@
+/* MERGE-BLOCK: controls.css — joysticks zoals Minecraft.html */
+#touch-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 36vh;
+  max-height: 320px;
+  z-index: 25;
+  display: none;
+  pointer-events: none;
+  padding: 14px;
+  padding-bottom: calc(14px + var(--safe-bottom));
+  box-sizing: border-box;
+  gap: 14px;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+#touch-controls.hidden {
+  display: none !important;
+}
+
+body.game-active.touch #touch-controls:not(.hidden) {
+  display: flex;
+}
+
+.touch-joystick {
+  width: clamp(140px, 38vw, 170px);
+  height: clamp(140px, 38vw, 170px);
+  position: relative;
+  border-radius: 999px;
+  pointer-events: auto;
+  touch-action: none;
+  background: rgba(6, 0, 18, 0.35);
+  border: 1px solid rgba(0, 229, 255, 0.32);
+  box-shadow: 0 0 24px rgba(0, 229, 255, 0.12);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  flex-shrink: 0;
+}
+
+.touch-joystick .ring {
+  position: absolute;
+  inset: 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(0, 229, 255, 0.28);
+  box-shadow: inset 0 0 24px rgba(0, 229, 255, 0.12);
+  pointer-events: none;
+}
+
+.touch-joystick .knob {
+  --dx: 0px;
+  --dy: 0px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 66px;
+  height: 66px;
+  border-radius: 999px;
+  transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy)));
+  background: rgba(255, 0, 204, 0.16);
+  border: 2px solid rgba(255, 0, 204, 0.55);
+  box-shadow: 0 0 26px rgba(255, 0, 204, 0.18);
+  pointer-events: none;
+}
+
+.touch-action-btn {
+  align-self: center;
+  width: clamp(58px, 16vw, 72px);
+  height: clamp(58px, 16vw, 72px);
+  border-radius: 22px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: rgba(8, 14, 26, 0.72);
+  color: #fca5a5;
+  font-size: 26px;
+  font-weight: 800;
+  pointer-events: auto;
+  touch-action: none;
+  flex-shrink: 0;
+}
+
+.touch-action-btn.inhale:active,
+.touch-action-btn.inhale.pressed {
+  background: rgba(239, 68, 68, 0.28);
+  transform: scale(0.94);
+}
+
+.touch-action-btn.hack {
+  border-color: rgba(251, 191, 36, 0.55);
+  color: #fcd34d;
+}
+
+.touch-action-btn.hack:active,
+.touch-action-btn.hack.pressed {
+  background: rgba(245, 158, 11, 0.28);
+  transform: scale(0.94);
+}
+
+#touch-controls {
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.touch-action-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-self: center;
+  pointer-events: auto;
+}
+
+@media (max-width: 420px) {
+  #touch-controls {
+    padding-left: 8px;
+    padding-right: 8px;
+    gap: 8px;
+  }
+
+  .touch-action-btn {
+    width: 52px;
+    height: 52px;
+    font-size: 22px;
+  }
+}
+/* END-MERGE-BLOCK */

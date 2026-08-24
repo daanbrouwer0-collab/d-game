@@ -1,0 +1,9 @@
+# Niet uploaden naar Netlify (sneller deploy, geen rommel)
+**/node_modules/**
+**/.git/**
+**/.snapshots/**
+**/local/**
+**/.cursor/**
+**/*.md
+agent-transcripts/
+.netlify/

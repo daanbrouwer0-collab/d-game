@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tic Tac Toe — D-Game</title>
+    <meta
+      name="description"
+      content="Speel tic-tac-toe op één apparaat of via P2P (deellink of QR-scan)."
+    />
+    <link rel="stylesheet" href="../css/site.css" />
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <p class="nav"><a href="../">← Games</a></p>
+        <h1 class="brand">Tic Tac Toe</h1>
+        <p id="connection-status" class="status" data-state="idle">Niet verbonden</p>
+      </header>
+
+      <main>
+        <section id="lobby" class="panel">
+          <h2>Lobby</h2>
+          <p class="lede">
+            Speel op dit apparaat, of start P2P en laat de ander je QR scannen.
+          </p>
+
+          <div class="actions">
+            <button type="button" id="btn-local" class="btn btn-ghost">Op dit apparaat</button>
+            <button type="button" id="btn-host" class="btn btn-primary">Start P2P</button>
+          </div>
+
+          <div id="host-info" class="host-info hidden">
+            <p>Kamercode</p>
+            <p id="room-code" class="room-code"></p>
+            <p class="share-label">Scan deze QR om te joinen (P2P)</p>
+            <div class="invite-qr-wrap qr-canvas-wrap">
+              <canvas id="invite-qr-canvas" width="220" height="220"></canvas>
+            </div>
+            <p class="share-label">Deellink</p>
+            <a id="share-url" class="share-url" href="#"></a>
+            <div class="actions share-actions">
+              <button type="button" id="btn-share-whatsapp" class="btn btn-primary">
+                Deel via WhatsApp
+              </button>
+              <button type="button" id="btn-share" class="btn btn-ghost">Andere apps…</button>
+              <button type="button" id="btn-copy-link" class="btn btn-ghost">Kopieer link</button>
+            </div>
+          </div>
+
+          <div class="join-row">
+            <label for="join-code">Join P2P</label>
+            <div class="join-controls">
+              <input
+                id="join-code"
+                type="text"
+                maxlength="12"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="bijv. AB7K2M"
+              />
+              <button type="button" id="btn-join" class="btn btn-primary">Join</button>
+              <button type="button" id="btn-scan-qr" class="btn btn-primary">Scan QR</button>
+            </div>
+          </div>
+
+          <p id="lobby-hint" class="hint"></p>
+          <p id="lobby-error" class="error" role="alert"></p>
+        </section>
+
+        <section id="game" class="panel hidden">
+          <div class="game-meta">
+            <p id="role-label" class="meta"></p>
+            <p id="turn-label" class="meta"></p>
+          </div>
+
+          <div id="board" class="board" aria-label="Tic tac toe bord"></div>
+
+          <p id="result-label" class="result"></p>
+
+          <div class="actions">
+            <button type="button" id="btn-restart" class="btn btn-primary" disabled>
+              Opnieuw spelen
+            </button>
+            <button type="button" id="btn-leave" class="btn btn-ghost">Terug naar lobby</button>
+            <button type="button" id="btn-reconnect" class="btn btn-ghost hidden">
+              Opnieuw verbinden
+            </button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

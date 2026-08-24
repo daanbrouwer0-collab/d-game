@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Geheugen — D-Game</title>
+    <link rel="stylesheet" href="../css/site.css" />
+  </head>
+  <body>
+    <div class="app app-home">
+      <header class="header">
+        <h1 class="brand">Geheugen</h1>
+        <p class="tagline">Lokale opslag — geen server.</p>
+      </header>
+      <main>
+        <section class="panel">
+          <h2>Overzicht</h2>
+          <div class="stats-grid" id="stats"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Profiel</h2>
+          <label class="field-label" for="display-name">Weergavenaam</label>
+          <input id="display-name" class="field" type="text" maxlength="20" />
+          <div class="color-row">
+            <span>Hoofd</span>
+            <input type="color" id="color-head" value="#cccccc" />
+          </div>
+          <div class="color-row">
+            <span>Lichaam</span>
+            <input type="color" id="color-body" value="#888888" />
+          </div>
+          <div class="color-row">
+            <span>Benen</span>
+            <input type="color" id="color-legs" value="#444444" />
+          </div>
+          <div class="actions">
+            <button type="button" id="btn-save-profile" class="btn btn-primary">Opslaan</button>
+          </div>
+          <p id="profile-msg" class="hint"></p>
+        </section>
+
+        <section class="panel">
+          <h2>Wissen</h2>
+          <p class="lede">Kies wat je wilt legen. Dit kan niet ongedaan.</p>
+          <div class="actions">
+            <button type="button" id="btn-clear-rooms" class="btn btn-ghost">Wis recente rooms</button>
+            <button type="button" id="btn-clear-friends" class="btn btn-ghost">Wis vrienden</button>
+            <button type="button" id="btn-clear-logs" class="btn btn-ghost">Wis event-logs</button>
+            <button type="button" id="btn-clear-all" class="btn btn-primary">Wis alles</button>
+          </div>
+          <p id="clear-msg" class="hint"></p>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

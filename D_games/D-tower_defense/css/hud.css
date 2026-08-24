@@ -1,0 +1,129 @@
+/* MERGE-BLOCK: hud.css */
+#ui {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+    box-sizing: border-box;
+}
+
+.hud-top-block {
+    flex-shrink: 0;
+    width: 100%;
+}
+
+.hud-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    text-shadow: 0 0 10px var(--prim);
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent);
+    pointer-events: none;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+}
+
+.hud-stats {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.hud-stats > * {
+    flex-shrink: 0;
+}
+
+.hud-stats-secondary {
+    margin-left: auto;
+}
+
+.hud-tpoints {
+    color: var(--succ);
+}
+
+.hud-btm {
+    margin-top: auto;
+    justify-content: center;
+    align-items: flex-end;
+    padding: var(--hud-btm-pad-y) var(--hud-btm-pad-x);
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.94) 60%, transparent);
+}
+
+.btn-grp {
+    display: flex;
+    gap: var(--build-btn-gap);
+    pointer-events: auto;
+    flex-wrap: wrap;
+    justify-content: space-evenly;
+    width: 100%;
+}
+
+.build-btn {
+    background: rgba(0, 243, 255, 0.05);
+    border: 1px solid var(--prim);
+    color: var(--prim);
+    padding: var(--build-btn-pad-y) var(--build-btn-pad-x);
+    font-family: var(--font-mono);
+    cursor: pointer;
+    min-width: 0;
+    min-height: var(--build-btn-min-h);
+    flex: 1 0 calc(25% - var(--build-btn-gap));
+    text-align: center;
+    border-radius: var(--build-btn-radius);
+    position: relative;
+    transition: 0.2s;
+    pointer-events: auto;
+    font-size: var(--build-btn-font);
+    line-height: 1.15;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.build-btn:hover,
+.build-btn.active {
+    background: var(--prim);
+    color: #000;
+    box-shadow: 0 0 15px var(--prim);
+}
+
+.build-btn .cost {
+    display: block;
+    font-size: 0.72em;
+    opacity: 0.85;
+    margin-top: 2px;
+    line-height: 1;
+}
+
+#center-msg {
+    width: 100%;
+    min-height: 22px;
+    padding: 4px 12px 8px;
+    text-align: center;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    text-shadow: 0 0 10px currentColor;
+    border-bottom: 1px solid rgba(0, 243, 255, 0.12);
+}
+
+#center-msg.active {
+    opacity: 1;
+}
+/* END-MERGE-BLOCK */

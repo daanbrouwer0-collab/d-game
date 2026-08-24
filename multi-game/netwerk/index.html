@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Netwerk — D-Game</title>
+    <link rel="stylesheet" href="../css/site.css" />
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+  </head>
+  <body>
+    <div class="app app-wide">
+      <header class="header">
+        <h1 class="brand">Netwerk</h1>
+        <p class="tagline">Test P2P-multiplayer: host, QR-scan, echo.</p>
+      </header>
+
+      <main>
+        <section class="panel">
+          <h2>Communicatie</h2>
+          <p class="lede">
+            P2P is live via PeerJS (deellink of QR-scan). Matrix komt later.
+            Hotseat op één apparaat staat alleen in spellen, niet hier.
+          </p>
+          <ul id="transport-list" class="transport-list"></ul>
+        </section>
+
+        <section class="panel">
+          <h2>P2P — Host</h2>
+          <p class="lede">Start een testroom. Deel de QR of link met een andere telefoon/tab.</p>
+          <div class="actions">
+            <button type="button" id="btn-p2p-host" class="btn btn-primary">Start host</button>
+            <button type="button" id="btn-p2p-stop" class="btn btn-ghost hidden">Stop host</button>
+          </div>
+          <p id="p2p-status" class="status" data-state="idle">Niet verbonden</p>
+          <p id="p2p-host-info" class="hint"></p>
+          <div id="invite-wrap" class="invite-qr-wrap qr-canvas-wrap hidden">
+            <canvas id="invite-qr-canvas" width="220" height="220"></canvas>
+          </div>
+          <div id="host-actions" class="actions share-actions hidden">
+            <button type="button" id="btn-copy-link" class="btn btn-ghost">Kopieer link</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>P2P — Join</h2>
+          <p class="lede">Scan de QR van de host of vul de kamercode in.</p>
+          <div class="join-row">
+            <label for="p2p-join-code">Kamercode</label>
+            <div class="join-controls">
+              <input id="p2p-join-code" type="text" maxlength="12" placeholder="CODE" />
+              <button type="button" id="btn-p2p-join" class="btn btn-primary">Join</button>
+              <button type="button" id="btn-scan-qr" class="btn btn-primary">Scan QR</button>
+            </div>
+          </div>
+          <p id="lab-p2p-result" class="lab-result"></p>
+        </section>
+
+        <section class="panel">
+          <h2>P2P — Echo test</h2>
+          <p class="lede">Na verbinding: stuur een ping naar de andere peer.</p>
+          <div class="actions">
+            <button type="button" id="btn-echo" class="btn btn-primary" disabled>
+              Stuur ping
+            </button>
+          </div>
+          <p id="lab-echo-result" class="lab-result"></p>
+        </section>
+
+        <section class="panel">
+          <h2>Matrix</h2>
+          <p class="lede">Zelfde Room API als P2P, maar nog niet actief (geen login/homeserver).</p>
+          <div class="actions">
+            <button type="button" id="btn-matrix-try" class="btn btn-ghost">
+              Probeer createRoom(matrix)
+            </button>
+          </div>
+          <p id="lab-matrix-result" class="lab-result"></p>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

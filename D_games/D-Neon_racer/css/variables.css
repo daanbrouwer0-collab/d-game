@@ -1,0 +1,36 @@
+/* MERGE-BLOCK: variables.css */
+:root {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: 'Plus Jakarta Sans', var(--font-sans);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --bg-app: #050010;
+  --bg-canvas: #0a001a;
+  --bg-card: rgba(14, 8, 32, 0.88);
+  --bg-input: rgba(8, 4, 20, 0.85);
+  --border: rgba(255, 0, 255, 0.15);
+  --border-active: rgba(0, 255, 255, 0.45);
+
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  --accent: #ff00ff;
+  --accent-glow: rgba(255, 0, 255, 0.22);
+  --accent-2: #00ffff;
+  --accent-2-glow: rgba(0, 255, 255, 0.18);
+  --success: #00ff88;
+  --warning: #ffdd33;
+  --danger: #ff0055;
+
+  --nav-height: 52px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
+  --transition: 0.2s ease;
+}
+/* END-MERGE-BLOCK */

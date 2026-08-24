@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Friends — D-Game</title>
+    <link rel="stylesheet" href="../css/site.css" />
+  </head>
+  <body>
+    <div class="app app-home">
+      <header class="header">
+        <h1 class="brand">Friends</h1>
+        <p class="tagline">Lokale contacten op dit apparaat.</p>
+      </header>
+      <main>
+        <section class="panel">
+          <h2>Toevoegen</h2>
+          <label class="field-label" for="friend-name">Naam</label>
+          <input id="friend-name" class="field" type="text" maxlength="24" placeholder="bijv. Sam" />
+          <label class="field-label" for="friend-note">Notitie (optioneel)</label>
+          <input id="friend-note" class="field" type="text" maxlength="80" placeholder="bijv. school / familielid" />
+          <div class="actions">
+            <button type="button" id="btn-add-friend" class="btn btn-primary">Opslaan</button>
+          </div>
+          <p id="friends-error" class="error" role="alert"></p>
+        </section>
+        <section class="panel">
+          <h2>Lijst</h2>
+          <ul id="friend-list" class="friend-list"></ul>
+          <p id="friends-empty" class="hint hidden">Nog geen vrienden opgeslagen.</p>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

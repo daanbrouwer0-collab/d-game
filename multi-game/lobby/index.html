@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lobby — D-Game</title>
+    <link rel="stylesheet" href="../css/site.css" />
+  </head>
+  <body>
+    <div class="app app-home">
+      <header class="header">
+        <h1 class="brand">Lobby</h1>
+        <p class="tagline">Recente rooms op dit apparaat.</p>
+      </header>
+      <main>
+        <section class="panel">
+          <h2>Jouw rooms</h2>
+          <p class="lede">
+            Alleen wat jij eerder hostte of joinde. Geen live-directory zonder server.
+          </p>
+          <ul id="lobby-list" class="lobby-list"></ul>
+          <p id="lobby-empty" class="hint hidden">Nog geen lobbies — start een spel.</p>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

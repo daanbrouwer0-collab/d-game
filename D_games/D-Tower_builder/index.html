@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Tower Build — Bouw je toren</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/nav.css">
+  <link rel="stylesheet" href="css/menu.css">
+  <link rel="stylesheet" href="css/hud.css">
+  <link rel="stylesheet" href="css/controls.css">
+
+  <!-- MERGE: plak css/*.css in één <style> voor single-file build -->
+</head>
+<body>
+  <div id="app">
+    <!-- ===== SPEL TAB — 2D side view ===== -->
+    <section id="screen-play" class="view-screen active">
+      <div id="game-wrap">
+        <canvas id="game-canvas" aria-label="2D side-view game"></canvas>
+
+        <div id="game-hud">
+          <div id="build-toolbar" class="build-toolbar" role="toolbar" aria-label="Bouwmaterialen">
+            <button type="button" class="build-btn active" data-build="beam" aria-pressed="true">Balken</button>
+            <button type="button" class="build-btn" data-build="walkway" aria-pressed="false">Loopplank</button>
+            <button type="button" class="build-btn" data-build="rope" aria-pressed="false">Touw</button>
+            <button type="button" class="build-btn" data-build="knot" aria-pressed="false">Knoop</button>
+            <button type="button" id="btn-build-mode" class="build-btn build-mode-toggle" aria-pressed="false">Bouw mode UIT</button>
+          </div>
+          <div class="hud-stats">
+            <span id="hud-level">Lvl: 1</span>
+            <span id="hud-wood">Hout: 0</span>
+            <span id="hud-plank">Plank: 0</span>
+            <span id="hud-rope">Touw: 0</span>
+            <span id="hud-hp">HP: 100</span>
+          </div>
+        </div>
+
+        <div id="pause-badge" class="hidden">Gepauzeerd</div>
+
+        <div id="msg-overlay">
+          <h2 id="msg-text">Veel succes!</h2>
+        </div>
+
+        <div id="share-modal" class="modal" aria-hidden="true">
+          <div class="modal-card glass-card">
+            <div class="modal-head">
+              <h2>Foto maken!</h2>
+            </div>
+            <div class="share-modal-body">
+              <p class="share-modal-text">Je hebt een fototoestel gevonden! Wil je dit moment delen?</p>
+              <div class="share-preview-wrap">
+                <img id="share-preview" alt="Screenshot van dit moment" width="600" height="400">
+              </div>
+              <div class="share-modal-actions">
+                <button id="btn-share-yes" class="btn share-btn" type="button">Deel foto</button>
+                <button id="btn-share-no" class="btn alt" type="button">Nee, verder spelen</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="touch-controls">
+          <div class="control-cluster control-cluster-move">
+            <button id="btn-left" class="control-btn" type="button" aria-label="Links">
+              <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+            </button>
+            <button id="btn-right" class="control-btn" type="button" aria-label="Rechts">
+              <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
+          </div>
+          <div class="control-cluster control-cluster-actions">
+            <button id="btn-shoot" class="control-btn shoot" type="button" aria-label="Schiet">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/></svg>
+            </button>
+            <button id="btn-jump" class="control-btn jump" type="button" aria-label="Spring">↑</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== KARAKTER TAB ===== -->
+    <section id="screen-character" class="view-screen">
+      <div class="panel-scroll">
+        <div class="menu-page-head">
+          <button class="btn-back" type="button" data-menu-back aria-label="Terug">← Terug</button>
+          <h2>Karakter</h2>
+        </div>
+        <div class="glass-card">
+          <div class="stat-grid">
+            <div class="stat-card">
+              <div class="label">Score</div>
+              <div class="value" id="stat-score">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Munten</div>
+              <div class="value" id="stat-coins">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Level</div>
+              <div class="value" id="stat-level">1</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Gezondheid</div>
+              <div class="value" id="stat-hp">100%</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Gewicht</div>
+              <div class="value" id="stat-weight">72 kg</div>
+            </div>
+          </div>
+        </div>
+        <div class="glass-card character-appearance">
+          <div class="character-appearance-head">
+            <h3>Uiterlijk</h3>
+            <button id="btn-reset-colors" class="btn alt" type="button">Reset</button>
+          </div>
+          <div class="character-preview-wrap">
+            <canvas id="character-preview" width="128" height="176" aria-label="Karakter preview"></canvas>
+          </div>
+          <div class="character-color-list">
+            <label class="color-row" for="color-head">
+              <span class="color-row-label">Hoofd</span>
+              <input id="color-head" class="color-input" type="color" value="#5ef0ff">
+            </label>
+            <label class="color-row" for="color-body">
+              <span class="color-row-label">Midden</span>
+              <input id="color-body" class="color-input" type="color" value="#00e5ff">
+            </label>
+            <label class="color-row" for="color-legs">
+              <span class="color-row-label">Benen</span>
+              <input id="color-legs" class="color-input" type="color" value="#0097b2">
+            </label>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== WERELD (menu-pagina) ===== -->
+    <section id="screen-world" class="view-screen">
+      <div class="panel-scroll">
+        <div class="menu-page-head">
+          <button class="btn-back" type="button" data-menu-back aria-label="Terug">← Terug</button>
+          <h2>Wereld</h2>
+        </div>
+        <div class="glass-card" id="world-level-list">
+          <div class="setting-row" data-world-level="1">
+            <div class="info">
+              <strong>Level 1 — Bosrand</strong>
+              <span id="world-lvl-1-desc">Verzamel munten en bereik het einde</span>
+            </div>
+            <button id="world-lvl-1-btn" class="btn success" type="button" disabled>Actief</button>
+          </div>
+          <div class="setting-row" data-world-level="2">
+            <div class="info">
+              <strong>Level 2 — Grot</strong>
+              <span id="world-lvl-2-desc">Nog niet vrijgespeeld</span>
+            </div>
+            <button id="world-lvl-2-btn" class="btn" type="button" disabled>Vergrendeld</button>
+          </div>
+          <div class="setting-row" data-world-level="3">
+            <div class="info">
+              <strong>Level 3 — Top</strong>
+              <span id="world-lvl-3-desc">Nog niet vrijgespeeld</span>
+            </div>
+            <button id="world-lvl-3-btn" class="btn" type="button" disabled>Vergrendeld</button>
+          </div>
+        </div>
+        <p style="color:var(--text-secondary);font-size:13px;line-height:1.5;">
+          Side-view wereld met scrollende camera. Pas platforms, vijanden en doelen aan in <code>game-sideview.js</code>.
+        </p>
+      </div>
+    </section>
+
+    <!-- ===== ITEMS TAB ===== -->
+    <section id="screen-items" class="view-screen">
+      <div class="panel-scroll">
+        <div class="menu-page-head">
+          <button class="btn-back" type="button" data-menu-back aria-label="Terug">← Terug</button>
+          <h2>Items</h2>
+        </div>
+        <div class="glass-card">
+          <div class="item-list" id="item-list">
+            <div class="item-row">
+              <div class="item-icon item-icon-coin" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#f59e0b" stroke="#fde68a" stroke-width="2"/></svg>
+              </div>
+              <div class="item-info">
+                <strong>Munten</strong>
+                <span>Gouden muntstukken</span>
+              </div>
+              <div class="item-count" id="inv-coin">0</div>
+            </div>
+            <div class="item-row">
+              <div class="item-icon item-icon-wood" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="8" rx="2" fill="#92400e" stroke="#d97706" stroke-width="1.5"/><line x1="7" y1="10" x2="17" y2="10" stroke="#fcd34d" stroke-width="1"/></svg>
+              </div>
+              <div class="item-info">
+                <strong>Hout</strong>
+                <span>Houtblokken voor crafting</span>
+              </div>
+              <div class="item-count" id="inv-wood">0</div>
+            </div>
+            <div class="item-row">
+              <div class="item-icon item-icon-plank" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="3" y="9" width="18" height="6" rx="1" fill="#b45309" stroke="#f59e0b" stroke-width="1.5"/><line x1="5" y1="11" x2="19" y2="11" stroke="#fcd34d" stroke-width="0.8"/><line x1="5" y1="13" x2="19" y2="13" stroke="#92400e" stroke-width="0.8"/></svg>
+              </div>
+              <div class="item-info">
+                <strong>Plank</strong>
+                <span>Loopplanken voor belopen</span>
+              </div>
+              <div class="item-count" id="inv-plank">0</div>
+            </div>
+            <div class="item-row">
+              <div class="item-icon item-icon-rope" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M3 12c2.5-3 5-3 7.5 0s5 3 7.5 0 5-3 7.5 0" fill="none" stroke="#d6b48a" stroke-width="2.5" stroke-linecap="round"/><circle cx="3" cy="12" r="1.5" fill="#e7cba9"/><circle cx="21" cy="12" r="1.5" fill="#e7cba9"/></svg>
+              </div>
+              <div class="item-info">
+                <strong>Touw</strong>
+                <span>Sterk touw voor bruggen</span>
+              </div>
+              <div class="item-count" id="inv-rope">0</div>
+            </div>
+            <div class="item-row">
+              <div class="item-icon item-icon-camera" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="12" rx="2" fill="#374151" stroke="#9ca3af" stroke-width="1.5"/><rect x="8" y="4" width="8" height="4" rx="1" fill="#4b5563" stroke="#9ca3af" stroke-width="1"/><circle cx="12" cy="13" r="4" fill="#111827" stroke="#6b7280" stroke-width="1.5"/><circle cx="10.5" cy="11.5" r="1.2" fill="rgba(147,197,253,0.6)"/><circle cx="18.5" cy="9.5" r="1.2" fill="#ef4444"/></svg>
+              </div>
+              <div class="item-info">
+                <strong>Fototoestel</strong>
+                <span>Leg avonturen vast op foto</span>
+              </div>
+              <div class="item-count" id="inv-camera">0</div>
+            </div>
+          </div>
+        </div>
+        <p style="margin-top:16px;color:var(--text-secondary);font-size:13px;line-height:1.5;">
+          Loop over items in het spel om ze op te pakken. Je voorraad verschijnt hier automatisch.
+        </p>
+      </div>
+    </section>
+
+    <!-- ===== MENU PAGINA'S ===== -->
+    <section id="screen-help" class="view-screen">
+      <div class="panel-scroll">
+        <div class="menu-page-head">
+          <button class="btn-back" type="button" data-menu-back aria-label="Terug">← Terug</button>
+          <h2>Uitleg</h2>
+        </div>
+        <div class="glass-card menu-help-body">
+          <p><strong>Doel</strong> — Bouw een stevige constructie met balken en loopplanken en bereik het einde van het level.</p>
+          <p><strong>Bouwen</strong> — Kies bovenin <em>Balken</em>, <em>Loopplank</em> of <em>Touw</em> en <em>sleep</em> van punt A naar punt B.</p>
+          <p><strong>Knopen</strong> — Elk balk-einde is een knoop. Sleep een nieuw einde op een bestaande knoop (paars) om ze te verbinden — zo bouw je vakwerk.</p>
+          <p><strong>Verankeren</strong> — Sleep een einde op een <em>plateau</em> of de <em>grond</em>; dat punt wordt een vast (goud) ankerpunt waar je constructie aan hangt.</p>
+          <p><strong>Knoop-tool</strong> — Tik op een balk om hem te splitsen (extra knoop), op een plateau voor een los ankerpunt, of op een knoop om hem vast te zetten.</p>
+          <p><strong>Bouw mode</strong> — Zet <em>Bouw mode AAN</em> in de HUD om te bouwen (physics uit). Zet hem uit om te lopen en de constructie te testen.</p>
+          <p><strong>Stabiliteit</strong> — Alles hangt aan vaste ankerpunten via een netwerk van balken. Te weinig steun? Dan zakt of valt het — echte physics.</p>
+          <p><strong>Lopen</strong> — Je staat alleen op <em>loopplanken</em>, plateaus en de grond. Van onderaf stoot je je hoofd tegen een loopplank (net als bij een plateau). <em>Balken</em> zijn een laag erachter (geen hitbox) — je loopt er voorlangs.</p>
+          <p><strong>Gewicht & breken</strong> — Jouw gewicht en materiaalgewicht stel je in via ☰ → <em>Instellingen</em>. Te zware of te zwakke constructies reken rood uit en <em>breekt</em> na korte tijd.</p>
+          <p><strong>Verbinden</strong> — Balken dragen wél: ze koppelen via knopen aan loopplanken en plateaus en houden zo je looppaden omhoog. Touw trekt alleen (zoals een kabel).</p>
+          <p><strong>Bewegen</strong> — Pijltjes links/rechts of A/D. Springen: ↑ / W.</p>
+          <p><strong>Items</strong> — Hout en touw voor bouwen; pak ze op in het level.</p>
+          <p><strong>Levels</strong> — Bereik het einde van het level om door te gaan. Vrijgespeelde levels zie je via ☰ → <em>Wereld</em>.</p>
+          <p><strong>Startscherm</strong> — Tik op <em>Start</em> in de onderbalk. Kies een session of maak een nieuwe met naam, karakter en moeilijkheid.</p>
+        </div>
+      </div>
+    </section>
+
+        <section id="screen-settings" class="view-screen">
+      <div class="panel-scroll">
+        <div class="menu-page-head">
+          <button class="btn-back" type="button" data-menu-back aria-label="Terug">← Terug</button>
+          <h2>Instellingen</h2>
+        </div>
+        <div class="glass-card">
+          <div class="setting-row">
+            <div class="info">
+              <strong>Geluid</strong>
+              <span>Effecten en feedback</span>
+            </div>
+            <button id="toggle-sound-settings" class="toggle" type="button" aria-pressed="false">Geluid: UIT</button>
+          </div>
+          <div class="setting-row">
+            <div class="info">
+              <strong>Trillen</strong>
+              <span>Haptische feedback op mobiel</span>
+            </div>
+            <button id="toggle-vibration" class="toggle" type="button" aria-pressed="true">Trillen: AAN</button>
+          </div>
+          <div class="setting-row">
+            <div class="info">
+              <strong>Alles wissen</strong>
+              <span>Sessions, voortgang en instellingen</span>
+            </div>
+            <button id="btn-reset-progress" class="btn danger" type="button">Reset</button>
+          </div>
+        </div>
+        <div class="glass-card">
+          <h3>Constructie</h3>
+          <p class="help-hint">Alleen als bouw mode uit is. Massa, rek en breken via Matter.js.</p>
+          <div class="setting-row">
+            <div class="info">
+              <strong>Jouw gewicht</strong>
+              <span>Extra massa op de loopplank waar je op staat</span>
+            </div>
+            <div class="setting-control">
+              <input id="physics-player-weight" type="range" min="25" max="160" step="1" value="72" aria-label="Gewicht poppetje">
+              <span id="physics-player-weight-val" class="physics-slider-val">72 kg</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="info">
+              <strong>Gewicht balken</strong>
+              <span>Zwaarder = meer doorzakken</span>
+            </div>
+            <div class="setting-control">
+              <input id="physics-beam-mass" type="range" min="20" max="200" step="5" value="100" aria-label="Gewicht balken">
+              <span id="physics-beam-mass-val" class="physics-slider-val">100%</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="info">
+              <strong>Gewicht loopplanken</strong>
+              <span>Planken waar je op loopt</span>
+            </div>
+            <div class="setting-control">
+              <input id="physics-walkway-mass" type="range" min="20" max="200" step="5" value="100" aria-label="Gewicht loopplanken">
+              <span id="physics-walkway-mass-val" class="physics-slider-val">100%</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="info">
+              <strong>Stijfheid</strong>
+              <span>Hoger = minder doorbuigen</span>
+            </div>
+            <div class="setting-control">
+              <input id="physics-stiffness" type="range" min="70" max="140" step="1" value="100" aria-label="Stijfheid">
+              <span id="physics-stiffness-val" class="physics-slider-val">100%</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="info">
+              <strong>Breekgevoeligheid</strong>
+              <span>Lager = sneller breken</span>
+            </div>
+            <div class="setting-control">
+              <input id="physics-strength" type="range" min="70" max="150" step="1" value="100" aria-label="Breekgevoeligheid">
+              <span id="physics-strength-val" class="physics-slider-val">100%</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="info">
+              <strong>Simulatie</strong>
+              <span>Meer stappen = stabieler</span>
+            </div>
+            <div class="setting-control">
+              <input id="physics-quality" type="range" min="70" max="140" step="1" value="100" aria-label="Simulatie">
+              <span id="physics-quality-val" class="physics-slider-val">100%</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="info">
+              <strong>Stress-kleuren</strong>
+              <span>Rek in balken (groen → rood)</span>
+            </div>
+            <button id="toggle-physics-stress" class="toggle" type="button" aria-pressed="true">Stress: AAN</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-more" class="view-screen">
+      <div class="panel-scroll">
+        <div class="menu-page-head">
+          <button class="btn-back" type="button" data-menu-back aria-label="Terug">← Terug</button>
+          <h2>Meer</h2>
+        </div>
+        <div class="glass-card menu-more-actions">
+          <button id="btn-app-save" class="menu-action-btn" type="button">
+            <strong>Session opslaan</strong>
+            <span>Bewaar huidige session op dit apparaat</span>
+          </button>
+        </div>
+        <div class="glass-card">
+          <div class="setting-row">
+            <div class="info">
+              <strong>Side Quest</strong>
+              <span>2D side-view template v1.0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Menu dropdown omhoog (D-Qwest stijl) -->
+  <div id="menu-scrim" class="menu-scrim hidden" aria-hidden="true"></div>
+  <div id="menu-popup" class="menu-popup" aria-hidden="true">
+    <button type="button" class="menu-popup-item" data-menu-page="world">
+      <span class="mpi-icon" aria-hidden="true">🌍</span>
+      <span>Wereld</span>
+    </button>
+    <button type="button" class="menu-popup-item" data-menu-page="help">
+      <span class="mpi-icon" aria-hidden="true">?</span>
+      <span>Uitleg</span>
+    </button>
+    <button type="button" class="menu-popup-item" data-menu-page="settings">
+      <span class="mpi-icon" aria-hidden="true">⚙</span>
+      <span>Instellingen</span>
+    </button>
+    <button type="button" class="menu-popup-item" data-menu-page="more">
+      <span class="mpi-icon" aria-hidden="true">⋯</span>
+      <span>Meer</span>
+    </button>
+  </div>
+
+  <!-- Bottom navigatie (Pdf_Bareka stijl) -->
+  <nav class="bottom-nav" aria-label="Hoofdnavigatie">
+    <div class="bottom-nav-inner">
+      <button class="nav-item active" data-tab="play" type="button" aria-label="Spel">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"/></svg>
+      </button>
+      <button class="nav-item" data-tab="items" type="button" aria-label="Items">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg>
+      </button>
+      <button class="nav-item" data-tab="character" type="button" aria-label="Karakter">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+      </button>
+      <button class="nav-item" data-tab="start" type="button" aria-label="Startscherm">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg>
+      </button>
+      <button class="nav-item" data-tab="menu" type="button" aria-label="Menu">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Menu overlay — sessions -->
+  <div id="menu-overlay">
+    <div class="menu-card glass-card">
+      <h1>Tower Build</h1>
+      <p class="subtitle">Bouw je toren — mobiel</p>
+      <div id="menu-msg" class="menu-msg"></div>
+
+      <div id="menu-view-new" class="menu-view">
+        <h2 class="menu-view-title">Nieuwe session</h2>
+        <div class="menu-field menu-field-stack">
+          <label class="menu-label" for="session-name">Session naam</label>
+          <input id="session-name" class="input" maxlength="24" autocomplete="off" placeholder="Bijv. Avontuur 1">
+          <label class="menu-label" for="character-name">Karakter naam</label>
+          <input id="character-name" class="input" maxlength="18" autocomplete="nickname" placeholder="Naam van je held">
+          <label class="menu-label" for="session-difficulty">Moeilijkheid</label>
+          <select id="session-difficulty" class="input menu-select">
+            <option value="easy">Easy</option>
+            <option value="normal" selected>Normal</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+        <div class="menu-actions">
+          <button id="btn-session-new-go" class="btn success" type="button">Go</button>
+          <button id="btn-session-new-back" class="btn alt hidden" type="button">Terug</button>
+        </div>
+      </div>
+
+      <div id="menu-view-home" class="menu-view hidden">
+        <h2 class="menu-view-title">Start</h2>
+        <div class="menu-field menu-field-stack">
+          <label class="menu-label" for="session-select">Session</label>
+          <select id="session-select" class="input menu-select"></select>
+        </div>
+        <div class="menu-actions">
+          <button id="btn-session-home-go" class="btn success" type="button">Load</button>
+          <button id="btn-session-home-new" class="btn alt" type="button">New</button>
+        </div>
+        <button id="btn-session-home-back" class="btn-back menu-home-back hidden" type="button">← Terug naar pauze</button>
+      </div>
+
+      <div id="menu-view-pause" class="menu-view hidden">
+        <h2 class="menu-view-title" id="pause-session-title">Session</h2>
+        <p id="pause-session-meta" class="pause-session-meta"></p>
+        <div class="menu-actions menu-actions-pause">
+          <button id="btn-session-save" class="btn alt" type="button">Opslaan</button>
+          <button id="btn-session-resume" class="btn success" type="button">Hervatten</button>
+          <button id="btn-session-pause-new" class="btn alt" type="button">New</button>
+          <button id="btn-session-pause-load" class="btn alt" type="button">Load</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast">
+    <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+    <span id="toast-text">Klaar!</span>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/matter-js@0.19.0/build/matter.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/toast.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/app-menu.js"></script>
+  <script src="js/builder-matter.js"></script>
+  <script src="js/game-sideview.js"></script>
+  <script src="js/character.js"></script>
+  <script src="js/main.js"></script>
+
+  <!-- MERGE: plak js/*.js in één <script> voor single-file build -->
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="nl">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>MD-Tic-Tac-Too</title>
+  <link rel="stylesheet" href="./css/game.css" />
+</head>
+
+<body>
+  <a class="back-link" href="../multi.html">← Multi Device lobby</a>
+
+  <div class="app">
+    <header class="hero">
+      <p class="eyebrow">Multi Device · Speelbord</p>
+      <h1>MD-Tic-Tac-Too</h1>
+      <p class="sub" id="status-line">Laden…</p>
+    </header>
+
+    <section id="screen-auth" class="panel hidden">
+      <h2>Niet ingelogd</h2>
+      <p>Log in op de Multi Device-lobby. Rooms maak je daar aan.</p>
+      <a class="btn primary" href="../multi.html">Naar Multi Device lobby</a>
+    </section>
+
+    <section id="screen-lobby" class="panel hidden">
+      <div class="you-are" id="you-are"></div>
+      <h2>Speelbord</h2>
+      <p class="hint">
+        Rooms maak je aan en beheer je in de Multi Device-lobby.
+        Open een room daar, of gebruik een uitnodigingslink.
+      </p>
+      <a class="btn primary" href="../multi.html">Naar Multi Device lobby</a>
+      <p class="hint" style="margin-top:14px;">Wachten op room via link…</p>
+    </section>
+
+    <section id="screen-game" class="panel hidden">
+      <div class="match-meta">
+        <div>
+          <div class="mark-row"><span class="mark x">X</span> <span id="player-x">—</span></div>
+          <div class="mark-row"><span class="mark o">O</span> <span id="player-o">—</span></div>
+        </div>
+        <a class="btn ghost small" href="../multi.html">Lobby</a>
+      </div>
+
+      <p class="turn-line" id="turn-line">—</p>
+      <div id="board" class="board" aria-label="Tic-tac-toe bord"></div>
+      <div class="game-actions">
+        <button type="button" class="btn primary hidden" id="btn-rematch">Opnieuw</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="../invite-share.js"></script>
+  <script src="../matrix-auth.js"></script>
+  <script src="../matrix-client.js"></script>
+  <script src="./js/matrix.js"></script>
+  <script src="./js/game.js"></script>
+</body>
+
+</html>

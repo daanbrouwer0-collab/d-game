@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="nl">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Single Device — Games</title>
+  <link rel="stylesheet" href="./hub.css" />
+  <script src="./games.js"></script>
+  <script src="./hub.js"></script>
+</head>
+
+<body>
+  <div class="bg-glow-container" aria-hidden="true">
+    <div class="bg-glow"></div>
+  </div>
+
+  <a class="hub-back" href="./index.html" aria-label="Terug naar keuze">← Terug</a>
+
+  <nav class="top-actions" aria-label="Acties">
+    <button type="button" class="hub-icon-btn" id="btn-hub-character" aria-label="Karakter" aria-expanded="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true" id="hub-character-icon-svg">
+        <path id="hub-icon-head" stroke-linecap="round" stroke-linejoin="round"
+          d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+        <path id="hub-icon-body" stroke-linecap="round" stroke-linejoin="round"
+          d="M4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+      </svg>
+    </button>
+    <button type="button" class="hub-icon-btn" id="btn-hub-menu" aria-label="Menu" aria-expanded="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
+      </svg>
+    </button>
+  </nav>
+
+  <div id="hub-menu-scrim" class="hub-scrim hidden" aria-hidden="true"></div>
+  <div id="hub-menu-popup" class="hub-menu-popup" aria-hidden="true">
+    <button type="button" class="hub-menu-item" data-hub-action="character">
+      <span class="mpi-icon" aria-hidden="true"
+        style="display: inline-flex; align-items: center; justify-content: center;">
+        <svg viewBox="0 0 24 24" style="width: 20px; height: 20px;">
+          <path id="hub-icon-menu-head" stroke-linecap="round" stroke-linejoin="round" fill="none" stroke="currentColor"
+            stroke-width="2.2" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+          <path id="hub-icon-menu-body" stroke-linecap="round" stroke-linejoin="round" fill="none" stroke="currentColor"
+            stroke-width="2.2"
+            d="M4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+        </svg>
+      </span>
+      <span>Karakter</span>
+    </button>
+    <button type="button" class="hub-menu-item" data-hub-action="home">
+      <span class="mpi-icon" aria-hidden="true">⌂</span>
+      <span>Home</span>
+    </button>
+    <button type="button" class="hub-menu-item" data-hub-action="games">
+      <span class="mpi-icon" aria-hidden="true">🎮</span>
+      <span>Games</span>
+    </button>
+    <button type="button" class="hub-menu-item" data-hub-action="tips">
+      <span class="mpi-icon" aria-hidden="true">?</span>
+      <span>Tip</span>
+    </button>
+    <button type="button" class="hub-menu-item" data-hub-action="memory">
+      <span class="mpi-icon" aria-hidden="true">💾</span>
+      <span>Geheugen</span>
+    </button>
+  </div>
+
+  <div id="hub-character-overlay" class="hub-overlay hidden" aria-hidden="true">
+    <div class="hub-panel" role="dialog" aria-label="Karakter">
+      <div class="hub-panel-head" style="justify-content: flex-end;">
+        <button type="button" class="hub-close" id="btn-hub-character-close">Sluiten</button>
+      </div>
+      <div class="character-preview-wrap">
+        <canvas id="hub-character-preview" width="128" height="176" aria-label="Karakter preview"></canvas>
+      </div>
+      <div class="color-row">
+        <span>Hoofd</span>
+        <input type="color" id="hub-color-head" value="#cccccc" aria-label="Kleur hoofd">
+      </div>
+      <div class="color-row">
+        <span>Lichaam</span>
+        <input type="color" id="hub-color-body" value="#888888" aria-label="Kleur lichaam">
+      </div>
+      <div class="color-row">
+        <span>Benen</span>
+        <input type="color" id="hub-color-legs" value="#444444" aria-label="Kleur benen">
+      </div>
+      <div class="hub-field">
+        <label for="hub-character-name">Naam</label>
+        <input id="hub-character-name" type="text" maxlength="18" autocomplete="nickname"
+          placeholder="Naam van je held">
+      </div>
+      <button type="button" class="hub-btn-save" id="btn-hub-character-save">Opslaan</button>
+    </div>
+  </div>
+
+  <div id="hub-memory-overlay" class="hub-overlay hidden" aria-hidden="true">
+    <div class="hub-panel" role="dialog" aria-labelledby="hub-memory-title">
+      <div class="hub-panel-head">
+        <h2 id="hub-memory-title">Geheugen</h2>
+        <button type="button" class="hub-close" id="btn-hub-memory-close">Sluiten</button>
+      </div>
+      <p class="hub-panel-desc">
+        Hier staat wat deze pagina onthoudt: je naam en karakterkleuren. Wis alles om opnieuw te beginnen als
+        <strong>nobody</strong>.
+      </p>
+      <button type="button" class="hub-btn-danger" id="btn-hub-memory-clear">Naam en instellingen wissen</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <header>
+      <h1 id="hub-main-title">Single Device</h1>
+      <p class="sub">Games op één toestel — solo of samen (hotseat).</p>
+    </header>
+
+    <section id="hub-games-grid" class="grid" aria-label="Single Device games"></section>
+    <p id="hub-empty-mode" class="empty-mode" hidden>Geen games zichtbaar. Stel je naam in via Karakter.</p>
+
+    <div class="tips" id="hub-tips">
+      <strong>Tip:</strong> speel je gek.
+    </div>
+  </div>
+
+  <script>
+    initHubList('single');
+  </script>
+</body>
+
+</html>

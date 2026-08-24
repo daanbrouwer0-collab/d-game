@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ganzenbord — D-Game</title>
+    <meta
+      name="description"
+      content="Ganzenbord tot 6 spelers. Deel de lobby-link, host start wanneer je wilt."
+    />
+    <link rel="stylesheet" href="../css/site.css" />
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+  </head>
+  <body>
+    <div class="app app-wide">
+      <header class="header">
+        <p class="nav"><a href="../">← D-Game</a></p>
+        <h1 class="brand">Ganzenbord</h1>
+        <p id="connection-status" class="status" data-state="idle">Niet verbonden</p>
+      </header>
+
+      <main>
+        <p id="lobby-error" class="error" role="alert"></p>
+        <p id="lobby-hint" class="hint"></p>
+
+        <section id="setup" class="panel">
+          <h2>Meedoen</h2>
+          <p class="lede">
+            Tot 6 spelers. Speel op dit apparaat, of deel een link zodat anderen joinen.
+          </p>
+
+          <label class="field-label" for="player-name">Jouw naam</label>
+          <input
+            id="player-name"
+            class="field"
+            type="text"
+            maxlength="20"
+            placeholder="bijv. Sam"
+            autocomplete="nickname"
+          />
+
+          <div class="actions">
+            <button type="button" id="btn-local" class="btn btn-primary">
+              Speel hier
+            </button>
+            <button type="button" id="btn-host" class="btn btn-primary">
+              Uitnodigen
+            </button>
+          </div>
+
+          <div class="join-row">
+            <label for="join-code">Of join met code</label>
+            <div class="join-controls">
+              <input
+                id="join-code"
+                type="text"
+                maxlength="8"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="CODE"
+              />
+              <button type="button" id="btn-join" class="btn btn-primary">Join</button>
+              <button type="button" id="btn-scan-qr" class="btn btn-primary">Scan QR</button>
+            </div>
+          </div>
+
+          <div id="recent-setup" class="recent-box hidden">
+            <h3 class="recent-title">Jouw recente rooms</h3>
+            <p class="recent-note">
+              Alleen rooms die jij eerder maakte of joinde (op dit apparaat). Geen live-lijst van
+              alle rooms online — dat kan niet zonder server.
+            </p>
+            <ul id="recent-setup-list" class="recent-list"></ul>
+          </div>
+        </section>
+
+        <section id="lobby" class="panel hidden">
+          <div class="lobby-header">
+            <h2>Lobby</h2>
+            <p id="lobby-count" class="lobby-count">0 / 6 spelers</p>
+          </div>
+
+          <p class="lede">Iedereen die de link opent, verschijnt hier. Host houdt dit tabblad open.</p>
+
+          <ul id="player-list" class="player-list"></ul>
+
+          <div class="invite-box">
+            <p>Kamercode: <strong id="room-code"></strong></p>
+            <p class="share-label">Scan om te joinen (P2P)</p>
+            <div class="invite-qr-wrap qr-canvas-wrap">
+              <canvas id="invite-qr-canvas" width="220" height="220"></canvas>
+            </div>
+            <a id="share-url" class="share-url" href="#"></a>
+            <div class="actions share-actions">
+              <button type="button" id="btn-share-whatsapp" class="btn btn-primary">
+                Deel via WhatsApp
+              </button>
+              <button type="button" id="btn-share" class="btn btn-ghost">Andere apps…</button>
+              <button type="button" id="btn-copy-link" class="btn btn-ghost">Kopieer link</button>
+            </div>
+          </div>
+
+          <div id="host-controls" class="host-controls hidden">
+            <div id="local-add" class="local-add hidden">
+              <label class="field-label" for="local-player-name">Extra speler (dit apparaat)</label>
+              <div class="join-controls">
+                <input
+                  id="local-player-name"
+                  class="field"
+                  type="text"
+                  maxlength="20"
+                  placeholder="Naam"
+                  autocomplete="off"
+                />
+                <button type="button" id="btn-add-local" class="btn btn-ghost">Toevoegen</button>
+              </div>
+            </div>
+            <button type="button" id="btn-start" class="btn btn-primary" disabled>
+              Start (min. 2 spelers)
+            </button>
+          </div>
+
+          <p id="guest-waiting" class="hint hidden">Wachten tot de host start…</p>
+
+          <details id="switch-room" class="switch-room">
+            <summary>Andere room</summary>
+            <p class="recent-note">
+              Wissel van lobby, of open een recente room. De huidige verbinding wordt verbroken.
+            </p>
+            <ul id="recent-lobby-list" class="recent-list"></ul>
+            <div class="join-controls switch-join">
+              <input
+                id="switch-code"
+                type="text"
+                maxlength="8"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="Andere CODE"
+              />
+              <button type="button" id="btn-switch-join" class="btn btn-primary">Join</button>
+            </div>
+            <div class="actions">
+              <button type="button" id="btn-switch-new" class="btn btn-ghost">
+                Nieuwe lobby maken
+              </button>
+            </div>
+          </details>
+
+          <div class="actions">
+            <button type="button" id="btn-leave" class="btn btn-ghost">Verlaat lobby</button>
+          </div>
+        </section>
+
+        <section id="game" class="panel hidden">
+          <p id="turn-label" class="meta"></p>
+          <p id="log-label" class="log"></p>
+
+          <div id="positions" class="positions"></div>
+          <div id="board-track" class="board-track" aria-hidden="true"></div>
+
+          <div class="actions">
+            <button type="button" id="btn-roll" class="btn btn-primary" disabled>
+              Gooi dobbelsteen
+            </button>
+            <button type="button" id="btn-leave-game" class="btn btn-ghost">Verlaten</button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module">
+      import { mountShellNav } from "../js/shell/nav.js";
+      mountShellNav({ active: "games", base: "../" });
+    </script>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

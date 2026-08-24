@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Kirby — Vergeten Blokkenwereld</title>
+
+  <!-- Google Fonts (optioneel — verwijder bij single-file merge) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- MERGE: plak css/*.css hier in volgorde: variables, base, nav, menu, hud, controls -->
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/nav.css">
+  <link rel="stylesheet" href="css/menu.css">
+  <link rel="stylesheet" href="css/hud.css">
+  <link rel="stylesheet" href="css/controls.css">
+</head>
+<body>
+  <div id="app">
+    <!-- ===== HUB TAB ===== -->
+    <section id="screen-play" class="view-screen active">
+      <div id="play-wrap">
+        <div id="game-hud">
+          <div class="hud-stats">
+            <span id="hud-level">Fase: 1</span>
+            <span id="hud-score">Credits: 0</span>
+            <span id="hud-coins">Modules: 0</span>
+            <span id="hud-hp">Energie: 100%</span>
+          </div>
+        </div>
+
+        <div id="pause-badge" class="hidden">Gepauzeerd</div>
+
+        <div id="game-scene" class="hidden" aria-label="Kirby voxel wereld"></div>
+        <p id="game-scene-hint" class="game-scene-hint hidden">
+          WASD lopen · Q/E draaien · F hakken · shift zuigen · spatie spring
+        </p>
+
+        <div id="touch-controls" class="hidden" aria-hidden="true">
+          <div id="touch-joystick-left" class="touch-joystick" aria-label="Lopen">
+            <div class="ring"></div>
+            <div class="knob" id="touch-knob-left"></div>
+          </div>
+          <div class="touch-action-row">
+            <button id="btn-inhale" class="touch-action-btn inhale" type="button" aria-label="Zuigen">◎</button>
+            <button id="btn-hack" class="touch-action-btn hack" type="button" aria-label="Hakken">⛏</button>
+          </div>
+          <div id="touch-joystick-right" class="touch-joystick" aria-label="Kijken en springen">
+            <div class="ring"></div>
+            <div class="knob" id="touch-knob-right"></div>
+          </div>
+        </div>
+
+        <div id="msg-overlay">
+          <h2 id="msg-text">Veel succes!</h2>
+        </div>
+
+        <div id="play-dashboard" class="panel-scroll play-scroll">
+          <div class="glass-card play-hero">
+            <div class="play-hero-copy">
+              <div class="hero-eyebrow">Kirby &amp; de Vergeten Blokkenwereld</div>
+              <h1 id="hub-title">Kirby rent door een wereld van blokken</h1>
+              <p id="hub-subtitle">
+                Een rond roze held in een Minecraft-achtige wereld. Loop rond, spring op blokken
+                en zuig kleurrijke sterren naar binnen.
+              </p>
+              <div class="hero-chip-row">
+                <span class="hero-chip" id="hub-mode-chip">Actief template: Avontuur</span>
+                <span class="hero-chip" id="hub-session-chip">Session: nog niet gestart</span>
+                <span class="hero-chip" id="hub-status-chip">Status: klaar voor elke game</span>
+              </div>
+              <div class="hero-actions">
+                <button id="btn-play-kirby" class="btn success" type="button">Speel Kirby wereld</button>
+                <button id="btn-cycle-template" class="btn alt" type="button">Volgende template</button>
+                <button id="btn-random-template" class="btn alt" type="button">Random idee</button>
+                <button id="btn-boost-progress" class="btn" type="button">Template upgraden</button>
+              </div>
+            </div>
+            <div class="play-hero-figure">
+              <div id="hero-avatar" class="hero-avatar" aria-label="Karakter in dashboard">
+                <div class="hero-avatar-head"></div>
+                <div class="hero-avatar-body"></div>
+                <div class="hero-avatar-legs">
+                  <span></span>
+                  <span></span>
+                </div>
+              </div>
+              <div class="hero-avatar-meta">
+                <strong id="hero-character-name">Held</strong>
+                <span id="hero-session-line">Nog geen actieve session</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="play-grid">
+            <div class="glass-card dashboard-card">
+              <div class="dashboard-card-head">
+                <h2>Snelle acties</h2>
+                <span class="meta-tag">Direct bruikbaar</span>
+              </div>
+              <div class="quick-action-grid">
+                <button id="btn-add-score" class="quick-action-btn" type="button">
+                  <strong>Credits</strong>
+                  <span>Voeg ontwerpbudget toe</span>
+                </button>
+                <button id="btn-add-coin" class="quick-action-btn" type="button">
+                  <strong>UI module</strong>
+                  <span>Breid schermen en knoppen uit</span>
+                </button>
+                <button id="btn-unlock-system" class="quick-action-btn" type="button">
+                  <strong>Systeem</strong>
+                  <span>Voeg logica of regels toe</span>
+                </button>
+                <button id="btn-restore-energy" class="quick-action-btn" type="button">
+                  <strong>Energie</strong>
+                  <span>Herstel template-status</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="glass-card dashboard-card">
+              <div class="dashboard-card-head">
+                <h2>Game types</h2>
+                <span class="meta-tag">Wisselbaar</span>
+              </div>
+              <div class="template-mode-grid">
+                <button class="template-mode-btn active" data-mode="3d" type="button">
+                  <strong>Kirby 3D</strong>
+                  <span>Blokkenwereld, springen, zuigen</span>
+                </button>
+                <button class="template-mode-btn" data-mode="adventure" type="button">
+                  <strong>Avontuur</strong>
+                  <span>Actie, platform, verhaal</span>
+                </button>
+                <button class="template-mode-btn" data-mode="chess" type="button">
+                  <strong>Schaak</strong>
+                  <span>Beurten, AI, bordlogica</span>
+                </button>
+                <button class="template-mode-btn" data-mode="fishing" type="button">
+                  <strong>Vissen</strong>
+                  <span>Ritme, locaties, beloning</span>
+                </button>
+                <button class="template-mode-btn" data-mode="poker" type="button">
+                  <strong>Poker</strong>
+                  <span>Kaarten, rondes, chips</span>
+                </button>
+                <button class="template-mode-btn" data-mode="memory" type="button">
+                  <strong>Memory</strong>
+                  <span>Kaartparen, levels, score</span>
+                </button>
+                <button class="template-mode-btn" data-mode="risk" type="button">
+                  <strong>Risk</strong>
+                  <span>Kaart, teams, strategie</span>
+                </button>
+              </div>
+              <p id="active-mode-desc" class="dashboard-note">
+                Kies een template en gebruik dezelfde navigatie, karakterlaag en menu-structuur.
+              </p>
+            </div>
+
+            <div class="glass-card dashboard-card">
+              <div class="dashboard-card-head">
+                <h2>Template kern</h2>
+                <span class="meta-tag">Behouden</span>
+              </div>
+              <div class="core-feature-list">
+                <div class="core-feature-row">
+                  <strong>Start- en pauzemenu</strong>
+                  <span>Nieuwe session, laden, opslaan en hervatten</span>
+                </div>
+                <div class="core-feature-row">
+                  <strong>Karakterlaag</strong>
+                  <span>Poppetje, kleurkeuze en naam per session</span>
+                </div>
+                <div class="core-feature-row">
+                  <strong>Onderste navigatie</strong>
+                  <span>Play, items, karakter, start en menu blijven bestaan</span>
+                </div>
+                <div class="core-feature-row">
+                  <strong>Uitbreidbare structuur</strong>
+                  <span>Geschikt voor 2D, 3D, bordspellen en kaartspellen</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="glass-card dashboard-card">
+              <div class="dashboard-card-head">
+                <h2>Bouwstatus</h2>
+                <span class="meta-tag" id="progress-note">Klaar om te starten</span>
+              </div>
+              <div class="progress-list">
+                <div class="progress-step">
+                  <strong>1. Basis</strong>
+                  <span>Menu, opslag, navigatie en instellingen werken los van een game-scene.</span>
+                </div>
+                <div class="progress-step">
+                  <strong>2. Genre</strong>
+                  <span>Het actieve template bepaalt welke richting je later uitwerkt.</span>
+                </div>
+                <div class="progress-step">
+                  <strong>3. Uitwerking</strong>
+                  <span>Voeg daarna pas levels, 3D-werelden, kaarten of bordregels toe.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="share-modal" class="modal" aria-hidden="true">
+          <div class="modal-card glass-card">
+            <div class="modal-head">
+              <h2>Moment delen</h2>
+            </div>
+            <div class="share-modal-body">
+              <p class="share-modal-text">Wil je dit template-moment delen?</p>
+              <div class="share-preview-wrap">
+                <img id="share-preview" alt="Voorbeeld van dit moment" width="600" height="400">
+              </div>
+              <div class="share-modal-actions">
+                <button id="btn-share-yes" class="btn share-btn" type="button">Deel moment</button>
+                <button id="btn-share-no" class="btn alt" type="button">Sluiten</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== KARAKTER TAB ===== -->
+    <section id="screen-character" class="view-screen">
+      <div class="panel-scroll">
+        <div class="menu-page-head">
+          <button class="btn-back" type="button" data-menu-back aria-label="Terug">← Terug</button>
+          <h2>Karakter</h2>
+        </div>
+        <div class="glass-card">
+          <div class="stat-grid">
+            <div class="stat-card">
+              <div class="label">Score</div>
+              <div class="value" id="stat-score">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Munten</div>
+              <div class="value" id="stat-coins">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Level</div>
+              <div class="value" id="stat-level">1</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Gezondheid</div>
+              <div class="value" id="stat-hp">100%</div>
+            </div>
+          </div>
+        </div>
+        <div class="glass-card character-appearance">
+          <div class="character-appearance-head">
+            <h3>Uiterlijk</h3>
+            <button id="btn-reset-colors" class="btn alt" type="button">Reset</button>
+          </div>
+          <div class="character-preview-wrap">
+            <canvas id="character-preview" width="128" height="176" aria-label="Karakter preview"></canvas>
+          </div>
+          <div class="character-color-list">
+            <label class="color-row" for="color-head">
+              <span class="color-row-label">Hoofd</span>
+              <input id="color-head" class="color-input" type="color" value="#5ef0ff">
+            </label>
+            <label class="color-row" for="color-body">
+              <span class="color-row-label">Midden</span>
+              <input id="color-body" class="color-input" type="color" value="#00e5ff">
+            </label>
+            <label class="color-row" for="color-legs">
+              <span class="color-row-label">Benen</span>
+              <input id="color-legs" class="color-input" type="color" value="#0097b2">
+            </label>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== GAME TYPES (menu-pagina) ===== -->
+    <section id="screen-world" class="view-screen">
+      <div class="panel-scroll">
+        <div class="menu-page-head">
+          <button class="btn-back" type="button" data-menu-back aria-label="Terug">← Terug</button>
+          <h2>Game types</h2>
+        </div>
+        <div class="glass-card">
+          <div id="game-mode-list" class="mode-library-list"></div>
+        </div>
+        <p style="color:var(--text-secondary);font-size:13px;line-height:1.5;">
+          Deze bibliotheek toont welke richting actief is. Later kun je hier per game-type een eigen scene of regelsysteem aan koppelen.
+        </p>
+      </div>
+    </section>
+
+    <!-- ===== ITEMS TAB ===== -->
+    <section id="screen-items" class="view-screen">
+      <div class="panel-scroll">
+        <div class="menu-page-head">
+          <button class="btn-back" type="button" data-menu-back aria-label="Terug">← Terug</button>
+          <h2>Modules</h2>
+        </div>
+        <div class="glass-card">
+          <div class="item-list" id="item-list">
+            <div class="item-row">
+              <div class="item-icon item-icon-coin" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#f59e0b" stroke="#fde68a" stroke-width="2"/></svg>
+              </div>
+              <div class="item-info">
+                <strong>Credits</strong>
+                <span>Budget voor ideeën, schermen en iteraties</span>
+              </div>
+              <div class="item-count" id="inv-coin">0</div>
+            </div>
+            <div class="item-row">
+              <div class="item-icon item-icon-wood" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="8" rx="2" fill="#92400e" stroke="#d97706" stroke-width="1.5"/><line x1="7" y1="10" x2="17" y2="10" stroke="#fcd34d" stroke-width="1"/></svg>
+              </div>
+              <div class="item-info">
+                <strong>UI blokken</strong>
+                <span>Kaarten, panelen, knoppen en layoutstukken</span>
+              </div>
+              <div class="item-count" id="inv-wood">0</div>
+            </div>
+            <div class="item-row">
+              <div class="item-icon item-icon-rope" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M3 12c2.5-3 5-3 7.5 0s5 3 7.5 0 5-3 7.5 0" fill="none" stroke="#d6b48a" stroke-width="2.5" stroke-linecap="round"/><circle cx="3" cy="12" r="1.5" fill="#e7cba9"/><circle cx="21" cy="12" r="1.5" fill="#e7cba9"/></svg>
+              </div>
+              <div class="item-info">
+                <strong>Gameplay systemen</strong>
+                <span>Regels, AI, beurten en interacties</span>
+              </div>
+              <div class="item-count" id="inv-rope">0</div>
+            </div>
+            <div class="item-row">
+              <div class="item-icon item-icon-camera" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="12" rx="2" fill="#374151" stroke="#9ca3af" stroke-width="1.5"/><rect x="8" y="4" width="8" height="4" rx="1" fill="#4b5563" stroke="#9ca3af" stroke-width="1"/><circle cx="12" cy="13" r="4" fill="#111827" stroke="#6b7280" stroke-width="1.5"/><circle cx="10.5" cy="11.5" r="1.2" fill="rgba(147,197,253,0.6)"/><circle cx="18.5" cy="9.5" r="1.2" fill="#ef4444"/></svg>
+              </div>
+              <div class="item-info">
+                <strong>Sociale tools</strong>
+                <span>Delen, feedback en extra app-functies</span>
+              </div>
+              <div class="item-count" id="inv-camera">0</div>
+            </div>
+          </div>
+        </div>
+        <p style="margin-top:16px;color:var(--text-secondary);font-size:13px;line-height:1.5;">
+          Deze pagina werkt nu als module-overzicht voor je template. De aantallen groeien mee terwijl je functies activeert.
+        </p>
+      </div>
+    </section>
+
+    <!-- ===== MENU PAGINA'S ===== -->
+    <section id="screen-help" class="view-screen">
+      <div class="panel-scroll">
+        <div class="menu-page-head">
+          <button class="btn-back" type="button" data-menu-back aria-label="Terug">← Terug</button>
+          <h2>Uitleg</h2>
+        </div>
+        <div class="glass-card menu-help-body">
+          <p><strong>Doel</strong> — Gebruik deze app als universele basis voor allerlei games zonder dat er direct een game-scene zichtbaar hoeft te zijn.</p>
+          <p><strong>Hub</strong> — In de play-tab kies je templates, druk je op knoppen en bouw je de structuur verder uit.</p>
+          <p><strong>Game types</strong> — Via de tegels of via ☰ → <em>Game types</em> wissel je tussen avontuur, schaak, 3D, vissen, poker, memory of risk.</p>
+          <p><strong>Karakter</strong> — Geef je poppetje een naam en kleuren. Die stijl blijft bruikbaar voor meerdere soorten games.</p>
+          <p><strong>Modules</strong> — In de tab <em>Modules</em> zie je hoeveel bouwstenen en systemen actief zijn in je template.</p>
+          <p><strong>Startscherm</strong> — Tik op <em>Start</em> in de onderbalk om sessions aan te maken, te laden, op te slaan en te hervatten.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-settings" class="view-screen">
+      <div class="panel-scroll">
+        <div class="menu-page-head">
+          <button class="btn-back" type="button" data-menu-back aria-label="Terug">← Terug</button>
+          <h2>Instellingen</h2>
+        </div>
+        <div class="glass-card">
+          <div class="setting-row">
+            <div class="info">
+              <strong>Geluid</strong>
+              <span>Effecten en feedback</span>
+            </div>
+            <button id="toggle-sound-settings" class="toggle" type="button" aria-pressed="false">Geluid: UIT</button>
+          </div>
+          <div class="setting-row">
+            <div class="info">
+              <strong>Trillen</strong>
+              <span>Haptische feedback op mobiel</span>
+            </div>
+            <button id="toggle-vibration" class="toggle" type="button" aria-pressed="true">Trillen: AAN</button>
+          </div>
+          <div class="setting-row">
+            <div class="info">
+              <strong>Alles wissen</strong>
+              <span>Verwijdert alle sessions, voortgang en instellingen</span>
+            </div>
+            <button id="btn-reset-progress" class="btn danger" type="button">Reset</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-more" class="view-screen">
+      <div class="panel-scroll">
+        <div class="menu-page-head">
+          <button class="btn-back" type="button" data-menu-back aria-label="Terug">← Terug</button>
+          <h2>Meer</h2>
+        </div>
+        <div class="glass-card menu-more-actions">
+          <button id="btn-app-save" class="menu-action-btn" type="button">
+            <strong>Session opslaan</strong>
+            <span>Bewaar huidige session op dit apparaat</span>
+          </button>
+        </div>
+        <div class="glass-card">
+          <div class="setting-row">
+            <div class="info">
+              <strong>D-Game Studio</strong>
+              <span>Universele game template v2.0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Menu dropdown omhoog (D-Qwest stijl) -->
+  <div id="menu-scrim" class="menu-scrim hidden" aria-hidden="true"></div>
+  <div id="menu-popup" class="menu-popup" aria-hidden="true">
+    <button type="button" class="menu-popup-item" data-menu-page="world">
+      <span class="mpi-icon" aria-hidden="true">🌍</span>
+      <span>Wereld</span>
+    </button>
+    <button type="button" class="menu-popup-item" data-menu-page="help">
+      <span class="mpi-icon" aria-hidden="true">?</span>
+      <span>Uitleg</span>
+    </button>
+    <button type="button" class="menu-popup-item" data-menu-page="settings">
+      <span class="mpi-icon" aria-hidden="true">⚙</span>
+      <span>Instellingen</span>
+    </button>
+    <button type="button" class="menu-popup-item" data-menu-page="more">
+      <span class="mpi-icon" aria-hidden="true">⋯</span>
+      <span>Meer</span>
+    </button>
+  </div>
+
+  <!-- Bottom navigatie (Pdf_Bareka stijl) -->
+  <nav class="bottom-nav" aria-label="Hoofdnavigatie">
+    <div class="bottom-nav-inner">
+      <button class="nav-item active" data-tab="play" type="button" aria-label="Spel">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"/></svg>
+      </button>
+      <button class="nav-item" data-tab="items" type="button" aria-label="Items">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg>
+      </button>
+      <button class="nav-item" data-tab="character" type="button" aria-label="Karakter">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+      </button>
+      <button class="nav-item" data-tab="start" type="button" aria-label="Startscherm">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg>
+      </button>
+      <button class="nav-item" data-tab="menu" type="button" aria-label="Menu">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Menu overlay — sessions -->
+  <div id="menu-overlay">
+    <div class="menu-card glass-card">
+      <h1>D-Game Studio</h1>
+      <p class="subtitle">Universele game template met karakter, menu, sessies en vaste navigatie</p>
+      <div id="menu-msg" class="menu-msg"></div>
+
+      <div id="menu-view-new" class="menu-view">
+        <h2 class="menu-view-title">Nieuwe session</h2>
+        <div class="menu-field menu-field-stack">
+          <label class="menu-label" for="session-name">Session naam</label>
+          <input id="session-name" class="input" maxlength="24" autocomplete="off" placeholder="Bijv. Avontuur 1">
+          <label class="menu-label" for="character-name">Karakter naam</label>
+          <input id="character-name" class="input" maxlength="18" autocomplete="nickname" placeholder="Naam van je held">
+          <label class="menu-label" for="session-difficulty">Moeilijkheid</label>
+          <select id="session-difficulty" class="input menu-select">
+            <option value="easy">Easy</option>
+            <option value="normal" selected>Normal</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+        <div class="menu-actions">
+          <button id="btn-session-new-go" class="btn success" type="button">Go</button>
+          <button id="btn-session-new-back" class="btn alt hidden" type="button">Terug</button>
+        </div>
+      </div>
+
+      <div id="menu-view-home" class="menu-view hidden">
+        <h2 class="menu-view-title">Start</h2>
+        <div class="menu-field menu-field-stack">
+          <label class="menu-label" for="session-select">Session</label>
+          <select id="session-select" class="input menu-select"></select>
+        </div>
+        <div class="menu-actions">
+          <button id="btn-session-home-go" class="btn success" type="button">Load</button>
+          <button id="btn-session-home-new" class="btn alt" type="button">New</button>
+        </div>
+        <button id="btn-session-home-back" class="btn-back menu-home-back hidden" type="button">← Terug naar pauze</button>
+      </div>
+
+      <div id="menu-view-pause" class="menu-view hidden">
+        <h2 class="menu-view-title" id="pause-session-title">Session</h2>
+        <p id="pause-session-meta" class="pause-session-meta"></p>
+        <div class="menu-actions menu-actions-pause">
+          <button id="btn-session-save" class="btn alt" type="button">Opslaan</button>
+          <button id="btn-session-resume" class="btn success" type="button">Hervatten</button>
+          <button id="btn-session-pause-new" class="btn alt" type="button">New</button>
+          <button id="btn-session-pause-load" class="btn alt" type="button">Load</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast">
+    <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+    <span id="toast-text">Klaar!</span>
+  </div>
+
+  <!-- MERGE: plak js/*.js hier in volgorde: config, storage, toast, nav, menu, vendor/three, game-voxel-kirby, game-sideview, main -->
+  <script src="js/config.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/toast.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/app-menu.js"></script>
+  <script src="js/vendor/three.min.js"></script>
+  <script src="js/game-voxel-kirby.js"></script>
+  <script src="js/game-sideview.js"></script>
+  <script src="js/character.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

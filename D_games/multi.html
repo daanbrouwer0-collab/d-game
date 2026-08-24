@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="nl">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi Device — Games</title>
+  <link rel="stylesheet" href="./hub.css" />
+  <script src="./games.js"></script>
+  <script src="./hub.js"></script>
+  <script src="./invite-share.js"></script>
+  <script src="./matrix-auth.js"></script>
+  <script src="./matrix-client.js"></script>
+  <script src="./md-contacts.js"></script>
+  <script src="./md-board.js"></script>
+  <script src="./MD-robot/js/boards.js"></script>
+  <script src="./MD-robot/js/engine.js"></script>
+  <script src="./md-create.js"></script>
+</head>
+
+<body data-matrix-login="true">
+  <div class="bg-glow-container" aria-hidden="true">
+    <div class="bg-glow"></div>
+  </div>
+
+  <a class="hub-back" href="./index.html" aria-label="Terug naar keuze">← Terug</a>
+
+  <nav class="top-actions" aria-label="Acties">
+    <button type="button" class="hub-icon-btn" id="btn-hub-character" aria-label="Karakter" aria-expanded="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true" id="hub-character-icon-svg">
+        <path id="hub-icon-head" stroke-linecap="round" stroke-linejoin="round"
+          d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+        <path id="hub-icon-body" stroke-linecap="round" stroke-linejoin="round"
+          d="M4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+      </svg>
+    </button>
+    <button type="button" class="hub-icon-btn" id="btn-hub-menu" aria-label="Menu" aria-expanded="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
+      </svg>
+    </button>
+  </nav>
+
+  <div id="hub-menu-scrim" class="hub-scrim hidden" aria-hidden="true"></div>
+  <div id="hub-menu-popup" class="hub-menu-popup" aria-hidden="true">
+    <button type="button" class="hub-menu-item" data-hub-action="character">
+      <span class="mpi-icon" aria-hidden="true"
+        style="display: inline-flex; align-items: center; justify-content: center;">
+        <svg viewBox="0 0 24 24" style="width: 20px; height: 20px;">
+          <path id="hub-icon-menu-head" stroke-linecap="round" stroke-linejoin="round" fill="none" stroke="currentColor"
+            stroke-width="2.2" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+          <path id="hub-icon-menu-body" stroke-linecap="round" stroke-linejoin="round" fill="none" stroke="currentColor"
+            stroke-width="2.2"
+            d="M4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+        </svg>
+      </span>
+      <span>Karakter</span>
+    </button>
+    <button type="button" class="hub-menu-item" data-hub-action="home">
+      <span class="mpi-icon" aria-hidden="true">⌂</span>
+      <span>Home</span>
+    </button>
+    <button type="button" class="hub-menu-item" data-hub-action="games">
+      <span class="mpi-icon" aria-hidden="true">🎮</span>
+      <span>Games</span>
+    </button>
+    <button type="button" class="hub-menu-item" data-hub-action="tips">
+      <span class="mpi-icon" aria-hidden="true">?</span>
+      <span>Tip</span>
+    </button>
+    <button type="button" class="hub-menu-item" data-hub-action="memory">
+      <span class="mpi-icon" aria-hidden="true">💾</span>
+      <span>Geheugen</span>
+    </button>
+  </div>
+
+  <div id="hub-character-overlay" class="hub-overlay hidden" aria-hidden="true">
+    <div class="hub-panel" role="dialog" aria-label="Karakter">
+      <div class="hub-panel-head" style="justify-content: flex-end;">
+        <button type="button" class="hub-close" id="btn-hub-character-close">Sluiten</button>
+      </div>
+      <div class="character-preview-wrap">
+        <canvas id="hub-character-preview" width="128" height="176" aria-label="Karakter preview"></canvas>
+      </div>
+      <div class="color-row">
+        <span>Hoofd</span>
+        <input type="color" id="hub-color-head" value="#cccccc" aria-label="Kleur hoofd">
+      </div>
+      <div class="color-row">
+        <span>Lichaam</span>
+        <input type="color" id="hub-color-body" value="#888888" aria-label="Kleur lichaam">
+      </div>
+      <div class="color-row">
+        <span>Benen</span>
+        <input type="color" id="hub-color-legs" value="#444444" aria-label="Kleur benen">
+      </div>
+      <div class="hub-field">
+        <label for="hub-character-name">Naam</label>
+        <input id="hub-character-name" type="text" maxlength="18" autocomplete="nickname"
+          placeholder="Naam van je held">
+      </div>
+      <button type="button" class="hub-btn-save" id="btn-hub-character-save">Opslaan</button>
+    </div>
+  </div>
+
+  <div id="hub-memory-overlay" class="hub-overlay hidden" aria-hidden="true">
+    <div class="hub-panel" role="dialog" aria-labelledby="hub-memory-title">
+      <div class="hub-panel-head">
+        <h2 id="hub-memory-title">Geheugen</h2>
+        <button type="button" class="hub-close" id="btn-hub-memory-close">Sluiten</button>
+      </div>
+      <p class="hub-panel-desc">
+        Hier staat wat deze pagina onthoudt: je naam en karakterkleuren. Wis alles om opnieuw te beginnen als
+        <strong>nobody</strong>.
+      </p>
+      <button type="button" class="hub-btn-danger" id="btn-hub-memory-clear">Naam en instellingen wissen</button>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('d-games-matrix-session')) {
+          document.documentElement.classList.add('md-session-pending');
+        }
+      } catch (e) { /* ignore */ }
+    })();
+  </script>
+
+  <div class="wrap">
+    <header>
+      <h1 id="hub-main-title">Multi Device</h1>
+      <p class="sub">Speel samen op meerdere apparaten.</p>
+    </header>
+
+    <section id="matrix-invite-banner" class="matrix-panel matrix-invite-banner" hidden>
+      <h2 class="matrix-panel-title">Uitnodiging</h2>
+      <p class="matrix-panel-desc" id="matrix-invite-banner-text">
+        Je bent uitgenodigd — log in om te spelen.
+      </p>
+      <div class="matrix-actions">
+        <button type="button" class="hub-btn-primary" id="matrix-invite-continue">Doorgaan naar game</button>
+        <button type="button" class="hub-btn-ghost" id="matrix-invite-dismiss">Negeren</button>
+      </div>
+    </section>
+
+    <section id="matrix-login-panel" class="matrix-panel matrix-login-panel" aria-label="Inloggen">
+      <p id="matrix-session-restore" class="matrix-session-restore" hidden>Sessie herstellen…</p>
+
+      <form id="matrix-login-form" class="matrix-form" autocomplete="on">
+        <h2 class="matrix-panel-title">Inloggen</h2>
+        <p class="matrix-panel-desc">
+          Speelersnaam van <strong>matrix.org</strong>, bijvoorbeeld <code>@jouwnaam:matrix.org</code>.
+        </p>
+        <div class="hub-field" style="margin-top: 0;">
+          <label for="matrix-address">Spelersnaam</label>
+          <input id="matrix-address" name="username" type="text" inputmode="email" autocomplete="username"
+            placeholder="@naam:matrix.org" required>
+        </div>
+        <div class="hub-field">
+          <label for="matrix-password">Wachtwoord</label>
+          <input id="matrix-password" name="password" type="password" autocomplete="current-password"
+            placeholder="Wachtwoord" required>
+        </div>
+        <p id="matrix-login-error" class="matrix-error" hidden></p>
+        <div class="matrix-actions">
+          <button type="submit" class="hub-btn-primary" id="matrix-login-submit">Inloggen</button>
+          <a class="hub-btn-ghost" id="matrix-signup-link" href="https://app.element.io/#/register" target="_blank" rel="noopener noreferrer">Account maken</a>
+        </div>
+      </form>
+
+      <div id="matrix-logged-in" class="matrix-logged-in matrix-session-bar" hidden>
+        <div class="matrix-user-meta">
+          <div class="matrix-user-name">Speler: <span id="matrix-user-label">—</span></div>
+          <div class="matrix-user-id" id="matrix-userid-label" hidden>—</div>
+          <div class="matrix-conn-status" id="matrix-conn-status" aria-live="polite"></div>
+        </div>
+        <button type="button" class="hub-btn-ghost" id="matrix-logout">Uitloggen</button>
+      </div>
+    </section>
+
+    <section id="matrix-why" class="matrix-panel matrix-why" aria-label="Waarom Matrix">
+      <p class="matrix-panel-desc" style="margin:0;">
+        Je speelt met één vaste spelersnaam (<code>@naam:matrix.org</code>) op meerdere apparaten —
+        zonder dat D-Games je wachtwoord ziet.
+        <a href="https://app.element.io/#/register" target="_blank" rel="noopener noreferrer">Account maken via Element</a>
+      </p>
+    </section>
+
+    <p id="matrix-login-hint" class="empty-mode">Log in om te spelen.</p>
+
+    <div id="matrix-games-section" hidden>
+      <section id="hub-games-grid" class="grid" hidden aria-hidden="true"></section>
+      <p id="hub-empty-mode" class="empty-mode" hidden></p>
+
+      <section class="matrix-panel md-lobby-panel md-play-panel" id="md-play-panel" aria-label="Speel">
+        <h2 class="matrix-panel-title">Speel</h2>
+
+        <div class="md-play-friend" id="md-play-friend-block">
+          <h3 class="md-subhead">Speel met vriend</h3>
+          <div class="hub-field" style="margin-top:0;" id="md-play-friend-select-wrap">
+            <label for="md-play-friend">Vriend</label>
+            <select id="md-play-friend" class="md-select">
+              <option value="">— kies vriend —</option>
+            </select>
+          </div>
+          <div class="hub-field" id="md-play-add-wrap" hidden>
+            <label for="md-play-add">Voeg vriend toe</label>
+            <div class="matrix-actions">
+              <input id="md-play-add" class="md-select" type="text" placeholder="@naam:matrix.org" autocomplete="off" />
+              <button type="button" class="hub-btn-ghost" id="md-play-add-btn">Toevoegen</button>
+            </div>
+          </div>
+          <div class="hub-field">
+            <label for="md-play-game">Spel</label>
+            <select id="md-play-game" class="md-select">
+              <option value="md-robot" selected>MD-robot</option>
+              <option value="tic-tac-too">MD-Tic-Tac-Too</option>
+              <option value="robotrally">D-RobotRally</option>
+            </select>
+          </div>
+          <div class="matrix-actions">
+            <button type="button" class="hub-btn-primary" id="md-play-friend-btn">Uitnodigen en spelen</button>
+          </div>
+        </div>
+
+        <details class="md-new-game" id="md-new-game">
+          <summary class="md-new-game-summary">Nieuw spel (zonder vriend)</summary>
+          <div class="hub-field">
+            <label for="md-create-game">Spel</label>
+            <select id="md-create-game" class="md-select">
+              <option value="md-robot" selected>MD-robot</option>
+              <option value="tic-tac-too">MD-Tic-Tac-Too</option>
+              <option value="robotrally">D-RobotRally</option>
+            </select>
+          </div>
+          <div class="hub-field" id="md-create-players-wrap">
+            <label for="md-create-players">Max. spelers</label>
+            <select id="md-create-players" class="md-select">
+              <option value="2" selected>2 spelers</option>
+              <option value="3">3 spelers</option>
+              <option value="4">4 spelers</option>
+            </select>
+          </div>
+          <div class="hub-field" id="md-create-board-wrap">
+            <label for="md-create-board">Bord</label>
+            <select id="md-create-board" class="md-select">
+              <option value="easy" selected>Easy</option>
+              <option value="normal">Normal</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
+          <div class="matrix-actions">
+            <button type="button" class="hub-btn-primary" id="md-create-btn">Nieuw spel</button>
+          </div>
+        </details>
+        <p class="md-status" id="md-create-status" aria-live="polite"></p>
+        <p class="md-status md-sync-subtle" id="md-sync-status" aria-live="polite"></p>
+      </section>
+
+      <p class="md-action-summary" id="md-action-summary" aria-live="polite"></p>
+
+      <section class="matrix-panel md-lobby-panel" id="md-invites-panel" aria-label="Uitnodigingen" hidden>
+        <h2 class="matrix-panel-title">Uitnodigingen</h2>
+        <ul id="md-invite-list" class="md-room-list"></ul>
+        <p id="md-invite-empty" class="hint-muted">Geen openstaande uitnodigingen.</p>
+      </section>
+
+      <section class="matrix-panel md-lobby-panel" aria-label="Jouw games">
+        <div class="md-section-head">
+          <h2 class="matrix-panel-title" style="margin:0;">Jouw games</h2>
+          <button type="button" class="hub-btn-ghost md-refresh-subtle" id="md-refresh-btn" title="Vernieuwen">Vernieuwen</button>
+        </div>
+        <ul id="md-games-list" class="md-room-list"></ul>
+        <p id="md-games-empty" class="hint-muted">Nog geen games — speel met een vriend of maak een nieuw spel.</p>
+      </section>
+
+      <details class="matrix-panel md-lobby-panel md-more-panel" id="md-friends-panel">
+        <summary class="md-more-summary">
+          <span class="matrix-panel-title">Vrienden</span>
+        </summary>
+        <p class="matrix-panel-desc">
+          Voeg iemand toe met <code>@naam:matrix.org</code>, of gebruik Speel met vriend hierboven.
+        </p>
+        <div class="hub-field" style="margin-top:0;">
+          <label for="md-contact-add">Vriend toevoegen</label>
+          <input id="md-contact-add" class="md-select" type="text" placeholder="@naam:matrix.org" autocomplete="off" />
+        </div>
+        <div class="matrix-actions">
+          <button type="button" class="hub-btn-primary" id="md-contact-add-btn">Toevoegen</button>
+        </div>
+        <p class="md-status" id="md-contact-status"></p>
+        <ul id="md-contact-list" class="md-room-list"></ul>
+        <p id="md-contact-empty" class="hint-muted">Nog geen vrienden.</p>
+      </details>
+
+      <section class="matrix-panel md-lobby-panel md-secondary-panel" id="md-board-panel" aria-label="Open games">
+        <div class="md-section-head">
+          <h2 class="matrix-panel-title" style="margin:0;">Open games</h2>
+          <button type="button" class="hub-btn-ghost md-refresh-subtle" id="md-board-refresh">Vernieuwen</button>
+        </div>
+        <p class="matrix-panel-desc">Games die openstaan voor iedereen.</p>
+        <p class="md-status" id="md-board-status" aria-live="polite"></p>
+        <ul id="md-board-list" class="md-room-list"></ul>
+        <p id="md-board-empty" class="hint-muted">Nog geen open games. Maak een spel om er een te plaatsen.</p>
+      </section>
+    </div>
+
+    <div id="md-beheer-overlay" class="hub-overlay hidden" aria-hidden="true">
+      <div class="hub-panel md-beheer-panel" role="dialog" aria-labelledby="md-beheer-title">
+        <div class="hub-panel-head">
+          <h2 id="md-beheer-title">Spel beheren</h2>
+          <button type="button" class="hub-close" id="md-beheer-close">Sluiten</button>
+        </div>
+        <p class="hub-panel-desc" id="md-beheer-status">—</p>
+        <p class="md-beheer-ready" id="md-beheer-ready" hidden>Klaar om te starten — open speelbord</p>
+
+        <div class="md-beheer-players-block">
+          <h3 class="md-subhead">Spelers</h3>
+          <ul id="md-beheer-players-list" class="md-players-list"></ul>
+          <p id="md-beheer-players-empty" class="hint-muted">Nog geen spelers.</p>
+        </div>
+
+        <div class="hub-field" style="margin-top:14px;">
+          <label for="md-beheer-link">Uitnodigingslink</label>
+          <input id="md-beheer-link" class="md-select" readonly />
+        </div>
+        <div class="matrix-actions">
+          <button type="button" class="hub-btn-primary" id="md-beheer-share">Kopieer link</button>
+          <button type="button" class="hub-btn-primary" id="md-beheer-open">Open speelbord</button>
+          <button type="button" class="hub-btn-ghost" id="md-beheer-whatsapp">WhatsApp</button>
+        </div>
+
+        <div class="hub-field" style="margin-top:14px;">
+          <label for="md-beheer-invite-user">Nodig vriend uit</label>
+          <select id="md-beheer-invite-user" class="md-select">
+            <option value="">— kies vriend —</option>
+          </select>
+        </div>
+        <button type="button" class="hub-btn-ghost" id="md-beheer-invite-btn" style="width:100%;margin-top:8px;">Uitnodigen</button>
+
+        <div id="md-beheer-robot-fields">
+          <h3 class="md-subhead" style="margin-top:16px;">Instellingen</h3>
+          <div class="hub-field">
+            <label for="md-beheer-players">Max. spelers</label>
+            <select id="md-beheer-players" class="md-select">
+              <option value="2">2 spelers</option>
+              <option value="3">3 spelers</option>
+              <option value="4">4 spelers</option>
+            </select>
+          </div>
+          <div class="hub-field">
+            <label for="md-beheer-board">Bord</label>
+            <select id="md-beheer-board" class="md-select">
+              <option value="easy" selected>Easy (2 checkpoints)</option>
+              <option value="normal">Normal (3 checkpoints)</option>
+              <option value="hard">Hard (3 checkpoints)</option>
+            </select>
+          </div>
+          <label class="md-check">
+            <input type="checkbox" id="md-beheer-push" checked />
+            <span>Duwen aan</span>
+          </label>
+          <label class="md-check">
+            <input type="checkbox" id="md-beheer-autostart" />
+            <span>Start automatisch bij genoeg spelers (min. 2)</span>
+          </label>
+          <button type="button" class="hub-btn-primary" id="md-beheer-save" style="width:100%;margin-top:10px;">Opslaan</button>
+          <button type="button" class="hub-btn-ghost" id="md-beheer-to-lobby" style="width:100%;margin-top:8px;" hidden>Terug naar lobby</button>
+        </div>
+
+        <details class="md-chat" id="md-beheer-chat" style="margin-top:16px;">
+          <summary class="md-chat-title">Chat</summary>
+          <div id="md-beheer-chat-log" class="md-chat-log" aria-live="polite"></div>
+          <div class="md-chat-compose">
+            <input id="md-beheer-chat-input" class="md-select" type="text" maxlength="500" placeholder="Bericht…" autocomplete="off" />
+            <button type="button" class="hub-btn-primary" id="md-beheer-chat-send">Stuur</button>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="tips" id="hub-tips">
+      <strong>Tip:</strong> Speel met vriend nodigt uit en opent meteen het speelbord.
+    </div>
+  </div>
+
+  <script src="./md-lobby.js"></script>
+  <script>
+    initHubList('multi');
+
+    (function multiInviteLanding() {
+      const banner = document.getElementById('matrix-invite-banner');
+      const bannerText = document.getElementById('matrix-invite-banner-text');
+      const btnContinue = document.getElementById('matrix-invite-continue');
+      const btnDismiss = document.getElementById('matrix-invite-dismiss');
+      if (typeof InviteShare === 'undefined') return;
+
+      const fromUrl = InviteShare.parseInviteFromLocation();
+      if (fromUrl) InviteShare.savePendingInvite(fromUrl);
+      let pending = InviteShare.loadPendingInvite();
+      let redirecting = false;
+
+      function gameLabel(game) {
+        return InviteShare.GAME_TITLES[game] || game;
+      }
+
+      function showLoginBanner() {
+        pending = InviteShare.loadPendingInvite();
+        if (!pending || !banner || redirecting) return;
+        banner.hidden = false;
+        if (bannerText) {
+          bannerText.textContent = `Je bent uitgenodigd voor ${gameLabel(pending.game)} — log in om te spelen.`;
+        }
+        if (btnContinue) btnContinue.hidden = true;
+      }
+
+      function hideBanner() {
+        if (banner) banner.hidden = true;
+      }
+
+      function goToGame() {
+        pending = InviteShare.loadPendingInvite();
+        if (!pending) return;
+        if (!MatrixAuth?.loadSession?.()) {
+          showLoginBanner();
+          document.getElementById('matrix-login-panel')?.scrollIntoView({ behavior: 'smooth' });
+          return;
+        }
+        redirecting = true;
+        hideBanner();
+        window.location.href = InviteShare.gameEntryUrl(pending);
+      }
+
+      btnContinue?.addEventListener('click', goToGame);
+      btnDismiss?.addEventListener('click', () => {
+        InviteShare.clearPendingInvite();
+        hideBanner();
+        const url = new URL(window.location.href);
+        url.searchParams.delete('join');
+        url.searchParams.delete('game');
+        url.searchParams.delete('min');
+        url.searchParams.delete('matrixRoom');
+        window.history.replaceState({}, '', url.pathname + url.search);
+      });
+
+      (async function bootInvite() {
+        if (!pending) return;
+        const existing = MatrixAuth?.loadSession?.();
+        if (!existing) {
+          showLoginBanner();
+          return;
+        }
+        // Valid session → direct naar speelbord, geen banner
+        hideBanner();
+        let valid = existing;
+        if (typeof MatrixAuth?.validateSession === 'function') {
+          valid = await MatrixAuth.validateSession(existing);
+        }
+        if (valid) {
+          goToGame();
+          return;
+        }
+        showLoginBanner();
+      })();
+
+      const prevLoginHook = window.onMatrixLoginSuccess;
+      window.onMatrixLoginSuccess = function onMatrixLoginSuccess(sess) {
+        if (typeof prevLoginHook === 'function') prevLoginHook(sess);
+        pending = InviteShare.loadPendingInvite();
+        if (pending) goToGame();
+      };
+    })();
+  </script>
+</body>
+
+</html>

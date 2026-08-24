@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="nl">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>MD-robot</title>
+  <link rel="stylesheet" href="./css/game.css" />
+</head>
+
+<body>
+  <a class="back-link" href="../multi.html">← Multi Device lobby</a>
+
+  <div class="app">
+    <header class="hero">
+      <p class="eyebrow">Multi Device · Speelbord</p>
+      <h1>MD-robot</h1>
+      <p class="sub" id="status-line">Laden…</p>
+    </header>
+
+    <section id="screen-auth" class="panel hidden">
+      <h2>Niet ingelogd</h2>
+      <p class="hint">Log in op de Multi Device-lobby. Spellen aanmaken en beheer doe je daar.</p>
+      <a class="btn primary" href="../multi.html">Naar Multi Device lobby</a>
+    </section>
+
+    <section id="screen-lobby" class="panel hidden">
+      <div class="you-are" id="you-are"></div>
+      <h2>Speelbord</h2>
+      <p class="hint">
+        Spellen maak je aan in de Multi Device-lobby.
+        Open daar een spel, of gebruik een uitnodigingslink.
+      </p>
+      <a class="btn primary" href="../multi.html">Naar Multi Device lobby</a>
+      <p class="hint" style="margin-top:14px;">Wachten op spel via link…</p>
+    </section>
+
+    <section id="screen-game" class="panel hidden">
+      <div class="match-meta">
+        <div>
+          <div id="role-badge" class="role-badge"></div>
+          <div id="players-line"></div>
+        </div>
+        <a class="btn ghost small" href="../multi.html">Lobby</a>
+      </div>
+
+      <p id="rules-line" class="rules-line"></p>
+      <p id="phase-line">—</p>
+      <p id="robot-meta" class="robot-meta"></p>
+
+      <div id="pending-joins" class="pending-joins hidden"></div>
+
+      <div id="waiting-share" class="waiting-share hidden">
+        <p class="hint">Nog niet genoeg spelers. Deel de uitnodiging zodat anderen kunnen joinen.</p>
+        <div class="card-actions">
+          <button type="button" class="btn primary" id="btn-share-whatsapp">Deel via WhatsApp</button>
+          <button type="button" class="btn ghost" id="btn-share-copy">Kopieer link</button>
+        </div>
+      </div>
+
+      <div id="board" class="md-board" aria-label="MD-robot bord"></div>
+
+      <div id="program-panel" class="program-panel">
+        <h3 class="prog-title">Registers</h3>
+        <div id="program-slots" class="register-row"></div>
+        <h3 class="prog-title">Hand</h3>
+        <div id="hand-cards" class="hand-row"></div>
+        <div class="card-actions">
+          <button type="button" class="btn ghost" id="btn-clear">Wis</button>
+          <button type="button" class="btn primary" id="btn-sent">Commit</button>
+        </div>
+      </div>
+
+      <div id="host-play-actions" class="game-actions hidden" style="margin-top:12px;">
+        <button type="button" class="btn primary" id="btn-start">Start race</button>
+        <button type="button" class="btn primary" id="btn-again">Opnieuw</button>
+        <p class="hint" style="width:100%;margin:0;">Bord en deellink: Multi Device lobby → Beheer</p>
+      </div>
+
+      <div id="guest-note" class="guest-note hidden">
+        <p class="hint">Je bent gast. Programmeer tegelijk met de anderen; de host lost de registers op.</p>
+      </div>
+
+      <div class="game-chat" id="game-chat">
+        <h3>Chat</h3>
+        <div id="game-chat-log" class="game-chat-log" aria-live="polite"></div>
+        <div class="game-chat-compose">
+          <input id="game-chat-input" type="text" maxlength="500" placeholder="Bericht…" autocomplete="off" />
+          <button type="button" class="btn primary" id="game-chat-send">Stuur</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="../invite-share.js"></script>
+  <script src="../matrix-auth.js"></script>
+  <script src="../matrix-client.js"></script>
+  <script src="../md-board.js"></script>
+  <script src="./js/boards.js"></script>
+  <script src="./js/engine.js"></script>
+  <script src="./js/matrix.js"></script>
+  <script src="./js/game.js"></script>
+</body>
+
+</html>

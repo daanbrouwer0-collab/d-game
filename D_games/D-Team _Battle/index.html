@@ -1,0 +1,1977 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Team Battle - Auto Battler</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050510;
+            --prim: #00f3ff;
+            --acc: #ff00ff;
+            --danger: #ff3333;
+            --succ: #71fa71;
+            --warn: #fafa7d;
+            --font: 'Orbitron', sans-serif;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--prim);
+            font-family: var(--font);
+            user-select: none;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #ui {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            padding: 18px;
+            box-sizing: border-box;
+            gap: 10px;
+        }
+
+        .hud-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.45);
+        }
+
+        .hud-left,
+        .hud-right {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .pill {
+            pointer-events: none;
+            background: rgba(0, 243, 255, 0.08);
+            border: 1px solid rgba(0, 243, 255, 0.35);
+            color: rgba(255, 255, 255, 0.9);
+            padding: 8px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            letter-spacing: 0.7px;
+            text-transform: uppercase;
+        }
+
+        .hud-btn {
+            pointer-events: auto;
+            background: rgba(0, 243, 255, 0.08);
+            border: 1px solid var(--prim);
+            color: var(--prim);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-family: var(--font);
+            font-weight: bold;
+            letter-spacing: 1px;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+
+        .hud-btn.alt {
+            background: rgba(255, 0, 255, 0.14);
+            color: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(255, 0, 255, 0.75);
+        }
+
+        #menu,
+        #setup,
+        #result {
+            position: absolute;
+            inset: 0;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.92);
+            z-index: 50;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        #menu .card,
+        #setup .card,
+        #result .card {
+            width: min(980px, 100%);
+            border: 1px solid rgba(0, 243, 255, 0.22);
+            border-radius: 14px;
+            background: rgba(0, 0, 0, 0.72);
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.12);
+            padding: 18px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        h1 {
+            margin: 0 0 10px;
+            font-size: clamp(30px, 6vw, 60px);
+            color: var(--prim);
+            text-shadow: 0 0 30px rgba(0, 243, 255, 0.25);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .sub {
+            margin: 0 0 16px;
+            color: rgba(255, 255, 255, 0.78);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .choices {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .choice {
+            width: 260px;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 243, 255, 0.25);
+            background: rgba(0, 243, 255, 0.06);
+            cursor: pointer;
+            transition: 0.15s;
+            user-select: none;
+            box-sizing: border-box;
+            text-align: left;
+        }
+
+        .choice.active {
+            border-color: rgba(255, 0, 255, 0.65);
+            background: rgba(255, 0, 255, 0.08);
+            box-shadow: 0 0 22px rgba(255, 0, 255, 0.18);
+        }
+
+        .choice .name {
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            color: rgba(255, 255, 255, 0.92);
+            font-size: 13px;
+        }
+
+        .choice .meta {
+            font-size: 12px;
+            opacity: 0.82;
+            line-height: 1.4;
+        }
+
+        .menu-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 16px;
+        }
+
+        .btn {
+            pointer-events: auto;
+            background: var(--prim);
+            color: black;
+            border: none;
+            padding: 10px 16px;
+            font-family: var(--font);
+            cursor: pointer;
+            font-weight: bold;
+            letter-spacing: 1px;
+            border-radius: 10px;
+            text-transform: uppercase;
+        }
+
+        .btn.alt {
+            background: rgba(255, 0, 255, 0.14);
+            color: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(255, 0, 255, 0.75);
+        }
+
+        .modal {
+            position: absolute;
+            inset: 0;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 60;
+            padding: 18px;
+            box-sizing: border-box;
+        }
+
+        .modal.open {
+            display: flex;
+        }
+
+        .modal-card {
+            width: min(980px, 100%);
+            background: rgba(0, 0, 0, 0.92);
+            border: 1px solid rgba(255, 0, 255, 0.35);
+            border-radius: 14px;
+            box-shadow: 0 0 34px rgba(255, 0, 255, 0.18);
+            padding: 16px;
+            box-sizing: border-box;
+            color: rgba(255, 255, 255, 0.88);
+        }
+
+        .modal-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-head h2 {
+            margin: 0;
+            color: rgba(255, 0, 255, 0.92);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-size: 18px;
+        }
+
+        .modal-body {
+            margin-top: 12px;
+            font-size: 13px;
+            line-height: 1.55;
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .setup-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(120px, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .slot {
+            border: 1px solid rgba(0, 243, 255, 0.25);
+            background: rgba(0, 243, 255, 0.06);
+            border-radius: 12px;
+            padding: 10px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        .slot .idx {
+            font-size: 12px;
+            opacity: 0.8;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .slot .type {
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.92);
+        }
+
+        .slot .slot-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .tiny {
+            font-size: 11px;
+            opacity: 0.85;
+        }
+
+        .skill-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(180px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .skill {
+            border: 1px solid rgba(0, 243, 255, 0.25);
+            background: rgba(0, 243, 255, 0.06);
+            border-radius: 12px;
+            padding: 10px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-height: 92px;
+        }
+
+        .skill.locked {
+            opacity: 0.55;
+            filter: grayscale(0.2);
+        }
+
+        .skill.unlocked {
+            border-color: rgba(113, 250, 113, 0.55);
+            box-shadow: 0 0 18px rgba(113, 250, 113, 0.12);
+        }
+
+        .skill .title {
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.92);
+        }
+
+        .skill .desc {
+            font-size: 12px;
+            opacity: 0.88;
+            line-height: 1.35;
+        }
+
+        .skill .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .skill .tag {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+        }
+
+        .skill .tag.cost {
+            border-color: rgba(250, 250, 125, 0.35);
+            color: var(--warn);
+        }
+
+        .skill .tag.req {
+            border-color: rgba(255, 0, 255, 0.35);
+            color: rgba(255, 0, 255, 0.9);
+        }
+
+        @media (max-width: 920px) {
+            .setup-grid {
+                grid-template-columns: repeat(2, minmax(140px, 1fr));
+            }
+
+            .skill-grid {
+                grid-template-columns: repeat(2, minmax(180px, 1fr));
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="game"></canvas>
+
+    <div id="ui">
+        <div class="hud-row">
+            <div class="hud-left">
+                <div class="pill">Fight <span id="hud-fight">1</span></div>
+                <div class="pill">Skill points <span id="hud-sp">0</span></div>
+                <div class="pill">Team <span id="hud-team">—</span></div>
+            </div>
+            <div class="hud-right">
+                <button id="btn-skilltree" class="hud-btn alt">Skilltree</button>
+                <button id="btn-menu" class="hud-btn">Menu</button>
+            </div>
+        </div>
+        <div class="hud-row" style="justify-content:center;">
+            <div class="pill" id="hud-status">Menu</div>
+        </div>
+    </div>
+
+    <div id="menu">
+        <div class="card">
+            <h1>Team Battle</h1>
+            <div class="sub">
+                Kies een ras/kleur, stel je team van 5 soldaten samen en kijk hoe het gevecht automatisch gaat.<br>
+                Na een win krijg je skill points om je skilltree verder aan te zetten.
+            </div>
+            <div style="opacity:0.9; letter-spacing:1px; text-transform:uppercase;">Kies je ras/kleur</div>
+            <div class="choices" id="race-grid"></div>
+            <div class="menu-actions">
+                <button id="btn-start" class="btn" style="margin-top:0;">Start</button>
+                <button id="btn-rules" class="btn alt" style="margin-top:0;">Rules</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="setup">
+        <div class="card">
+            <h1 style="font-size: clamp(26px, 4.5vw, 46px);">Stel je team samen</h1>
+            <div class="sub">Er zijn 5 posities. Kies per positie 1 van 3 soldaten. Daarna start het gevecht
+                automatisch.</div>
+            <div class="grid-2">
+                <div style="text-align:left;">
+                    <div style="letter-spacing:1px; text-transform:uppercase; opacity:0.9;">Jouw team</div>
+                    <div class="setup-grid" id="team-grid"></div>
+                </div>
+                <div style="text-align:left;">
+                    <div style="letter-spacing:1px; text-transform:uppercase; opacity:0.9;">Soldaten</div>
+                    <div id="soldier-help" class="sub" style="margin-top:10px;"></div>
+                    <div class="menu-actions" style="justify-content:flex-start;">
+                        <button id="btn-battle" class="btn" style="margin-top:0;">Start battle</button>
+                        <button id="btn-setup-skill" class="btn alt" style="margin-top:0;">Skilltree</button>
+                        <button id="btn-setup-menu" class="btn alt" style="margin-top:0;">Menu</button>
+                    </div>
+                    <div class="tiny" style="opacity:0.85; margin-top:10px; line-height:1.5;">
+                        Tip: Tanks blokkeren, Rangers schieten van afstand, Raiders zijn snel en flanken.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="result">
+        <div class="card">
+            <h1 id="result-title">Victory</h1>
+            <div class="sub" id="result-sub">—</div>
+            <div class="menu-actions">
+                <button id="btn-next" class="btn" style="margin-top:0;">Volgende gevecht</button>
+                <button id="btn-retry" class="btn" style="margin-top:0;">Opnieuw</button>
+                <button id="btn-result-skill" class="btn alt" style="margin-top:0;">Skilltree</button>
+                <button id="btn-result-menu" class="btn alt" style="margin-top:0;">Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="rules-modal" class="modal" aria-hidden="true">
+        <div class="modal-card">
+            <div class="modal-head">
+                <h2>Rules</h2>
+                <button id="btn-rules-close" class="btn" style="margin-top:0;">Sluiten</button>
+            </div>
+            <div class="modal-body">
+                - Kies een ras/kleur in het menu en druk Start.<br>
+                - Stel je team samen: 5 posities, 3 soldaten (Raider/Ranger/Tank).<br>
+                - Het gevecht gaat automatisch: units zoeken de dichtstbijzijnde vijand en vechten.<br>
+                - Obstakels staan op het battlefield en units proberen eromheen te bewegen.<br>
+                - Na een win krijg je skill points. Open de Skilltree om upgrades aan te zetten.<br>
+                - Reset in de Skilltree zet alle upgrades uit en geeft je punten terug.
+            </div>
+        </div>
+    </div>
+
+    <div id="skill-modal" class="modal" aria-hidden="true">
+        <div class="modal-card"
+            style="width: 100%; height: 100%; max-width: 1100px; display: flex; flex-direction: column; padding: 12px;">
+            <div class="modal-head">
+                <h2>Skilltree</h2>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <div class="pill" style="pointer-events:none;">Points <span id="skill-points">0</span></div>
+                    <button id="btn-skill-reset" class="btn alt" style="margin-top:0;">Reset</button>
+                    <button id="btn-skill-close" class="btn" style="margin-top:0;">Sluiten</button>
+                </div>
+            </div>
+            <div class="modal-body"
+                style="flex: 1; display: flex; flex-direction: column; min-height: 0; margin-top: 10px;">
+                <div
+                    style="flex: 1; position: relative; overflow: auto; background: rgba(0,0,0,0.5); border: 1px solid #333; border-radius: 8px;">
+                    <div id="skill-tree-container"
+                        style="position: absolute; width: 1000px; height: 750px; transform-origin: top left;">
+                        <svg id="skill-tree-svg"
+                            style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;"></svg>
+                        <div id="skill-tree-nodes" style="position: absolute; inset: 0; z-index: 2;"></div>
+                    </div>
+                </div>
+                <div id="skill-detail"
+                    style="height: 100px; border: 1px solid rgba(255,0,255,0.3); border-radius: 8px; margin-top: 10px; padding: 12px; display: flex; gap: 20px; background: rgba(0,0,0,0.8);">
+                    <div style="font-size: 40px; width: 60px; text-align: center; line-height: 70px;" id="sd-icon">❓
+                    </div>
+                    <div style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+                        <h3 id="sd-title" style="margin: 0 0 5px; color: #fff; font-size: 16px;">Selecteer een skill
+                        </h3>
+                        <div id="sd-desc" style="font-size: 13px; color: rgba(255,255,255,0.7);">Klik op een node in de
+                            tree voor meer informatie.</div>
+                        <div id="sd-cost" style="font-size: 13px; color: var(--warn); margin-top: 5px;"></div>
+                    </div>
+                    <div style="width: 140px; display: flex; align-items: center; justify-content: center;">
+                        <button id="btn-skill-unlock" class="btn" style="width: 100%;" disabled>Unlock</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        let DPR = 1;
+
+        const hudFightEl = document.getElementById('hud-fight');
+        const hudSpEl = document.getElementById('hud-sp');
+        const hudTeamEl = document.getElementById('hud-team');
+        const hudStatusEl = document.getElementById('hud-status');
+
+        const menuEl = document.getElementById('menu');
+        const setupEl = document.getElementById('setup');
+        const resultEl = document.getElementById('result');
+
+        const raceGridEl = document.getElementById('race-grid');
+        const btnStart = document.getElementById('btn-start');
+        const btnRules = document.getElementById('btn-rules');
+        const rulesModal = document.getElementById('rules-modal');
+        const btnRulesClose = document.getElementById('btn-rules-close');
+
+        const teamGridEl = document.getElementById('team-grid');
+        const soldierHelpEl = document.getElementById('soldier-help');
+        const btnBattle = document.getElementById('btn-battle');
+        const btnSetupMenu = document.getElementById('btn-setup-menu');
+        const btnSetupSkill = document.getElementById('btn-setup-skill');
+
+        const btnMenu = document.getElementById('btn-menu');
+        const btnSkilltree = document.getElementById('btn-skilltree');
+        const skillModal = document.getElementById('skill-modal');
+        const btnSkillClose = document.getElementById('btn-skill-close');
+        const btnSkillReset = document.getElementById('btn-skill-reset');
+        const skillPointsEl = document.getElementById('skill-points');
+
+        const resultTitleEl = document.getElementById('result-title');
+        const resultSubEl = document.getElementById('result-sub');
+        const btnNext = document.getElementById('btn-next');
+        const btnRetry = document.getElementById('btn-retry');
+        const btnResultMenu = document.getElementById('btn-result-menu');
+        const btnResultSkill = document.getElementById('btn-result-skill');
+
+        const GAME = {
+            state: 'menu',
+            fightIndex: 1,
+            skillPoints: 1,
+            selectedRace: null,
+            team: Array.from({ length: 5 }, () => 'raider'),
+            enemyTeam: [],
+            obstacles: [],
+            units: [],
+            bullets: [],
+            fx: [],
+            lastTs: performance.now(),
+            arena: { w: 1200, h: 700, pad: 40 },
+            theme: null, // Selected per battle
+            winner: null,
+        };
+
+        const ARENA_THEMES = {
+            CYBER: { bg: '#020b1a', floor: '#00d2ff', obs: '#00f3ff', bullet: '#00f3ff', name: 'Cyber Neon' },
+            VOID: { bg: '#0a0210', floor: '#ff00ff', obs: '#bf00ff', bullet: '#ff00ff', name: 'Deep Void' },
+            TOXIC: { bg: '#020a02', floor: '#00ff44', obs: '#71fa71', bullet: '#71fa71', name: 'Toxic Zone' },
+            WAR: { bg: '#0a0a0a', floor: '#ff4400', obs: '#ff8800', bullet: '#ffaa00', name: 'War Zone' }
+        };
+
+        const RACES = [
+            { id: 'human', name: 'Humans', color: '#00f3ff', meta: 'Gebalanceerd.\nTeam kleur: Cyan' },
+            { id: 'orc', name: 'Orcs', color: '#71fa71', meta: 'Aggressief.\nTeam kleur: Groen' },
+            { id: 'robot', name: 'Robots', color: '#ff00ff', meta: 'Precisie.\nTeam kleur: Magenta' },
+        ];
+
+        const SOLDIERS = {
+            raider: { id: 'raider', name: 'Raider', hp: 85, dmg: 12, range: 35, atkCd: 0.55, move: 150, radius: 12, projectile: false, heal: false },
+            vanguard: { id: 'vanguard', name: 'Vanguard', hp: 110, dmg: 14, range: 35, atkCd: 0.6, move: 140, radius: 12, projectile: false, heal: false },
+            berserker: { id: 'berserker', name: 'Berserker', hp: 70, dmg: 20, range: 30, atkCd: 0.35, move: 170, radius: 11, projectile: false, heal: false },
+            tank: { id: 'tank', name: 'Tank', hp: 200, dmg: 9, range: 30, atkCd: 0.7, move: 105, radius: 15, projectile: false, heal: false },
+            juggernaut: { id: 'juggernaut', name: 'Juggernaut', hp: 350, dmg: 16, range: 35, atkCd: 0.9, move: 80, radius: 18, projectile: false, heal: false },
+            guardian: { id: 'guardian', name: 'Guardian', hp: 150, dmg: 8, range: 35, atkCd: 0.75, move: 110, radius: 14, projectile: false, heal: false },
+            assassin: { id: 'assassin', name: 'Assassin', hp: 65, dmg: 28, range: 25, atkCd: 0.4, move: 180, radius: 10, projectile: false, heal: false },
+            ranger: { id: 'ranger', name: 'Ranger', hp: 70, dmg: 10, range: 170, atkCd: 0.7, move: 135, radius: 11, projectile: true, heal: false },
+            sharpshooter: { id: 'sharpshooter', name: 'Sharpshooter', hp: 75, dmg: 15, range: 220, atkCd: 0.8, move: 120, radius: 11, projectile: true, heal: false },
+            sniper: { id: 'sniper', name: 'Sniper', hp: 55, dmg: 40, range: 320, atkCd: 1.5, move: 100, radius: 11, projectile: true, heal: false },
+            medic: { id: 'medic', name: 'Medic', hp: 80, dmg: 15, range: 160, atkCd: 0.9, move: 130, radius: 11, projectile: true, heal: true },
+        };
+
+        const SKILLS = [];
+        const SKILL_MAP = {};
+
+        const branchPositions = [
+            { id: 0, x: 1.5, y: 0, req: [] },
+            { id: 1, x: 0.5, y: 1, req: [0] },
+            { id: 2, x: 2.5, y: 1, req: [0] },
+            { id: 3, x: 0.5, y: 2, req: [1] },
+            { id: 4, x: 2.5, y: 2, req: [2] },
+            { id: 5, x: 0, y: 3, req: [3] },
+            { id: 6, x: 1, y: 3, req: [3] },
+            { id: 7, x: 2, y: 3, req: [4] },
+            { id: 8, x: 3, y: 3, req: [4] },
+            { id: 9, x: 0, y: 4, req: [5] },
+            { id: 10, x: 1, y: 4, req: [6] },
+            { id: 11, x: 2, y: 4, req: [7] },
+            { id: 12, x: 3, y: 4, req: [8] },
+            { id: 13, x: 0, y: 5, req: [9] },
+            { id: 14, x: 1, y: 5, req: [10] },
+            { id: 15, x: 2, y: 5, req: [11] },
+            { id: 16, x: 3, y: 5, req: [12] },
+        ];
+
+        const powerSkills = [
+            { type: 'unlock', unit: 'berserker', title: 'Unlock Berserker', icon: '😡', desc: 'Zeer snel, hoge damage, weinig HP' },
+            { type: 'dmg', val: 0.05, title: 'Damage I', icon: '⚔️' },
+            { type: 'as', val: 0.05, title: 'Tempo I', icon: '⚡' },
+            { type: 'unlock', unit: 'assassin', title: 'Unlock Assassin', icon: '🗡️', desc: 'Snel, enorme damage, korte range' },
+            { type: 'crit', val: 0.10, title: 'Critical I', icon: '🎯' },
+            { type: 'dmg', val: 0.10, title: 'Damage II', icon: '⚔️' },
+            { type: 'as', val: 0.10, title: 'Tempo II', icon: '⚡' },
+            { type: 'dmg', val: 0.15, title: 'Damage III', icon: '⚔️' },
+            { type: 'unlock', unit: 'sniper', title: 'Unlock Sniper', icon: '🔭', desc: 'Zeer hoge range, hoge damage, langzaam' },
+            { type: 'dmg', val: 0.10, title: 'Savage Hits I', icon: '🩸' },
+            { type: 'ai', sub: 'focus', title: 'Samenwerken', icon: '🤝', desc: 'Focus fire: units vallen makkelijker samen hetzelfde doelwit aan.' },
+            { type: 'crit', val: 0.15, title: 'Critical III', icon: '🎯' },
+            { type: 'ai', sub: 'priority', title: 'Zwakke Plek', icon: '🧠', desc: 'Prioriteer healers en kwetsbare units (snipers/assassins).' },
+            { type: 'dmg', val: 0.20, title: 'Damage IV', icon: '⚔️' },
+            { type: 'as', val: 0.15, title: 'Tempo III', icon: '⚡' },
+            { type: 'crit', val: 0.20, title: 'Critical IV', icon: '🎯' },
+            { type: 'dmg', val: 0.25, title: 'Damage V', icon: '⚔️' }
+        ];
+
+        const defenseSkills = [
+            { type: 'unlock', unit: 'vanguard', title: 'Unlock Vanguard', icon: '🛡️', desc: 'Stevige melee unit, meer HP dan Raider' },
+            { type: 'hp', val: 0.10, title: 'Vitality I', icon: '❤️' },
+            { type: 'regen', val: 1.5, title: 'Regen I', icon: '🧪' },
+            { type: 'unlock', unit: 'guardian', title: 'Unlock Guardian', icon: '🏰', desc: 'Defensieve unit met goeie HP' },
+            { type: 'hp', val: 0.15, title: 'Vitality II', icon: '❤️' },
+            { type: 'unlock', unit: 'tank', title: 'Unlock Tank', icon: '🚜', desc: 'Frontline eenheid met enorm veel HP' },
+            { type: 'regen', val: 2.5, title: 'Regen III', icon: '🧪' },
+            { type: 'hp', val: 0.25, title: 'Vitality IV', icon: '❤️' },
+            { type: 'unlock', unit: 'juggernaut', title: 'Unlock Juggernaut', icon: '🦾', desc: 'Extreem taai, massieve HP' },
+            { type: 'hp', val: 0.15, title: 'Fortitude I', icon: '🧱' },
+            { type: 'ai', sub: 'flee', title: 'Vluchten', icon: '🏃‍♂️', desc: 'Units rennen weg als hun HP onder 25% komt en proberen te overleven.' },
+            { type: 'hp', val: 0.20, title: 'Fortitude II', icon: '🧱' },
+            { type: 'ai', sub: 'help', title: 'Hulp Roepen', icon: '🆘', desc: 'Als een unit onder de 30% HP komt, komen bondgenoten direct helpen.' },
+            { type: 'hp', val: 0.30, title: 'Vitality V', icon: '❤️' },
+            { type: 'ai', sub: 'taunt', title: 'Afleiding', icon: '📢', desc: 'Tanks en Juggernauts trekken automatisch de aandacht van nabije vijanden.' },
+            { type: 'hp', val: 0.35, title: 'Fortitude IV', icon: '🧱' },
+            { type: 'hp', val: 0.40, title: 'Vitality VI', icon: '❤️' }
+        ];
+
+        const utilitySkills = [
+            { type: 'unlock', unit: 'sharpshooter', title: 'Unlock Sharpshooter', icon: '🏹', desc: 'Goede all-round ranged unit' },
+            { type: 'range', val: 0.10, title: 'Optics I', icon: '👁️' },
+            { type: 'move', val: 0.10, title: 'Mobility I', icon: '👟' },
+            { type: 'unlock', unit: 'ranger', title: 'Unlock Ranger', icon: '🎯', desc: 'Standaard Ranged attack eenheid' },
+            { type: 'range', val: 0.15, title: 'Optics II', icon: '👁️' },
+            { type: 'unlock', unit: 'medic', title: 'Unlock Medic', icon: '⚕️', desc: 'Geneest bondgenoten vanaf een afstand' },
+            { type: 'move', val: 0.20, title: 'Mobility III', icon: '👟' },
+            { type: 'range', val: 0.20, title: 'Optics III', icon: '👁️' },
+            { type: 'move', val: 0.25, title: 'Mobility IV', icon: '👟' },
+            { type: 'move', val: 0.15, title: 'Agility I', icon: '🤸' },
+            { type: 'ai', sub: 'kiting', title: 'Kiting', icon: '🏹', desc: 'Ranged units lopen tactisch achteruit als vijanden te dichtbij komen.' },
+            { type: 'move', val: 0.20, title: 'Agility II', icon: '🤸' },
+            { type: 'ai', sub: 'flank', title: 'Flanking', icon: '↪️', desc: 'Snelle melee units proberen via de zijkant aan te vallen.' },
+            { type: 'move', val: 0.30, title: 'Mobility V', icon: '👟' },
+            { type: 'range', val: 0.35, title: 'Optics V', icon: '👁️' },
+            { type: 'move', val: 0.35, title: 'Agility III', icon: '🤸' },
+            { type: 'range', val: 0.40, title: 'Optics VI', icon: '👁️' }
+        ];
+
+        function buildBranch(branchName, color, offset_x, defs) {
+            const posIds = []; // positional IDs for req lookup (always index-based)
+            for (let i = 0; i < 17; i++) {
+                const pos = branchPositions[i];
+                const def = defs[i];
+                let desc = def.desc || '';
+                if (!desc) {
+                    if (def.type === 'dmg') desc = '+' + (def.val * 100) + '% Damage';
+                    if (def.type === 'as') desc = '+' + (def.val * 100) + '% Attack Speed';
+                    if (def.type === 'crit') desc = '+' + (def.val * 100) + '% Critical Chance';
+                    if (def.type === 'hp') desc = '+' + (def.val * 100) + '% HP';
+                    if (def.type === 'regen') desc = '+' + def.val + ' HP/s Regen';
+                    if (def.type === 'move') desc = '+' + (def.val * 100) + '% Move Speed';
+                    if (def.type === 'range') desc = '+' + (def.val * 100) + '% Attack/Heal Range';
+                }
+                // Always use a stable positional ID for req lookups
+                const posId = branchName.substring(0, 1) + '_' + i;
+                posIds.push(posId);
+                const reqStr = pos.req.map(r => posIds[r]);
+
+                // The real skill ID (unlock nodes get their special ID for filtering, but req uses posId)
+                const id = def.type === 'unlock' ? 'unit_' + def.unit : posId;
+
+                SKILLS.push({
+                    id: id,
+                    posId: posId, // so children can find this node by position
+                    title: def.title,
+                    desc: desc,
+                    cost: (pos.y === 0 || pos.y === 1) ? 1 : (pos.y === 2 || pos.y === 3) ? 2 : 3,
+                    req: reqStr,
+                    x: offset_x + pos.x * 75 + 37.5 + 18,
+                    y: 80 + pos.y * 100 + 20,
+                    icon: def.icon,
+                    color: color,
+                    type: def.type,
+                    val: def.val,
+                    unit: def.unit,
+                    sub: def.sub
+                });
+            }
+        }
+
+        buildBranch('Power', '#ff3333', 30, powerSkills);
+        buildBranch('Defens', '#00f3ff', 360, defenseSkills);
+        buildBranch('Utility', '#71fa71', 690, utilitySkills);
+        // Build SKILL_MAP using both id and posId so req lookups work
+        SKILLS.forEach(s => {
+            SKILL_MAP[s.id] = s;
+            if (s.posId && s.posId !== s.id) SKILL_MAP[s.posId] = s;
+        });
+
+        const skillState = {
+            unlocked: new Set(),
+            spent: 0,
+        };
+
+        function setModal(el, open) {
+            if (open) el.classList.add('open');
+            else el.classList.remove('open');
+            el.setAttribute('aria-hidden', open ? 'false' : 'true');
+        }
+
+        function showOnly(screen) {
+            menuEl.style.display = screen === 'menu' ? 'flex' : 'none';
+            setupEl.style.display = screen === 'setup' ? 'flex' : 'none';
+            resultEl.style.display = screen === 'result' ? 'flex' : 'none';
+            GAME.state = screen;
+            hudStatusEl.textContent = screen === 'menu' ? 'Menu' : screen === 'setup' ? 'Team selectie' : screen === 'result' ? 'Resultaat' : 'Battle';
+        }
+
+        function resize() {
+            DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+            canvas.width = Math.floor(window.innerWidth * DPR);
+            canvas.height = Math.floor(window.innerHeight * DPR);
+            canvas.style.width = window.innerWidth + 'px';
+            canvas.style.height = window.innerHeight + 'px';
+            ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+
+        function clamp(v, a, b) {
+            return Math.max(a, Math.min(b, v));
+        }
+
+        function dist2(ax, ay, bx, by) {
+            const dx = ax - bx;
+            const dy = ay - by;
+            return dx * dx + dy * dy;
+        }
+
+        function len(x, y) {
+            return Math.hypot(x, y);
+        }
+
+        function norm(x, y) {
+            const l = Math.hypot(x, y) || 1;
+            return { x: x / l, y: y / l };
+        }
+
+        function rand(min, max) {
+            return min + Math.random() * (max - min);
+        }
+
+        function pick(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        function currentRace() {
+            return RACES.find(r => r.id === GAME.selectedRace) || RACES[0];
+        }
+
+        function getSkillMultipliers() {
+            let hp = 1, dmg = 1, atk = 1, move = 1, crit = 0, regen = 0, range = 1;
+            let ai_flee = false, ai_help = false, ai_taunt = false;
+            let ai_kiting = false, ai_flank = false, ai_focus = false, ai_priority = false;
+
+            for (const id of skillState.unlocked) {
+                const s = SKILL_MAP[id];
+                if (!s) continue;
+                if (s.type === 'hp') hp += s.val;
+                if (s.type === 'dmg') dmg += s.val;
+                if (s.type === 'as') atk += s.val;
+                if (s.type === 'move') move += s.val;
+                if (s.type === 'range') range += s.val;
+                if (s.type === 'crit') crit += s.val;
+                if (s.type === 'regen') regen += s.val;
+                if (s.type === 'ai') {
+                    if (s.sub === 'flee') ai_flee = true;
+                    if (s.sub === 'help') ai_help = true;
+                    if (s.sub === 'taunt') ai_taunt = true;
+                    if (s.sub === 'kiting') ai_kiting = true;
+                    if (s.sub === 'flank') ai_flank = true;
+                    if (s.sub === 'focus') ai_focus = true;
+                    if (s.sub === 'priority') ai_priority = true;
+                }
+            }
+
+            return { hp, dmg, atk, move, crit, regen, range, ai_flee, ai_help, ai_taunt, ai_kiting, ai_flank, ai_focus, ai_priority };
+        }
+
+        function applySkillsToPlayerUnits() {
+            const m = getSkillMultipliers();
+            for (const u of GAME.units) {
+                if (!u.alive) continue;
+                if (u.team !== 'player') continue;
+                const oldMax = u.maxHp || 1;
+                const ratio = clamp(u.hp / oldMax, 0, 1);
+                u.maxHp = u.baseHp * m.hp;
+                u.hp = clamp(ratio * u.maxHp, 0, u.maxHp);
+                u.dmg = u.baseDmg * m.dmg;
+                u.atkCd = u.baseAtkCd / m.atk;
+                u.move = u.baseMove * m.move;
+                if (u.baseRange) u.range = u.baseRange * m.range;
+                u.crit = m.crit;
+                u.regen = m.regen;
+                u.ai_flee = m.ai_flee;
+                u.ai_help = m.ai_help;
+                u.ai_taunt = m.ai_taunt;
+                u.ai_kiting = m.ai_kiting;
+                u.ai_flank = m.ai_flank;
+                u.ai_focus = m.ai_focus;
+                u.ai_priority = m.ai_priority;
+            }
+        }
+
+        function updateHUD() {
+            hudFightEl.textContent = String(GAME.fightIndex);
+            hudSpEl.textContent = String(GAME.skillPoints);
+            hudTeamEl.textContent = currentRace().name;
+        }
+
+        function initMenu() {
+            raceGridEl.innerHTML = '';
+            for (const r of RACES) {
+                const el = document.createElement('div');
+                el.className = 'choice';
+                el.dataset.id = r.id;
+                const nm = document.createElement('div');
+                nm.className = 'name';
+                nm.textContent = r.name;
+                const meta = document.createElement('div');
+                meta.className = 'meta';
+                meta.innerHTML = r.meta.split('\n').join('<br>');
+                el.appendChild(nm);
+                el.appendChild(meta);
+                el.addEventListener('click', () => selectRace(r.id));
+                raceGridEl.appendChild(el);
+            }
+            selectRace(RACES[0].id);
+
+            btnRules.addEventListener('click', () => setModal(rulesModal, true));
+            btnRulesClose.addEventListener('click', () => setModal(rulesModal, false));
+            rulesModal.addEventListener('click', (e) => { if (e.target === rulesModal) setModal(rulesModal, false); });
+
+            btnStart.addEventListener('click', () => {
+                buildSetupUI();
+                showOnly('setup');
+            });
+        }
+
+        function selectRace(id) {
+            GAME.selectedRace = id;
+            const r = currentRace();
+            document.documentElement.style.setProperty('--prim', r.color);
+            raceGridEl.querySelectorAll('.choice').forEach(n => n.classList.toggle('active', n.dataset.id === id));
+            updateHUD();
+        }
+
+        function buildSetupUI() {
+            teamGridEl.innerHTML = '';
+            for (let i = 0; i < 5; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'slot';
+                const idx = document.createElement('div');
+                idx.className = 'idx';
+                idx.textContent = 'Positie ' + (i + 1);
+
+                const select = document.createElement('select');
+                select.className = 'hud-btn';
+                select.style.width = '100%';
+                select.style.marginTop = '8px';
+                select.style.fontSize = '12px';
+                select.style.padding = '8px 4px';
+                select.style.background = 'rgba(0,0,20,0.8)';
+
+                const available = Object.keys(SOLDIERS).filter(k => k === 'raider' || skillState.unlocked.has('unit_' + k));
+                available.forEach(k => {
+                    const opt = document.createElement('option');
+                    opt.value = k;
+                    opt.textContent = SOLDIERS[k].name;
+                    if (GAME.team[i] === k) opt.selected = true;
+                    select.appendChild(opt);
+                });
+
+                select.addEventListener('change', (e) => {
+                    GAME.team[i] = e.target.value;
+                    renderSoldierHelp();
+                });
+
+                slot.appendChild(idx);
+                slot.appendChild(select);
+                teamGridEl.appendChild(slot);
+            }
+            renderSoldierHelp();
+        }
+
+
+        function renderSoldierHelp() {
+            const m = getSkillMultipliers();
+            const keys = Object.keys(SOLDIERS).filter(k => k === 'raider' || skillState.unlocked.has('unit_' + k));
+            const lines = keys.map(k => {
+                const s = SOLDIERS[k];
+                const hpVal = Math.round(s.hp * m.hp);
+                const dmgVal = +(s.dmg * m.dmg).toFixed(1);
+                const atkCdVal = +(s.atkCd / m.atk).toFixed(2);
+                const moveVal = Math.round(s.move * m.move);
+                const rangeVal = Math.round(s.range * m.range);
+                const role = s.heal ? 'Support' : (s.id === 'tank' || s.id === 'juggernaut' ? 'Frontline' : (s.range > 100 ? 'Ranged' : 'Skirmish'));
+                return `<div style="margin-bottom:10px;"><b>${s.name}</b> (${role})<br><span class="tiny">HP ${hpVal} | DMG ${dmgVal} | ATK-CD ${atkCdVal}s | MOVE ${moveVal} | RANGE ${rangeVal}</span></div>`;
+            }).join('');
+            soldierHelpEl.innerHTML = lines;
+        }
+
+        function canUnlock(skill) {
+            if (skillState.unlocked.has(skill.id)) return false;
+            if (GAME.skillPoints < skill.cost) return false;
+            // req uses positional IDs; check both the posId and id versions are unlocked
+            return skill.req.every(r => {
+                const node = SKILL_MAP[r];
+                if (!node) return true; // missing node = no req
+                return skillState.unlocked.has(node.id);
+            });
+        }
+
+        let selectedSkill = null;
+
+        function renderSkillTree() {
+            skillPointsEl.textContent = String(GAME.skillPoints);
+            const svg = document.getElementById('skill-tree-svg');
+            const nodesContainer = document.getElementById('skill-tree-nodes');
+
+            svg.innerHTML = '';
+            nodesContainer.innerHTML = '';
+
+            for (const s of SKILLS) {
+                const unlocked = skillState.unlocked.has(s.id);
+                for (const reqId of s.req) {
+                    const parent = SKILL_MAP[reqId];
+                    if (!parent) continue;
+                    const preqUnlocked = skillState.unlocked.has(reqId);
+
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', parent.x + 22);
+                    line.setAttribute('y1', parent.y + 22);
+                    line.setAttribute('x2', s.x + 22);
+                    line.setAttribute('y2', s.y + 22);
+                    line.setAttribute('stroke', unlocked ? s.color : (preqUnlocked ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.1)'));
+                    line.setAttribute('stroke-width', unlocked ? '4' : '2');
+                    svg.appendChild(line);
+                }
+            }
+
+            const titles = [
+                { text: 'Power', x: 30 + 112.5, color: '#ff3333' },
+                { text: 'Defens', x: 360 + 112.5, color: '#00f3ff' },
+                { text: 'Utility', x: 690 + 112.5, color: '#71fa71' }
+            ];
+            for (const t of titles) {
+                const el = document.createElement('div');
+                el.textContent = t.text;
+                el.style.position = 'absolute';
+                el.style.left = (t.x - 70) + 'px';
+                el.style.top = '25px';
+                el.style.width = '140px';
+                el.style.textAlign = 'center';
+                el.style.fontSize = '20px';
+                el.style.fontWeight = 'bold';
+                el.style.textTransform = 'uppercase';
+                el.style.color = '#000';
+                el.style.background = t.color;
+                el.style.padding = '8px 0';
+                el.style.border = '2px solid #fff';
+                el.style.borderRadius = '8px';
+                nodesContainer.appendChild(el);
+            }
+
+            for (const s of SKILLS) {
+                const ok = canUnlock(s);
+                const unlocked = skillState.unlocked.has(s.id);
+                const el = document.createElement('div');
+                el.style.position = 'absolute';
+                el.style.left = s.x + 'px';
+                el.style.top = s.y + 'px';
+                el.style.width = '44px';
+                el.style.height = '44px';
+
+                let borderColor = '#444';
+                if (unlocked) borderColor = s.color;
+                else if (ok) borderColor = '#fff';
+
+                let bgHex = s.color;
+                if (bgHex.startsWith('var')) bgHex = '#ffffff';
+
+                let r = 0, g = 0, b = 0;
+                if (bgHex[0] === '#') {
+                    r = parseInt(bgHex.slice(1, 3), 16) || 0;
+                    g = parseInt(bgHex.slice(3, 5), 16) || 0;
+                    b = parseInt(bgHex.slice(5, 7), 16) || 0;
+                }
+
+                el.style.border = '2px solid ' + borderColor;
+                el.style.background = unlocked ? `rgba(${r},${g},${b}, 0.25)` : '#111';
+                el.style.borderRadius = '8px';
+                el.style.display = 'flex';
+                el.style.alignItems = 'center';
+                el.style.justifyContent = 'center';
+                el.style.fontSize = '20px';
+                el.style.cursor = 'pointer';
+                el.style.boxSizing = 'border-box';
+                el.textContent = s.icon || 'x';
+
+                if (selectedSkill === s.id) {
+                    el.style.boxShadow = '0 0 15px ' + s.color;
+                    el.style.transform = 'scale(1.15)';
+                    el.style.zIndex = '10';
+                }
+
+                el.addEventListener('click', () => {
+                    selectedSkill = s.id;
+                    renderSkillTree();
+                    updateSkillDetail();
+                });
+                nodesContainer.appendChild(el);
+            }
+            updateSkillDetail();
+        }
+
+        function updateSkillDetail() {
+            const btn = document.getElementById('btn-skill-unlock');
+            if (!selectedSkill) {
+                document.getElementById('sd-title').textContent = 'Selecteer een skill';
+                document.getElementById('sd-desc').textContent = 'Klik op een node in de tree voor meer informatie.';
+                document.getElementById('sd-cost').innerHTML = '';
+                document.getElementById('sd-icon').textContent = '❓';
+                btn.disabled = true;
+                btn.textContent = 'Unlock';
+                return;
+            }
+            const s = SKILL_MAP[selectedSkill];
+            document.getElementById('sd-title').textContent = s.title;
+            document.getElementById('sd-desc').textContent = s.desc;
+            document.getElementById('sd-icon').textContent = s.icon;
+
+            const unlocked = skillState.unlocked.has(s.id);
+            const ok = canUnlock(s);
+
+            // Build requirement display
+            let reqHtml = '';
+            if (s.req && s.req.length > 0) {
+                const parts = s.req.map(r => {
+                    const node = SKILL_MAP[r];
+                    if (!node) return '';
+                    const done = skillState.unlocked.has(node.id);
+                    const color = done ? '#71fa71' : '#ff6666';
+                    return `<span style="color:${color};">${node.icon || ''} ${node.title}</span>`;
+                }).filter(Boolean);
+                reqHtml = `<div style="font-size:12px;margin-top:4px;">Vereist: ${parts.join(', ')}</div>`;
+            } else {
+                reqHtml = `<div style="font-size:12px;margin-top:4px;color:rgba(255,255,255,0.4);">Geen vereisten</div>`;
+            }
+
+            if (unlocked) {
+                document.getElementById('sd-cost').innerHTML = '<span style="color:#71fa71;">✔ Unlocked</span>' + reqHtml;
+                btn.disabled = true;
+                btn.className = 'btn alt';
+                btn.textContent = 'Unlocked';
+            } else {
+                document.getElementById('sd-cost').innerHTML = 'Kosten: <b>' + s.cost + ' SP</b>' + reqHtml;
+                btn.disabled = !ok;
+                btn.className = 'btn';
+                btn.textContent = 'Unlock';
+            }
+
+            btn.onclick = () => {
+                if (!canUnlock(s)) return;
+                GAME.skillPoints -= s.cost;
+                skillState.spent += s.cost;
+                skillState.unlocked.add(s.id);
+                renderSkillTree();
+                renderSoldierHelp();
+                applySkillsToPlayerUnits();
+            };
+        }
+
+        function openSkillTree() {
+            renderSkillTree();
+            setModal(skillModal, true);
+        }
+
+        function resetSkillTree() {
+            const spent = skillState.spent;
+            skillState.unlocked = new Set();
+            skillState.spent = 0;
+            GAME.skillPoints += spent;
+            GAME.team = Array.from({ length: 5 }, () => 'raider');
+            buildSetupUI();
+            renderSkillTree();
+            renderSoldierHelp();
+            applySkillsToPlayerUnits();
+        }
+
+        btnSkillClose.addEventListener('click', () => setModal(skillModal, false));
+        btnSkillReset.addEventListener('click', resetSkillTree);
+        skillModal.addEventListener('click', (e) => { if (e.target === skillModal) setModal(skillModal, false); });
+
+        btnSkilltree.addEventListener('click', openSkillTree);
+        btnSetupSkill.addEventListener('click', openSkillTree);
+        btnResultSkill.addEventListener('click', openSkillTree);
+
+        btnMenu.addEventListener('click', () => {
+            stopBattleToMenu();
+        });
+        btnSetupMenu.addEventListener('click', () => {
+            stopBattleToMenu();
+        });
+        btnResultMenu.addEventListener('click', () => {
+            stopBattleToMenu();
+        });
+
+        function stopBattleToMenu() {
+            setModal(skillModal, false);
+            setModal(rulesModal, false);
+            GAME.winner = null;
+            GAME.units = [];
+            GAME.bullets = [];
+            GAME.fx = [];
+            hudStatusEl.textContent = 'Menu';
+            showOnly('menu');
+        }
+
+        btnBattle.addEventListener('click', () => startBattle(false));
+        btnNext.addEventListener('click', () => startBattle(true));
+        btnRetry.addEventListener('click', () => startBattle(false));
+
+        function spawnObstacles() {
+            const { w, h, pad } = GAME.arena;
+            const obs = [];
+
+            // Pick theme
+            const themeKeys = Object.keys(ARENA_THEMES);
+            GAME.theme = ARENA_THEMES[themeKeys[GAME.fightIndex % themeKeys.length]];
+
+            const layouts = ['T_WALLS', 'L_BENCH', 'PILLAR_CLUSTERS', 'MIXED_BLOCKS'];
+            const layout = layouts[Math.floor(Math.random() * layouts.length)];
+
+            function addObs(o) {
+                // Precise overlap check
+                let tooClose = false;
+                for (const existing of obs) {
+                    const d = Math.hypot(o.x - existing.x, o.y - existing.y);
+                    const minD = (o.r || Math.max(o.w, o.h)) + (existing.r || Math.max(existing.w, existing.h));
+                    if (d < minD * 0.8) { tooClose = true; break; }
+                }
+                if (!tooClose) obs.push({ ...o, blocksBullets: Math.random() > 0.3 });
+            }
+
+            if (layout === 'T_WALLS') {
+                for (let i = 0; i < 2; i++) {
+                    const side = i === 0 ? -1 : 1;
+                    const cx = w / 2 + side * 200;
+                    const cy = h / 2;
+                    // Horizontal
+                    addObs({ type: 'rect', x: cx, y: cy, w: 120, h: 30 });
+                    // Vertical
+                    addObs({ type: 'rect', x: cx + (side * 45), y: cy, w: 30, h: 120 });
+                }
+            } else if (layout === 'L_BENCH') {
+                const cx = w / 2;
+                const cy = h / 2;
+                addObs({ type: 'rect', x: cx - 150, y: cy - 100, w: 100, h: 30 });
+                addObs({ type: 'rect', x: cx - 185, y: cy - 50, w: 30, h: 100 });
+                addObs({ type: 'rect', x: cx + 150, y: cy + 100, w: 100, h: 30 });
+                addObs({ type: 'rect', x: cx + 185, y: cy + 50, w: 30, h: 100 });
+            } else if (layout === 'PILLAR_CLUSTERS') {
+                for (let i = 0; i < 2; i++) {
+                    const side = i === 0 ? -1 : 1;
+                    const cx = w / 2 + side * 250;
+                    const cy = h / 2;
+                    addObs({ type: 'circle', x: cx, y: cy - 60, r: 40 });
+                    addObs({ type: 'circle', x: cx - 50, y: cy + 30, r: 40 });
+                    addObs({ type: 'circle', x: cx + 50, y: cy + 30, r: 40 });
+                }
+            } else {
+                // Mixed but structured
+                addObs({ type: 'rect', x: w / 2, y: h / 2 - 150, w: 200, h: 40 });
+                addObs({ type: 'rect', x: w / 2, y: h / 2 + 150, w: 200, h: 40 });
+                addObs({ type: 'circle', x: w / 2 - 250, y: h / 2, r: 50 });
+                addObs({ type: 'circle', x: w / 2 + 250, y: h / 2, r: 50 });
+            }
+
+            return obs;
+        }
+
+        function seededRandom(seed) {
+            let s = seed;
+            return function () {
+                s = (s * 16807 + 0) % 2147483647;
+                return (s - 1) / 2147483646;
+            };
+        }
+
+        function genEnemyTeam() {
+            const fi = GAME.fightIndex;
+            const rng = seededRandom(fi * 7919 + 3);
+
+            // Pool groeit naarmate rondes vorderen
+            let pool = ['raider', 'raider', 'raider', 'vanguard', 'sharpshooter'];
+            if (fi >= 2) pool.push('ranger', 'guardian');
+            if (fi >= 3) pool.push('assassin', 'vanguard');
+            if (fi >= 4) pool.push('raider', 'tank', 'berserker');
+            if (fi >= 5) pool.push('assassin', 'sniper', 'sharpshooter');
+            if (fi >= 6) pool.push('tank', 'medic', 'guardian');
+            if (fi >= 8) pool.push('juggernaut', 'sniper', 'berserker');
+            if (fi >= 10) pool.push('juggernaut', 'medic', 'vanguard');
+
+            const team = [];
+            let tankyCount = 0;
+            const MAX_TANKY = fi <= 3 ? 1 : fi <= 6 ? 2 : 3;
+
+            for (let i = 0; i < 5; i++) {
+                // Shuffle remaining pool
+                let attempts = 0;
+                let chosen;
+                do {
+                    chosen = pool[Math.floor(rng() * pool.length)];
+                    attempts++;
+                } while (attempts < 10 && (chosen === 'tank' || chosen === 'juggernaut') && tankyCount >= MAX_TANKY);
+
+                if ((chosen === 'tank' || chosen === 'juggernaut') && tankyCount >= MAX_TANKY) {
+                    chosen = 'raider'; // fallback
+                }
+                if (chosen === 'tank' || chosen === 'juggernaut') tankyCount++;
+                team.push(chosen);
+            }
+            return team;
+        }
+
+        function startBattle(nextFight) {
+            setModal(skillModal, false);
+            setModal(rulesModal, false);
+            resultEl.style.display = 'none';
+
+            if (nextFight) GAME.fightIndex += 1;
+            GAME.winner = null;
+
+            GAME.enemyTeam = genEnemyTeam();
+            GAME.obstacles = spawnObstacles();
+            GAME.units = [];
+            GAME.bullets = [];
+            GAME.fx = [];
+
+            const m = getSkillMultipliers();
+            const r = currentRace();
+            const { w, h, pad } = GAME.arena;
+
+            const px0 = w * 0.18;
+            const px1 = w * 0.82;
+            for (let i = 0; i < 5; i++) {
+                const t = i / 4;
+                const x = px0 + (px1 - px0) * t;
+                const y = h - pad - 65;
+                GAME.units.push(makeUnit('player', GAME.team[i], x, y, r.color, m));
+            }
+
+            const ex0 = w * 0.18;
+            const ex1 = w * 0.82;
+            const difficulty = 1 + (GAME.fightIndex - 1) * 0.03;
+            for (let i = 0; i < 5; i++) {
+                const t = i / 4;
+                const x = ex0 + (ex1 - ex0) * t;
+                const y = pad + 65;
+                GAME.units.push(makeUnit('enemy', GAME.enemyTeam[i], x, y, '#ff3333', null, difficulty));
+            }
+
+            showOnly('battle');
+            hudStatusEl.textContent = 'Battle';
+            updateHUD();
+        }
+
+        function makeUnit(team, typeId, x, y, color, mult, difficulty) {
+            const def = SOLDIERS[typeId] || SOLDIERS.raider;
+            const scale = difficulty || 1;
+            const baseHp = def.hp;
+            const baseDmg = def.dmg;
+            const baseAtkCd = def.atkCd;
+            const baseRange = def.range;
+            const baseMove = def.move;
+            const hp = mult ? baseHp * mult.hp : baseHp * scale;
+            const dmg = mult ? baseDmg * mult.dmg : baseDmg * scale;
+            const atkCd = mult ? baseAtkCd / mult.atk : baseAtkCd / Math.sqrt(scale);
+            const move = mult ? baseMove * mult.move : baseMove * (1 + (scale - 1) * 0.3);
+            const range = mult ? baseRange * mult.range : baseRange;
+            const crit = mult ? mult.crit : 0;
+            const regen = mult ? mult.regen : 0;
+            const ai_flee = mult ? mult.ai_flee : false;
+            const ai_help = mult ? mult.ai_help : false;
+            const ai_taunt = mult ? mult.ai_taunt : false;
+            const ai_kiting = mult ? mult.ai_kiting : false;
+            const ai_flank = mult ? mult.ai_flank : false;
+            const ai_focus = mult ? mult.ai_focus : false;
+            const ai_priority = mult ? mult.ai_priority : false;
+            return {
+                id: cryptoRandomId(),
+                team,
+                typeId,
+                name: def.name,
+                x,
+                y,
+                vx: 0,
+                vy: 0,
+                hp,
+                maxHp: hp,
+                baseHp,
+                baseDmg,
+                baseAtkCd,
+                baseMove,
+                baseRange,
+                dmg,
+                range,
+                atkCd,
+                atkT: rand(0, def.atkCd),
+                move,
+                radius: def.radius,
+                projectile: def.projectile,
+                heal: def.heal,
+                crit,
+                regen,
+                ai_flee, ai_help, ai_taunt, ai_kiting, ai_flank, ai_focus, ai_priority,
+                alive: true,
+                targetId: null,
+                lastHitBy: null,
+                lastHitById: null,
+                stuckT: 0,
+                lastPos: { x, y }
+            };
+        }
+
+        function findTarget(u, allies) {
+            let best = null;
+            let bestScore = Infinity;
+
+            for (const o of GAME.units) {
+                if (!o.alive || o === u) continue;
+                if (allies ? o.team !== u.team : o.team === u.team) continue;
+                if (allies && o.hp >= o.maxHp) continue;
+
+                let dist = Math.hypot(u.x - o.x, u.y - o.y);
+                let score = dist;
+
+                if (!allies) {
+                    if (u.ai_focus) {
+                        const isTargeted = GAME.units.some(a => a.team === u.team && a.targetId === o.id);
+                        if (isTargeted) score *= 0.6;
+                    }
+                    if (u.ai_priority) {
+                        if (o.heal) score *= 0.4;
+                        else if (o.typeId === 'sniper' || o.typeId === 'assassin' || o.typeId === 'ranger') score *= 0.6;
+                        else if (o.typeId === 'tank' || o.typeId === 'juggernaut') score *= 1.5;
+                    }
+                    if (u.ai_help) {
+                        const ally = GAME.units.find(a => a.team === u.team && o.targetId === a.id);
+                        if (ally && ally.hp < ally.maxHp * 0.3) score *= 0.2; // Grote waarschijnlijkheid dat we komen helpen
+                    }
+                    if (o.ai_taunt && (o.typeId === 'tank' || o.typeId === 'juggernaut')) {
+                        if (dist < 250) score *= 0.05; // Dit weegt heel zwaar mee!
+                    }
+                }
+
+                if (score < bestScore) {
+                    bestScore = score;
+                    best = o;
+                }
+            }
+            return best;
+        }
+
+        function cryptoRandomId() {
+            if (window.crypto && crypto.getRandomValues) {
+                const buf = new Uint32Array(2);
+                crypto.getRandomValues(buf);
+                return buf[0].toString(16) + buf[1].toString(16);
+            }
+            return String(Math.random()).slice(2);
+        }
+
+        function applyObstacleCollision(u) {
+            for (const o of GAME.obstacles) {
+                if (o.type === 'circle') {
+                    const dx = u.x - o.x;
+                    const dy = u.y - o.y;
+                    const d = Math.hypot(dx, dy);
+                    const minDist = u.radius + o.r;
+                    if (d < minDist && d > 0.0001) {
+                        const push = (minDist - d) + 0.5; // Stronger push
+                        u.x += (dx / d) * push;
+                        u.y += (dy / d) * push;
+                    }
+                } else {
+                    const left = o.x - o.w / 2;
+                    const right = o.x + o.w / 2;
+                    const top = o.y - o.h / 2;
+                    const bottom = o.y + o.h / 2;
+                    const cx = clamp(u.x, left, right);
+                    const cy = clamp(u.y, top, bottom);
+                    const dx = u.x - cx;
+                    const dy = u.y - cy;
+                    const d = Math.hypot(dx, dy);
+                    if (d < u.radius && d > 0.0001) {
+                        const push = (u.radius - d) + 0.5; // Stronger push
+                        u.x += (dx / d) * push;
+                        u.y += (dy / d) * push;
+                    } else if (d <= 0.0001) {
+                        u.x += rand(-1, 1) * 0.5;
+                        u.y += rand(-1, 1) * 0.5;
+                    }
+                }
+            }
+        }
+
+        function applyUnitSeparation(u) {
+            for (const o of GAME.units) {
+                if (!o.alive) continue;
+                if (o === u) continue;
+                const dx = u.x - o.x;
+                const dy = u.y - o.y;
+                const d = Math.hypot(dx, dy);
+                const minD = u.radius + o.radius;
+                if (d > 0.0001 && d < minD) {
+                    const push = (minD - d) * 0.5;
+                    u.x += (dx / d) * push;
+                    u.y += (dy / d) * push;
+                }
+            }
+        }
+
+        function keepInBounds(u) {
+            const { w, h, pad } = GAME.arena;
+            u.x = clamp(u.x, pad, w - pad);
+            u.y = clamp(u.y, pad, h - pad);
+        }
+
+        function avoidanceVector(u, tx, ty) {
+            let ax = 0;
+            let ay = 0;
+
+            const toT = norm(tx - u.x, ty - u.y);
+
+            for (const o of GAME.obstacles) {
+                const dx = u.x - o.x;
+                const dy = u.y - o.y;
+                const d = Math.hypot(dx, dy);
+                const size = o.type === 'circle' ? o.r * 2 : Math.max(o.w, o.h);
+                const influence = size * 0.9 + 80; // Larger influence
+
+                if (d < influence) {
+                    const weight = (influence - d) / influence;
+
+                    // Away from center
+                    const away = norm(dx, dy);
+                    ax += away.x * weight * 2.5; // Stronger away force
+                    ay += away.y * weight * 2.5;
+
+                    // Intelligent sidestepping
+                    const perp = { x: -toT.y, y: toT.x };
+                    const dot = perp.x * dx + perp.y * dy;
+                    const sideDir = dot > 0 ? 1 : -1;
+
+                    ax += perp.x * sideDir * weight * 3.5; // Stronger side force
+                    ay += perp.y * sideDir * weight * 3.5;
+                }
+            }
+            return { x: ax, y: ay };
+        }
+
+        function doAttack(u, target, isHealing) {
+            if (isHealing) {
+                target.hp = Math.min(target.maxHp, target.hp + Math.abs(u.baseDmg * (u.team === 'player' ? getSkillMultipliers().dmg : 1)));
+                GAME.fx.push({
+                    t: 0, x1: u.x, y1: u.y, x2: target.x, y2: target.y, c: '#71fa71'
+                });
+                if (u.projectile) {
+                    const d = norm(target.x - u.x, target.y - u.y);
+                    GAME.bullets.push({
+                        x: u.x, y: u.y, vx: d.x * 520, vy: d.y * 520, life: 0.7, c: '#71fa71'
+                    });
+                }
+                return;
+            }
+
+            const crit = Math.random() < u.crit;
+            let dmgVal = u.dmg;
+            if (u.heal && target.team !== u.team) dmgVal = 2; // Medic dealing little damage to enemy
+            const dmg = crit ? dmgVal * 2 : dmgVal;
+            target.hp -= dmg;
+            target.lastHitBy = u.team;
+            GAME.fx.push({
+                t: 0,
+                x1: u.x,
+                y1: u.y,
+                x2: target.x,
+                y2: target.y,
+                c: crit ? '#fafa7d' : (u.team === 'player' ? currentRace().color : '#ff3333')
+            });
+            if (u.projectile) {
+                const d = norm(target.x - u.x, target.y - u.y);
+                GAME.bullets.push({
+                    x: u.x,
+                    y: u.y,
+                    vx: d.x * 520,
+                    vy: d.y * 520,
+                    life: 0.7,
+                    c: u.team === 'player' ? currentRace().color : '#ff3333'
+                });
+            }
+        }
+
+        function updateBattle(dt) {
+            if (GAME.winner) return;
+            const playerAlive = GAME.units.some(u => u.alive && u.team === 'player');
+            const enemyAlive = GAME.units.some(u => u.alive && u.team === 'enemy');
+            if (!playerAlive || !enemyAlive) {
+                GAME.winner = playerAlive ? 'player' : 'enemy';
+                endBattle(GAME.winner);
+                return;
+            }
+
+            for (const u of GAME.units) {
+                if (!u.alive) continue;
+                if (u.regen > 0 && u.team === 'player') {
+                    u.hp = Math.min(u.maxHp, u.hp + u.regen * dt);
+                }
+
+                let t = findTarget(u, false);
+                let isHealing = false;
+
+                if (u.heal) {
+                    const ally = findTarget(u, true);
+                    if (ally) {
+                        t = ally;
+                        isHealing = true;
+                    }
+                }
+
+                if (!t) {
+                    u.targetId = null;
+                    continue;
+                }
+                u.targetId = t.id;
+
+                const dx = t.x - u.x;
+                const dy = t.y - u.y;
+                const d = Math.hypot(dx, dy);
+                u.atkT -= dt;
+
+                let isFleeing = false;
+                let isKiting = false;
+
+                if (u.ai_flee && u.hp < u.maxHp * 0.25 && !isHealing) {
+                    if (d < 200) { isFleeing = true; }
+                } else if (u.ai_kiting && u.range > 100 && !isHealing) {
+                    if (d < u.range * 0.7) { isKiting = true; }
+                }
+
+                if (isFleeing || isKiting) {
+                    const to = norm(-dx, -dy);
+                    const avoid = avoidanceVector(u, u.x - dx, u.y - dy);
+                    const steer = norm(to.x + avoid.x, to.y + avoid.y);
+                    u.vx = steer.x * u.move * (isFleeing ? 1.2 : 0.85);
+                    u.vy = steer.y * u.move * (isFleeing ? 1.2 : 0.85);
+
+                    if (isKiting && d <= u.range && u.atkT <= 0) {
+                        u.atkT = u.atkCd;
+                        doAttack(u, t, isHealing);
+                    }
+                } else {
+                    if (d <= (u.range + u.radius + t.radius)) {
+                        u.vx *= 0.7;
+                        u.vy *= 0.7;
+                        if (u.atkT <= 0) {
+                            u.atkT = u.atkCd;
+                            doAttack(u, t, isHealing);
+                        }
+
+                        if (u.ai_flank && u.range < 50 && u.move > 140 && d > (u.radius + t.radius + 10)) {
+                            const perp = norm(-dy, dx);
+                            u.vx += perp.x * u.move * 0.3;
+                            u.vy += perp.y * u.move * 0.3;
+                        }
+                    } else {
+                        let to = norm(dx, dy);
+                        if (u.ai_flank && u.range < 50 && u.move > 140 && d > 100) {
+                            const perp = norm(-dy, dx);
+                            const sign = (parseInt(u.id, 16) % 2 === 0) ? 1 : -1;
+                            to.x = to.x * 0.8 + perp.x * 0.6 * sign;
+                            to.y = to.y * 0.8 + perp.y * 0.6 * sign;
+                            to = norm(to.x, to.y);
+                        }
+                        const avoid = avoidanceVector(u, t.x, t.y);
+                        const steer = norm(to.x + avoid.x, to.y + avoid.y);
+                        u.vx = steer.x * u.move;
+                        u.vy = steer.y * u.move;
+                    }
+                }
+
+                // Stuck detection/wiggle
+                const dPos = Math.hypot(u.x - u.lastPos.x, u.y - u.lastPos.y);
+                if (u.alive && dPos < 0.2 && (Math.abs(u.vx) > 1 || Math.abs(u.vy) > 1)) {
+                    u.stuckT += dt;
+                } else {
+                    u.stuckT = 0;
+                }
+                u.lastPos.x = u.x;
+                u.lastPos.y = u.y;
+
+                if (u.stuckT > 0.25) { // Faster activation
+                    // Stronger wiggle impulse
+                    u.vx += (Math.random() - 0.5) * 600;
+                    u.vy += (Math.random() - 0.5) * 600;
+                    if (u.stuckT > 0.8) u.stuckT = 0;
+                }
+
+                u.x += u.vx * dt;
+                u.y += u.vy * dt;
+
+                applyObstacleCollision(u);
+                applyUnitSeparation(u);
+                keepInBounds(u);
+            }
+
+            for (const u of GAME.units) {
+                if (!u.alive) continue;
+                if (u.hp <= 0) u.alive = false;
+            }
+
+            for (let i = GAME.bullets.length - 1; i >= 0; i--) {
+                const b = GAME.bullets[i];
+                b.life -= dt;
+                b.x += b.vx * dt;
+                b.y += b.vy * dt;
+
+                // Obstacle collision (Bullet blocking)
+                let hitWall = false;
+                for (const o of GAME.obstacles) {
+                    if (!o.blocksBullets) continue;
+                    if (o.type === 'circle') {
+                        if (Math.hypot(b.x - o.x, b.y - o.y) < o.r) hitWall = true;
+                    } else {
+                        if (b.x > o.x - o.w / 2 && b.x < o.x + o.w / 2 && b.y > o.y - o.h / 2 && b.y < o.y + o.h / 2) hitWall = true;
+                    }
+                    if (hitWall) break;
+                }
+
+                if (hitWall) b.life = -1;
+                if (b.life <= 0) GAME.bullets.splice(i, 1);
+            }
+
+            for (let i = GAME.fx.length - 1; i >= 0; i--) {
+                const f = GAME.fx[i];
+                f.t += dt;
+                if (f.t > 0.14) GAME.fx.splice(i, 1);
+            }
+        }
+
+        function endBattle(winner) {
+            const win = winner === 'player';
+            if (win) {
+                GAME.skillPoints += 1;
+            }
+            updateHUD();
+
+            const title = win ? 'Victory' : 'Defeat';
+            resultTitleEl.textContent = title;
+            resultTitleEl.style.color = win ? 'var(--succ)' : 'var(--danger)';
+            const msg = win
+                ? `Je won fight ${GAME.fightIndex}. +1 skill point. Stel je team opnieuw samen voor het volgende gevecht.`
+                : `Je team is verslagen in fight ${GAME.fightIndex}. Pas je team/skills aan en probeer opnieuw.`;
+            resultSubEl.textContent = msg;
+            btnNext.style.display = win ? '' : 'none';
+            btnRetry.style.display = win ? 'none' : '';
+            showOnly('result');
+            buildSetupUI();
+        }
+
+        function drawArena() {
+            const { w, h } = GAME.arena;
+            const theme = GAME.theme || ARENA_THEMES.CYBER;
+
+            // Background
+            ctx.fillStyle = theme.bg;
+            ctx.fillRect(0, 0, w, h);
+
+            // Floor Grid
+            ctx.strokeStyle = theme.floor;
+            ctx.globalAlpha = 0.1;
+            ctx.lineWidth = 1;
+            const gridSize = 50;
+            for (let x = 0; x < w; x += gridSize) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+            }
+            for (let y = 0; y < h; y += gridSize) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+
+            // Arena Border
+            ctx.strokeStyle = theme.obs;
+            ctx.lineWidth = 4;
+            ctx.strokeRect(0, 0, w, h);
+
+            for (const o of GAME.obstacles) {
+                const time = GAME.time * 2;
+                const glowIdx = o.blocksBullets ? 0.3 : 0.1;
+                const pulse = 0.8 + Math.sin(time) * 0.1;
+
+                ctx.fillStyle = o.blocksBullets ? `rgba(255, 255, 255, 0.1)` : `rgba(255, 255, 255, 0.03)`;
+                ctx.strokeStyle = theme.obs;
+                ctx.lineWidth = o.blocksBullets ? 4 : 2;
+
+                if (o.type === 'circle') {
+                    ctx.beginPath();
+                    ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                } else {
+                    const x = o.x - o.w / 2;
+                    const y = o.y - o.h / 2;
+                    ctx.fillRect(x, y, o.w, o.h);
+                    ctx.strokeRect(x, y, o.w, o.h);
+                }
+
+                // Shield pulse if bullet-blocking
+                if (o.blocksBullets) {
+                    ctx.globalAlpha = 0.2 * pulse;
+                    ctx.lineWidth = 2;
+                    if (o.type === 'circle') {
+                        ctx.beginPath(); ctx.arc(o.x, o.y, o.r + 5, 0, Math.PI * 2); ctx.stroke();
+                    } else {
+                        ctx.strokeRect(o.x - o.w / 2 - 5, o.y - o.h / 2 - 5, o.w + 10, o.h + 10);
+                    }
+                }
+                ctx.globalAlpha = 1;
+            }
+
+            for (const f of GAME.fx) {
+                const a = clamp(1 - (f.t / 0.14), 0, 1);
+                ctx.strokeStyle = f.c;
+                ctx.globalAlpha = 0.65 * a;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(f.x1, f.y1);
+                ctx.lineTo(f.x2, f.y2);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+
+            for (const b of GAME.bullets) {
+                ctx.fillStyle = b.c;
+                ctx.globalAlpha = 0.85;
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 3.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+
+            for (const u of GAME.units) {
+                if (!u.alive) continue;
+
+                const color = u.team === 'player' ? currentRace().color : '#ff3333';
+                ctx.fillStyle = color;
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.globalAlpha = 0.9;
+
+                const x = u.x;
+                const y = u.y;
+                const r = u.radius;
+
+                ctx.beginPath();
+                if (u.typeId === 'tank' || u.typeId === 'juggernaut' || u.typeId === 'guardian') {
+                    // Square variants
+                    if (u.typeId === 'juggernaut') {
+                        // Octagon
+                        for (let i = 0; i < 8; i++) {
+                            const ang = (i / 8) * Math.PI * 2 + Math.PI / 8;
+                            const px = x + Math.cos(ang) * r;
+                            const py = y + Math.sin(ang) * r;
+                            if (i === 0) ctx.moveTo(px, py);
+                            else ctx.lineTo(px, py);
+                        }
+                    } else if (u.typeId === 'guardian') {
+                        // Rounded Square
+                        const crc = r * 0.4;
+                        ctx.moveTo(x - r + crc, y - r);
+                        ctx.lineTo(x + r - crc, y - r);
+                        ctx.quadraticCurveTo(x + r, y - r, x + r, y - r + crc);
+                        ctx.lineTo(x + r, y + r - crc);
+                        ctx.quadraticCurveTo(x + r, y + r, x + r - crc, y + r);
+                        ctx.lineTo(x - r + crc, y + r);
+                        ctx.quadraticCurveTo(x - r, y + r, x - r, y + r - crc);
+                        ctx.lineTo(x - r, y - r + crc);
+                        ctx.quadraticCurveTo(x - r, y - r, x - r + crc, y - r);
+                    } else {
+                        // Square (Tank)
+                        ctx.rect(x - r, y - r, r * 2, r * 2);
+                    }
+                } else if (u.typeId === 'ranger' || u.typeId === 'sniper' || u.typeId === 'sharpshooter') {
+                    // Triangle / Pentagon / Long Diamond
+                    if (u.typeId === 'sniper') {
+                        // Pointy Pentagon
+                        for (let i = 0; i < 5; i++) {
+                            const ang = (i / 5) * Math.PI * 2 - Math.PI / 2;
+                            const px = x + Math.cos(ang) * r;
+                            const py = y + Math.sin(ang) * r;
+                            if (i === 0) ctx.moveTo(px, py);
+                            else ctx.lineTo(px, py);
+                        }
+                    } else if (u.typeId === 'sharpshooter') {
+                        // Long Diamond
+                        ctx.moveTo(x, y - r * 1.3);
+                        ctx.lineTo(x + r * 0.6, y);
+                        ctx.lineTo(x, y + r * 1.3);
+                        ctx.lineTo(x - r * 0.6, y);
+                    } else {
+                        // Triangle (Ranger)
+                        ctx.moveTo(x, y - r);
+                        ctx.lineTo(x + r, y + r * 0.8);
+                        ctx.lineTo(x - r, y + r * 0.8);
+                    }
+                } else if (u.typeId === 'assassin' || u.typeId === 'vanguard') {
+                    // Diamond / Shield
+                    if (u.typeId === 'vanguard') {
+                        // Shield shape (Pentagon down)
+                        ctx.moveTo(x - r, y - r * 0.6);
+                        ctx.lineTo(x + r, y - r * 0.6);
+                        ctx.lineTo(x + r, y + r * 0.4);
+                        ctx.lineTo(x, y + r);
+                        ctx.lineTo(x - r, y + r * 0.4);
+                    } else {
+                        // Diamond (Assassin)
+                        ctx.moveTo(x, y - r * 1.2);
+                        ctx.lineTo(x + r * 0.8, y);
+                        ctx.lineTo(x, y + r * 1.2);
+                        ctx.lineTo(x - r * 0.8, y);
+                    }
+                } else if (u.typeId === 'raider' || u.typeId === 'berserker') {
+                    // Hexagon / Star
+                    if (u.typeId === 'berserker') {
+                        // 8-point Star
+                        for (let i = 0; i < 16; i++) {
+                            const ang = (i / 16) * Math.PI * 2;
+                            const rad = (i % 2 === 0) ? r : r * 0.5;
+                            const px = x + Math.cos(ang) * rad;
+                            const py = y + Math.sin(ang) * rad;
+                            if (i === 0) ctx.moveTo(px, py);
+                            else ctx.lineTo(px, py);
+                        }
+                    } else {
+                        // Hexagon (Raider)
+                        for (let i = 0; i < 6; i++) {
+                            const ang = (i / 6) * Math.PI * 2;
+                            const px = x + Math.cos(ang) * r;
+                            const py = y + Math.sin(ang) * r;
+                            if (i === 0) ctx.moveTo(px, py);
+                            else ctx.lineTo(px, py);
+                        }
+                    }
+                } else {
+                    // Default/Medic: Circle
+                    ctx.arc(x, y, r, 0, Math.PI * 2);
+                }
+                ctx.closePath();
+                ctx.fill();
+
+                // Add Markings
+                ctx.globalAlpha = 1;
+                ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                if (u.typeId === 'medic') {
+                    // Plus sign for medic
+                    ctx.moveTo(x - r * 0.5, y); ctx.lineTo(x + r * 0.5, y);
+                    ctx.moveTo(x, y - r * 0.5); ctx.lineTo(x, y + r * 0.5);
+                } else if (u.typeId === 'tank' || u.typeId === 'juggernaut' || u.typeId === 'guardian') {
+                    // Shield/Bars for tanks
+                    ctx.moveTo(x - r * 0.4, y - r * 0.4); ctx.lineTo(x + r * 0.4, y + r * 0.4);
+                    ctx.moveTo(x + r * 0.4, y - r * 0.4); ctx.lineTo(x - r * 0.4, y + r * 0.4);
+                } else if (u.typeId === 'sniper' || u.typeId === 'sharpshooter') {
+                    // Crosshair for snipers
+                    ctx.arc(x, y, r * 0.5, 0, Math.PI * 2);
+                    ctx.moveTo(x - r * 0.7, y); ctx.lineTo(x + r * 0.7, y);
+                    ctx.moveTo(x, y - r * 0.7); ctx.lineTo(x, y + r * 0.7);
+                } else if (u.typeId === 'ranger') {
+                    // Single dot
+                    ctx.arc(x, y, 2, 0, Math.PI * 2);
+                } else if (u.typeId === 'assassin' || u.typeId === 'vanguard') {
+                    // Vertical line
+                    ctx.moveTo(x, y - r * 0.8); ctx.lineTo(x, y + r * 0.8);
+                } else if (u.typeId === 'raider' || u.typeId === 'berserker') {
+                    // Arrow/V
+                    ctx.moveTo(x - r * 0.4, y - r * 0.2);
+                    ctx.lineTo(x, y + r * 0.3);
+                    ctx.lineTo(x + r * 0.4, y - r * 0.2);
+                }
+                ctx.stroke();
+
+                const hpPct = clamp(u.hp / u.maxHp, 0, 1);
+                const barW = u.radius * 2 + 12;
+                const barH = 5;
+                const bx = u.x - barW / 2;
+                const by = u.y - u.radius - 12;
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(bx, by, barW, barH);
+                ctx.fillStyle = u.team === 'player' ? 'rgba(113, 250, 113, 0.9)' : 'rgba(255, 51, 51, 0.9)';
+                ctx.fillRect(bx, by, barW * hpPct, barH);
+            }
+
+            ctx.restore();
+        }
+
+        function loop(ts) {
+            const dt = Math.min(0.05, (ts - GAME.lastTs) / 1000);
+            GAME.lastTs = ts;
+            if (GAME.state === 'battle') updateBattle(dt);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawArena();
+            requestAnimationFrame(loop);
+        }
+
+        initMenu();
+        updateHUD();
+        showOnly('menu');
+        requestAnimationFrame(loop);
+    </script>
+</body>
+
+</html>

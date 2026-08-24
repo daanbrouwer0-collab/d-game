@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft 3D - Voxel Builder</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: radial-gradient(1100px circle at 30% 18%, #2a0052 0%, #070012 46%, #020006 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+        }
+
+        #hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 10;
+            pointer-events: none;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55), 0 0 16px rgba(0, 229, 255, 0.18);
+            padding: 12px;
+        }
+
+        #hud .row {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #hud .right {
+            width: 44px;
+            height: 44px;
+        }
+
+        .btn {
+            pointer-events: auto;
+            background: linear-gradient(180deg, rgba(12, 0, 28, 0.9), rgba(6, 0, 18, 0.75));
+            color: #fff;
+            border: 1px solid rgba(0, 229, 255, 0.28);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: 0.15s;
+            user-select: none;
+            box-shadow: 0 0 18px rgba(0, 229, 255, 0.14), inset 0 0 0 1px rgba(255, 0, 204, 0.1);
+        }
+
+        .btn:hover {
+            background: linear-gradient(180deg, rgba(18, 0, 42, 0.95), rgba(6, 0, 18, 0.8));
+            box-shadow: 0 0 26px rgba(0, 229, 255, 0.22), inset 0 0 0 1px rgba(255, 0, 204, 0.16);
+        }
+
+        #top-controls {
+            pointer-events: auto;
+            display: inline-flex;
+            gap: 10px;
+            align-items: center;
+            justify-self: center;
+        }
+
+        .select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background: linear-gradient(180deg, rgba(12, 0, 28, 0.9), rgba(6, 0, 18, 0.75));
+            color: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(0, 229, 255, 0.28);
+            border-radius: 10px;
+            padding: 10px 36px 10px 12px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            cursor: pointer;
+            user-select: none;
+            touch-action: none;
+            box-shadow: 0 0 18px rgba(0, 229, 255, 0.14), inset 0 0 0 1px rgba(255, 0, 204, 0.1);
+            background-image:
+                linear-gradient(180deg, rgba(12, 0, 28, 0.9), rgba(6, 0, 18, 0.75)),
+                linear-gradient(45deg, transparent 50%, rgba(0, 229, 255, 0.9) 50%),
+                linear-gradient(135deg, rgba(0, 229, 255, 0.9) 50%, transparent 50%);
+            background-position:
+                0 0,
+                calc(100% - 18px) 50%,
+                calc(100% - 12px) 50%;
+            background-size:
+                auto,
+                7px 7px,
+                7px 7px;
+            background-repeat: no-repeat;
+        }
+
+        .select:focus {
+            outline: none;
+            border-color: rgba(0, 229, 255, 0.6);
+            box-shadow: 0 0 26px rgba(0, 229, 255, 0.22), inset 0 0 0 1px rgba(255, 0, 204, 0.16);
+        }
+
+        #menu,
+        #pause {
+            position: absolute;
+            inset: 0;
+            z-index: 30;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(1100px circle at 50% 30%, rgba(48, 0, 90, 0.7), rgba(0, 0, 0, 0.9));
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        #pause {
+            display: none;
+            z-index: 35;
+        }
+
+        .panel {
+            width: min(920px, 100%);
+            border-radius: 16px;
+            background: rgba(6, 0, 18, 0.78);
+            border: 1px solid rgba(0, 229, 255, 0.26);
+            padding: 18px;
+            box-sizing: border-box;
+            box-shadow: 0 0 32px rgba(0, 229, 255, 0.12), inset 0 0 0 1px rgba(255, 0, 204, 0.1);
+            text-align: center;
+        }
+
+        #menu h1 {
+            margin: 0 0 8px;
+            font-size: 54px;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            text-shadow: 0 10px 50px rgba(0, 0, 0, 0.3), 0 0 18px rgba(255, 0, 204, 0.25), 0 0 18px rgba(0, 229, 255, 0.18);
+        }
+
+        .sub {
+            margin: 0 0 14px;
+            opacity: 0.88;
+            line-height: 1.5;
+        }
+
+        .menu-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+
+        #rules-modal {
+            position: absolute;
+            inset: 0;
+            z-index: 40;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 18px;
+            box-sizing: border-box;
+            background: radial-gradient(1100px circle at 50% 30%, rgba(48, 0, 90, 0.72), rgba(0, 0, 0, 0.92));
+        }
+
+        #rules-modal.open {
+            display: flex;
+        }
+
+        .modal-card {
+            width: min(860px, 100%);
+            padding: 16px;
+            box-sizing: border-box;
+            border-radius: 16px;
+            border: 1px solid rgba(0, 229, 255, 0.26);
+            background: rgba(6, 0, 18, 0.92);
+            box-shadow: 0 0 30px rgba(0, 229, 255, 0.12), inset 0 0 0 1px rgba(255, 0, 204, 0.1);
+        }
+
+        .modal-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-head h2 {
+            margin: 0;
+            font-size: 18px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .modal-body {
+            margin-top: 12px;
+            font-size: 13px;
+            line-height: 1.6;
+            opacity: 0.9;
+        }
+
+        canvas {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            display: block;
+            touch-action: none;
+        }
+
+        #touch-controls {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 36vh;
+            max-height: 320px;
+            z-index: 25;
+            display: none;
+            pointer-events: none;
+            padding: 14px;
+            box-sizing: border-box;
+            gap: 14px;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .touch-joystick {
+            width: 170px;
+            height: 170px;
+            position: relative;
+            border-radius: 999px;
+            pointer-events: auto;
+            touch-action: none;
+            background: rgba(6, 0, 18, 0.35);
+            border: 1px solid rgba(0, 229, 255, 0.32);
+            box-shadow: 0 0 24px rgba(0, 229, 255, 0.12);
+            backdrop-filter: blur(6px);
+        }
+
+        .touch-joystick .ring {
+            position: absolute;
+            inset: 14px;
+            border-radius: 999px;
+            border: 2px solid rgba(0, 229, 255, 0.28);
+            box-shadow: inset 0 0 24px rgba(0, 229, 255, 0.12);
+        }
+
+        .touch-joystick .knob {
+            --dx: 0px;
+            --dy: 0px;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 66px;
+            height: 66px;
+            border-radius: 999px;
+            transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy)));
+            background: rgba(255, 0, 204, 0.16);
+            border: 2px solid rgba(255, 0, 204, 0.55);
+            box-shadow: 0 0 26px rgba(255, 0, 204, 0.18);
+        }
+
+        body.touch #touch-controls {
+            display: flex;
+        }
+    </style>
+</head>
+<body>
+    <div id="hud">
+        <div class="row">
+            <button id="btn-menu" class="btn">MENU</button>
+            <div id="top-controls">
+                <select id="action-select" class="select" aria-label="Actie">
+                    <option value="break">HAKKEN</option>
+                    <option value="build">BOUWEN</option>
+                    <option value="none">NIETS</option>
+                </select>
+                <select id="block-select" class="select" aria-label="Block"></select>
+            </div>
+            <div class="right"></div>
+        </div>
+    </div>
+    <div id="touch-controls" aria-hidden="true">
+        <div id="touch-joystick-left" class="touch-joystick" aria-label="Move joystick">
+            <div class="ring"></div>
+            <div class="knob" id="touch-knob-left"></div>
+        </div>
+        <div id="touch-joystick-right" class="touch-joystick" aria-label="Look joystick">
+            <div class="ring"></div>
+            <div class="knob" id="touch-knob-right"></div>
+        </div>
+    </div>
+
+    <div id="menu">
+        <div class="panel">
+            <h1>MINECRAFT 3D</h1>
+            <p class="sub">Klik Start om te beginnen (mouse lock). Bouw en breek blokken in een voxelwereld.</p>
+            <div class="menu-actions">
+                <button id="btn-start" class="btn">START</button>
+                <button id="btn-rules" class="btn">RULES</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pause">
+        <div class="panel">
+            <h1 style="margin:0 0 8px; font-size:42px;">PAUSED</h1>
+            <p class="sub">Druk op Resume om door te spelen, of Menu om terug te gaan.</p>
+            <div class="menu-actions">
+                <button id="btn-resume" class="btn">RESUME</button>
+                <button id="btn-back-menu" class="btn">MENU</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="rules-modal" aria-hidden="true">
+        <div class="modal-card">
+            <div class="modal-head">
+                <h2>Rules</h2>
+                <button id="btn-rules-close" class="btn">Sluiten</button>
+            </div>
+            <div class="modal-body">
+                - Klik Start om pointer lock te activeren.<br>
+                - WASD = lopen, muis = kijken.<br>
+                - Als mouse lock niet werkt: gebruik Q/E en R/F om te kijken.<br>
+                - Space = jump, Shift = sprint.<br>
+                - LMB (linker muisknop) = breek block, RMB (rechter muisknop) = plaats geselecteerd block.<br>
+                - 1 t/m 5 of muiswiel = wissel block in hotbar.<br>
+                - ESC = pause/unlock.<br>
+            </div>
+        </div>
+    </div>
+
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.156.1/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.156.1/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+        import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+        const blockSelectEl = document.getElementById('block-select');
+        const actionSelectEl = document.getElementById('action-select');
+
+        const menuEl = document.getElementById('menu');
+        const pauseEl = document.getElementById('pause');
+        const rulesModal = document.getElementById('rules-modal');
+        const touchControlsEl = document.getElementById('touch-controls');
+        const touchJoyLeftEl = document.getElementById('touch-joystick-left');
+        const touchKnobLeftEl = document.getElementById('touch-knob-left');
+        const touchJoyRightEl = document.getElementById('touch-joystick-right');
+        const touchKnobRightEl = document.getElementById('touch-knob-right');
+
+        const btnStart = document.getElementById('btn-start');
+        const btnRules = document.getElementById('btn-rules');
+        const btnRulesClose = document.getElementById('btn-rules-close');
+        const btnMenu = document.getElementById('btn-menu');
+        const btnResume = document.getElementById('btn-resume');
+        const btnBackMenu = document.getElementById('btn-back-menu');
+
+        const BLOCKS = [
+            { id: 'grass', name: 'Grass', color: 0x31d96b },
+            { id: 'dirt', name: 'Dirt', color: 0xb35a2a },
+            { id: 'stone', name: 'Stone', color: 0x7a7d8f },
+            { id: 'wood', name: 'Wood', color: 0xd28b2d },
+            { id: 'glass', name: 'Glass', color: 0x5de9ff }
+        ];
+
+        const EXTRA_BLOCKS = {
+            leaves: { id: 'leaves', name: 'Leaves', color: 0x00a85a },
+            bedrock: { id: 'bedrock', name: 'Bedrock', color: 0x1c1a2e },
+            glow: { id: 'glow', name: 'Glow', color: 0x00e5ff }
+        };
+
+        const WORLD_XZ = 48;
+        const WORLD_H = 24;
+        const HALF = WORLD_XZ / 2;
+        const EPS = 0.001;
+
+        const PLAYER = {
+            width: 0.6,
+            height: 1.8,
+            eye: 1.62,
+            pos: new THREE.Vector3(0, 8, 0),
+            vel: new THREE.Vector3(0, 0, 0),
+            onGround: false
+        };
+
+        const MOVEMENT = {
+            walk: 4.8,
+            sprint: 7.6,
+            friction: 13.5,
+            gravity: 22.0,
+            jump: 8.0
+        };
+
+        let selectedIndex = 0;
+        let actionMode = 'break';
+        let isPlaying = false;
+        const inventory = new Map();
+        let worldSeed = (Math.random() * 1e9) | 0;
+        let yaw = 0;
+        let pitch = -0.35;
+        const LOOK_SPEED = 1.9;
+        const TOUCH_LOOK_SPEED = 2.55;
+        let lastTime = performance.now();
+        let isTouchMode = false;
+
+        let scene;
+        let camera;
+        let renderer;
+        let controls;
+        let raycaster;
+        let hemiLight;
+        let sunLight;
+        const dynamicMaterials = [];
+        const skyState = {
+            startMs: performance.now(),
+            cycleMs: 120000,
+            skyNight: new THREE.Color(0x030007),
+            skyDay: new THREE.Color(0x0b3a8a),
+            skyTwilight: new THREE.Color(0xff4f86),
+            fogNight: new THREE.Color(0x050010),
+            fogDay: new THREE.Color(0x060a33),
+            fogTwilight: new THREE.Color(0x410016),
+            hemiNight: new THREE.Color(0x00e5ff),
+            hemiDay: new THREE.Color(0xbbe8ff),
+            groundNight: new THREE.Color(0x170018),
+            groundDay: new THREE.Color(0x120014),
+            groundTwilight: new THREE.Color(0x2a0600),
+            sunNight: new THREE.Color(0xff63e6),
+            sunDay: new THREE.Color(0xffffff),
+            sunTwilight: new THREE.Color(0xff7a1a),
+            accentCyan: new THREE.Color(0x00e5ff),
+            accentMagenta: new THREE.Color(0xff63e6),
+            tmpA: new THREE.Color(),
+            tmpB: new THREE.Color()
+        };
+
+        const blockMap = new Map();
+        const instancedByType = new Map();
+        const instancePosByType = new Map();
+        const raycastTargets = [];
+        const worldMeshes = [];
+
+        const keyState = new Map();
+        let wantJump = false;
+        let wantSprint = false;
+        const touchState = {
+            moveX: 0,
+            moveZ: 0,
+            lookX: 0,
+            lookY: 0,
+            leftPointerId: null,
+            leftCenter: null,
+            leftMax: 1,
+            rightPointerId: null,
+            rightCenter: null,
+            rightMax: 1,
+            jumpQueued: false
+        };
+
+        const tmpMat = new THREE.Matrix4();
+        const tmpVec3 = new THREE.Vector3();
+        const tmpDir = new THREE.Vector3();
+        const tmpRight = new THREE.Vector3();
+        const tmpAabbMin = new THREE.Vector3();
+        const tmpAabbMax = new THREE.Vector3();
+        const lookEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+
+        const BLOCK_GEOM = new THREE.BoxGeometry(1, 1, 1);
+        const EDGE_GEOM = createEdgeShellGeometry(0.005);
+
+        buildBlockSelect();
+        initActionSelect();
+        initInventory();
+        setSelectedIndex(0);
+
+        init();
+        animate();
+
+        function shouldUseTouchControls() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.has('touch')) return true;
+            if (params.has('desktop')) return false;
+
+            const maxTouchPoints = navigator.maxTouchPoints ?? 0;
+            const hasTouch = maxTouchPoints > 0 || ('ontouchstart' in window);
+            const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+            const smallScreen = Math.min(window.innerWidth, window.innerHeight) <= 900;
+            return hasTouch || coarse || smallScreen;
+        }
+
+        function updateTouchUI() {
+            isTouchMode = shouldUseTouchControls();
+            const showTouch = isTouchMode && isPlaying && pauseEl.style.display !== 'flex' && menuEl.style.display === 'none';
+            if (touchControlsEl) {
+                touchControlsEl.style.display = showTouch ? 'flex' : 'none';
+                touchControlsEl.setAttribute('aria-hidden', showTouch ? 'false' : 'true');
+            }
+            document.body.classList.toggle('touch', showTouch);
+        }
+
+        function clamp(v, a, b) {
+            return Math.max(a, Math.min(b, v));
+        }
+
+        function applyDeadzone(v, dz) {
+            const av = Math.abs(v);
+            if (av <= dz) return 0;
+            const scaled = (av - dz) / (1 - dz);
+            return Math.sign(v) * scaled;
+        }
+
+        function resetTouchAxes() {
+            touchState.moveX = 0;
+            touchState.moveZ = 0;
+            touchState.lookX = 0;
+            touchState.lookY = 0;
+            touchState.leftPointerId = null;
+            touchState.leftCenter = null;
+            touchState.rightPointerId = null;
+            touchState.rightCenter = null;
+            if (touchKnobLeftEl) {
+                touchKnobLeftEl.style.setProperty('--dx', '0px');
+                touchKnobLeftEl.style.setProperty('--dy', '0px');
+            }
+            if (touchKnobRightEl) {
+                touchKnobRightEl.style.setProperty('--dx', '0px');
+                touchKnobRightEl.style.setProperty('--dy', '0px');
+            }
+        }
+
+        function setupJoystick(el, knobEl, side) {
+            if (!el || !knobEl) return;
+            let tapStartTime = 0;
+            let tapStartX = 0;
+            let tapStartY = 0;
+            let tapMoved = false;
+
+            const updateFromPoint = (clientX, clientY) => {
+                const center = side === 'left' ? touchState.leftCenter : touchState.rightCenter;
+                const max = side === 'left' ? touchState.leftMax : touchState.rightMax;
+                if (!center) return;
+
+                const dx = clientX - center.x;
+                const dy = clientY - center.y;
+                let nx = clamp(dx / max, -1, 1);
+                let ny = clamp(dy / max, -1, 1);
+                const len = Math.hypot(nx, ny);
+                if (len > 1e-6 && len > 1) {
+                    nx /= len;
+                    ny /= len;
+                }
+
+                const dz = 0.12;
+                nx = applyDeadzone(nx, dz);
+                ny = applyDeadzone(ny, dz);
+
+                knobEl.style.setProperty('--dx', `${nx * max}px`);
+                knobEl.style.setProperty('--dy', `${ny * max}px`);
+
+                if (side === 'left') {
+                    touchState.moveX = nx;
+                    touchState.moveZ = -ny;
+                } else {
+                    touchState.lookX = nx;
+                    touchState.lookY = ny;
+                }
+            };
+
+            const onDown = (e) => {
+                if (e.pointerType !== 'touch') return;
+                if (side === 'left' && touchState.leftPointerId !== null) return;
+                if (side === 'right' && touchState.rightPointerId !== null) return;
+
+                if (side === 'left') touchState.leftPointerId = e.pointerId;
+                else touchState.rightPointerId = e.pointerId;
+                tapStartTime = performance.now();
+                tapStartX = e.clientX;
+                tapStartY = e.clientY;
+                tapMoved = false;
+
+                el.setPointerCapture(e.pointerId);
+                const rect = el.getBoundingClientRect();
+                const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+                if (side === 'left') {
+                    touchState.leftCenter = center;
+                    touchState.leftMax = rect.width * 0.30;
+                } else {
+                    touchState.rightCenter = center;
+                    touchState.rightMax = rect.width * 0.30;
+                }
+                updateFromPoint(e.clientX, e.clientY);
+                e.preventDefault();
+                e.stopPropagation();
+            };
+
+            const onMove = (e) => {
+                if (e.pointerType !== 'touch') return;
+                const pid = side === 'left' ? touchState.leftPointerId : touchState.rightPointerId;
+                if (e.pointerId !== pid) return;
+                const dx = e.clientX - tapStartX;
+                const dy = e.clientY - tapStartY;
+                if ((dx * dx + dy * dy) > 144) tapMoved = true;
+                updateFromPoint(e.clientX, e.clientY);
+                e.preventDefault();
+                e.stopPropagation();
+            };
+
+            const onUp = (e) => {
+                if (e.pointerType !== 'touch') return;
+                const pid = side === 'left' ? touchState.leftPointerId : touchState.rightPointerId;
+                if (e.pointerId !== pid) return;
+                const tapMs = performance.now() - tapStartTime;
+                const lookMag = Math.hypot(touchState.lookX, touchState.lookY);
+                if (side === 'right' && !tapMoved && tapMs < 240 && lookMag < 0.35) {
+                    touchState.jumpQueued = true;
+                }
+
+                if (side === 'left') {
+                    touchState.leftPointerId = null;
+                    touchState.leftCenter = null;
+                    touchState.moveX = 0;
+                    touchState.moveZ = 0;
+                } else {
+                    touchState.rightPointerId = null;
+                    touchState.rightCenter = null;
+                    touchState.lookX = 0;
+                    touchState.lookY = 0;
+                }
+
+                knobEl.style.setProperty('--dx', '0px');
+                knobEl.style.setProperty('--dy', '0px');
+                e.preventDefault();
+                e.stopPropagation();
+            };
+
+            el.addEventListener('pointerdown', onDown, { passive: false });
+            el.addEventListener('pointermove', onMove, { passive: false });
+            el.addEventListener('pointerup', onUp, { passive: false });
+            el.addEventListener('pointercancel', onUp, { passive: false });
+            el.addEventListener('contextmenu', (e) => e.preventDefault());
+        }
+
+        function initInventory() {
+            inventory.clear();
+            for (const b of BLOCKS) inventory.set(b.id, 0);
+            refreshBlockSelectCounts();
+        }
+
+        function refreshBlockSelectCounts() {
+            if (!blockSelectEl) return;
+            for (const opt of blockSelectEl.options) {
+                const idx = Number(opt.value);
+                if (!Number.isFinite(idx) || idx < 0 || idx >= BLOCKS.length) continue;
+                const id = BLOCKS[idx].id;
+                const base = opt.dataset.base || BLOCKS[idx].name.toUpperCase();
+                const count = inventory.get(id) ?? 0;
+                opt.textContent = `${base} (${count})`;
+            }
+        }
+
+        function buildBlockSelect() {
+            if (!blockSelectEl) return;
+            blockSelectEl.innerHTML = '';
+            for (let i = 0; i < BLOCKS.length; i++) {
+                const opt = document.createElement('option');
+                opt.value = String(i);
+                opt.dataset.base = BLOCKS[i].name.toUpperCase();
+                opt.textContent = opt.dataset.base;
+                blockSelectEl.appendChild(opt);
+            }
+            blockSelectEl.addEventListener('change', () => {
+                const idx = Number(blockSelectEl.value);
+                if (Number.isFinite(idx)) setSelectedIndex(idx);
+            });
+            refreshBlockSelectCounts();
+        }
+
+        function initActionSelect() {
+            if (!actionSelectEl) return;
+            actionSelectEl.value = actionMode;
+            actionSelectEl.addEventListener('change', () => {
+                actionMode = actionSelectEl.value || 'none';
+            });
+        }
+
+        function setSelectedIndex(next) {
+            const clamped = ((next % BLOCKS.length) + BLOCKS.length) % BLOCKS.length;
+            selectedIndex = clamped;
+            if (blockSelectEl) blockSelectEl.value = String(selectedIndex);
+        }
+
+        function createEdgeShellGeometry(thickness) {
+            const t = thickness;
+            const inset = 0.5 + t / 2 + 0.004;
+            const parts = [];
+
+            const xEdge = new THREE.BoxGeometry(1.01, t, t);
+            const yEdge = new THREE.BoxGeometry(t, 1.01, t);
+            const zEdge = new THREE.BoxGeometry(t, t, 1.01);
+
+            for (const sy of [-1, 1]) {
+                for (const sz of [-1, 1]) {
+                    const g = xEdge.clone();
+                    g.translate(0, sy * inset, sz * inset);
+                    parts.push(g);
+                }
+            }
+
+            for (const sx of [-1, 1]) {
+                for (const sz of [-1, 1]) {
+                    const g = yEdge.clone();
+                    g.translate(sx * inset, 0, sz * inset);
+                    parts.push(g);
+                }
+            }
+
+            for (const sx of [-1, 1]) {
+                for (const sy of [-1, 1]) {
+                    const g = zEdge.clone();
+                    g.translate(sx * inset, sy * inset, 0);
+                    parts.push(g);
+                }
+            }
+
+            const merged = mergeGeometries(parts, false);
+            xEdge.dispose();
+            yEdge.dispose();
+            zEdge.dispose();
+            for (const p of parts) p.dispose();
+            return merged;
+        }
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x070012);
+            scene.fog = new THREE.Fog(0x070012, 18, 80);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 250);
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            renderer.shadowMap.enabled = false;
+            if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+            if ('toneMapping' in renderer) renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            if ('toneMappingExposure' in renderer) renderer.toneMappingExposure = 1.05;
+            document.body.appendChild(renderer.domElement);
+            renderer.domElement.tabIndex = 0;
+            renderer.domElement.style.outline = 'none';
+
+            controls = new PointerLockControls(camera, document.body);
+            scene.add(controls.getObject());
+
+            raycaster = new THREE.Raycaster();
+            raycaster.far = 6.5;
+
+            hemiLight = new THREE.HemisphereLight(0x00e5ff, 0x22001f, 0.9);
+            scene.add(hemiLight);
+
+            sunLight = new THREE.DirectionalLight(0xff63e6, 0.8);
+            sunLight.position.set(40, 55, 20);
+            scene.add(sunLight);
+
+            generateWorld();
+            rebuildMeshes();
+
+            window.addEventListener('resize', onResize);
+            window.addEventListener('keydown', onKeyDown);
+            window.addEventListener('keyup', onKeyUp);
+            window.addEventListener('mousedown', onMouseDown);
+            window.addEventListener('contextmenu', (e) => e.preventDefault());
+            window.addEventListener('wheel', onWheel, { passive: true });
+
+            controls.addEventListener('lock', () => {
+                pauseEl.style.display = 'none';
+                updateTouchUI();
+            });
+            controls.addEventListener('unlock', () => {
+                if (isPlaying && !isTouchMode) {
+                    pauseEl.style.display = 'flex';
+                }
+                updateTouchUI();
+            });
+
+            btnStart.addEventListener('click', () => {
+                hideMenu();
+                startPlaying();
+            });
+
+            btnRules.addEventListener('click', () => {
+                rulesModal.classList.add('open');
+                rulesModal.setAttribute('aria-hidden', 'false');
+            });
+            btnRulesClose.addEventListener('click', () => {
+                rulesModal.classList.remove('open');
+                rulesModal.setAttribute('aria-hidden', 'true');
+            });
+
+            btnMenu.addEventListener('click', () => {
+                backToMenu();
+            });
+            btnResume.addEventListener('click', () => {
+                if (!isPlaying) return;
+                pauseEl.style.display = 'none';
+                if (!isTouchMode) controls.lock();
+                updateTouchUI();
+            });
+            btnBackMenu.addEventListener('click', () => {
+                backToMenu();
+            });
+
+            setupJoystick(touchJoyLeftEl, touchKnobLeftEl, 'left');
+            setupJoystick(touchJoyRightEl, touchKnobRightEl, 'right');
+            setupTouchTapActions();
+            updateTouchUI();
+            resetPlayerSpawn();
+            updateSky(performance.now(), true);
+        }
+
+        function clamp01(v) {
+            return Math.min(1, Math.max(0, v));
+        }
+
+        function smooth01(t) {
+            return t * t * (3 - 2 * t);
+        }
+
+        function lerp(a, b, t) {
+            return a + (b - a) * t;
+        }
+
+        function updateSky(nowMs, force) {
+            if (!scene || !scene.fog || !hemiLight || !sunLight) return;
+            const p = ((nowMs - skyState.startMs) % skyState.cycleMs) / skyState.cycleMs;
+            const sunY = Math.sin(p * Math.PI * 2);
+            const day = smooth01(clamp01((sunY + 0.15) / 1.15));
+            const night = 1 - day;
+            const twilight = smooth01(clamp01(1 - Math.abs(sunY) / 0.55));
+
+            skyState.tmpA.copy(skyState.skyNight).lerp(skyState.skyDay, day);
+            skyState.tmpA.lerp(skyState.skyTwilight, twilight * 0.62);
+            if (force || !scene.background) scene.background = new THREE.Color();
+            scene.background.copy(skyState.tmpA);
+
+            skyState.tmpB.copy(skyState.fogNight).lerp(skyState.fogDay, day);
+            skyState.tmpB.lerp(skyState.fogTwilight, twilight * 0.48);
+            scene.fog.color.copy(skyState.tmpB);
+
+            hemiLight.color.copy(skyState.hemiNight).lerp(skyState.hemiDay, day);
+            hemiLight.groundColor.copy(skyState.groundNight).lerp(skyState.groundDay, day).lerp(skyState.groundTwilight, twilight * 0.45);
+            hemiLight.intensity = lerp(0.45, 1.05, day);
+
+            sunLight.color.copy(skyState.sunNight).lerp(skyState.sunDay, day).lerp(skyState.sunTwilight, twilight * 0.9);
+            sunLight.intensity = lerp(0.08, 0.95, day) + twilight * 0.12;
+
+            const accent = skyState.tmpB.copy(skyState.accentCyan).lerp(skyState.accentMagenta, twilight * 0.8 + night * 0.25);
+            const edgeOpacity = clamp01(lerp(0.08, 0.24, night) + twilight * 0.05);
+            const neonBoost = 0.55 + night * 1.25;
+
+            for (const item of dynamicMaterials) {
+                if (item.mat && item.baseEmissiveIntensity !== undefined) {
+                    item.mat.emissiveIntensity = item.baseEmissiveIntensity * neonBoost;
+                }
+                if (item.edgeMat) {
+                    item.edgeMat.color.copy(accent);
+                    item.edgeMat.opacity = edgeOpacity;
+                }
+            }
+
+            for (const obj of worldMeshes) {
+                if (obj && obj.isPointLight && obj.color && obj.color.getHex() === EXTRA_BLOCKS.glow.color) {
+                    obj.intensity = lerp(0.38, 0.85, night) + twilight * 0.1;
+                }
+            }
+        }
+
+        function setupTouchTapActions() {
+            if (!renderer || !renderer.domElement) return;
+
+            let tapPointerId = null;
+            let tapStartX = 0;
+            let tapStartY = 0;
+            let tapStartTime = 0;
+            let tapMoved = false;
+
+            const onDown = (e) => {
+                if (!isTouchMode) return;
+                if (!isPlaying) return;
+                if (pauseEl.style.display === 'flex') return;
+                if (menuEl.style.display !== 'none') return;
+                if (e.pointerType !== 'touch') return;
+                if (e.target && e.target.closest && (e.target.closest('#touch-controls') || e.target.closest('#hud'))) return;
+                if (tapPointerId !== null) return;
+
+                tapPointerId = e.pointerId;
+                tapStartX = e.clientX;
+                tapStartY = e.clientY;
+                tapStartTime = performance.now();
+                tapMoved = false;
+
+                e.preventDefault();
+            };
+
+            const onMove = (e) => {
+                if (e.pointerType !== 'touch') return;
+                if (e.pointerId !== tapPointerId) return;
+                const dx = e.clientX - tapStartX;
+                const dy = e.clientY - tapStartY;
+                if ((dx * dx + dy * dy) > 120) tapMoved = true;
+                e.preventDefault();
+            };
+
+            const finish = (e) => {
+                if (e.pointerType !== 'touch') return;
+                if (e.pointerId !== tapPointerId) return;
+                const tapMs = performance.now() - tapStartTime;
+                if (!tapMoved && tapMs < 280) performActionAt(e.clientX, e.clientY);
+                tapPointerId = null;
+                e.preventDefault();
+            };
+
+            renderer.domElement.addEventListener('pointerdown', onDown, { passive: false });
+            renderer.domElement.addEventListener('pointermove', onMove, { passive: false });
+            renderer.domElement.addEventListener('pointerup', finish, { passive: false });
+            renderer.domElement.addEventListener('pointercancel', finish, { passive: false });
+        }
+
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            updateTouchUI();
+        }
+
+        function showMenu() {
+            menuEl.style.display = 'flex';
+        }
+
+        function hideMenu() {
+            menuEl.style.display = 'none';
+        }
+
+        function startPlaying() {
+            isPlaying = true;
+            pauseEl.style.display = 'none';
+            updateTouchUI();
+            if (!isTouchMode) controls.lock();
+            renderer.domElement.focus();
+        }
+
+        function backToMenu() {
+            isPlaying = false;
+            pauseEl.style.display = 'none';
+            showMenu();
+            if (controls.isLocked) controls.unlock();
+            resetTouchAxes();
+            updateTouchUI();
+            resetPlayerSpawn();
+        }
+
+        function resetPlayerSpawn() {
+            const safe = findSpawn();
+            PLAYER.pos.set(safe.x + 0.5, safe.y + 0.01, safe.z + 0.5);
+            PLAYER.vel.set(0, 0, 0);
+            PLAYER.onGround = false;
+            yaw = 0;
+            pitch = -0.35;
+            applyLookFallback();
+            syncCameraToPlayer();
+        }
+
+        function findSpawn() {
+            const sx = 0;
+            const sz = 0;
+            for (let y = WORLD_H - 2; y >= 1; y--) {
+                if (getBlock(sx, y, sz) === null && getBlock(sx, y - 1, sz) !== null) return { x: sx, y: y, z: sz };
+            }
+            return { x: 0, y: 6, z: 0 };
+        }
+
+        function syncCameraToPlayer() {
+            controls.getObject().position.set(PLAYER.pos.x, PLAYER.pos.y + PLAYER.eye, PLAYER.pos.z);
+        }
+
+        function applyLookFallback() {
+            const clampedPitch = Math.min(1.35, Math.max(-1.35, pitch));
+            pitch = clampedPitch;
+            camera.up.set(0, 1, 0);
+            lookEuler.set(pitch, yaw, 0);
+            camera.quaternion.setFromEuler(lookEuler);
+        }
+
+        function onKeyDown(e) {
+            keyState.set(e.code, true);
+            if (!isPlaying && (e.code.startsWith('Key') || e.code.startsWith('Arrow'))) {
+                hideMenu();
+                isPlaying = true;
+                pauseEl.style.display = 'none';
+                renderer.domElement.focus();
+                updateTouchUI();
+            }
+            if (e.code === 'Escape') {
+                if (controls.isLocked) {
+                    controls.unlock();
+                } else if (isPlaying) {
+                    if (pauseEl.style.display === 'flex') {
+                        pauseEl.style.display = 'none';
+                        if (!isTouchMode) controls.lock();
+                    } else {
+                        pauseEl.style.display = 'flex';
+                    }
+                    updateTouchUI();
+                }
+            }
+            if (e.code === 'Space') wantJump = true;
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') wantSprint = true;
+            if (e.code.startsWith('Digit')) {
+                const n = Number(e.code.slice(5));
+                if (n >= 1 && n <= BLOCKS.length) setSelectedIndex(n - 1);
+            }
+        }
+
+        function onKeyUp(e) {
+            keyState.set(e.code, false);
+            if (e.code === 'Space') wantJump = false;
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') wantSprint = false;
+        }
+
+        function onWheel(e) {
+            if (!isPlaying) return;
+            if (e.deltaY > 0) setSelectedIndex(selectedIndex + 1);
+            if (e.deltaY < 0) setSelectedIndex(selectedIndex - 1);
+        }
+
+        function onMouseDown(e) {
+            if (!isPlaying) return;
+            if (pauseEl.style.display === 'flex') return;
+            if (e.target && e.target.closest && (e.target.closest('#hud') || e.target.closest('#touch-controls'))) return;
+            if (e.button === 0) performActionAt(e.clientX, e.clientY);
+        }
+
+        function getNdcFromClient(clientX, clientY) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            const x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            const y = -(((clientY - rect.top) / rect.height) * 2 - 1);
+            return { x, y };
+        }
+
+        function performActionAt(clientX, clientY) {
+            if (actionMode === 'break') breakBlockAt(clientX, clientY);
+            else if (actionMode === 'build') placeBlockAt(clientX, clientY);
+        }
+
+        function breakBlockAt(clientX, clientY) {
+            const ndc = getNdcFromClient(clientX, clientY);
+            const hit = raycastBlock(ndc.x, ndc.y);
+            if (!hit) return;
+            if (hit.pos.y <= 0) return;
+            if (inventory.has(hit.type)) {
+                inventory.set(hit.type, (inventory.get(hit.type) ?? 0) + 1);
+                refreshBlockSelectCounts();
+            }
+            setBlock(hit.pos.x, hit.pos.y, hit.pos.z, null);
+            rebuildMeshes();
+        }
+
+        function placeBlockAt(clientX, clientY) {
+            const wantType = BLOCKS[selectedIndex].id;
+            const have = inventory.get(wantType) ?? 0;
+            if (have <= 0) return;
+            const ndc = getNdcFromClient(clientX, clientY);
+            const hit = raycastBlock(ndc.x, ndc.y);
+            if (!hit) return;
+            const target = {
+                x: hit.pos.x + hit.normal.x,
+                y: hit.pos.y + hit.normal.y,
+                z: hit.pos.z + hit.normal.z
+            };
+            if (!isInsideWorld(target.x, target.y, target.z)) return;
+            if (getBlock(target.x, target.y, target.z) !== null) return;
+            if (wouldCollidePlayer(target.x, target.y, target.z)) return;
+            inventory.set(wantType, have - 1);
+            refreshBlockSelectCounts();
+            setBlock(target.x, target.y, target.z, wantType);
+            rebuildMeshes();
+        }
+
+        function raycastBlock(ndcX, ndcY) {
+            raycaster.setFromCamera({ x: ndcX, y: ndcY }, camera);
+            const hits = raycaster.intersectObjects(raycastTargets, false);
+            if (hits.length === 0) return null;
+            const h = hits[0];
+            const type = h.object.userData.type;
+            const arr = instancePosByType.get(type);
+            if (!arr) return null;
+            const p = arr[h.instanceId];
+            if (!p) return null;
+            const normal = h.face?.normal ? h.face.normal.clone() : new THREE.Vector3(0, 1, 0);
+            normal.transformDirection(h.object.matrixWorld);
+            normal.set(Math.round(normal.x), Math.round(normal.y), Math.round(normal.z));
+            return { pos: { x: p.x, y: p.y, z: p.z }, normal, type };
+        }
+
+        function isInsideWorld(x, y, z) {
+            return x >= -HALF && x < HALF && z >= -HALF && z < HALF && y >= 0 && y < WORLD_H;
+        }
+
+        function blockKey(x, y, z) {
+            return `${x},${y},${z}`;
+        }
+
+        function getBlock(x, y, z) {
+            return blockMap.get(blockKey(x, y, z)) ?? null;
+        }
+
+        function setBlock(x, y, z, type) {
+            const k = blockKey(x, y, z);
+            if (type === null) {
+                blockMap.delete(k);
+            } else {
+                blockMap.set(k, type);
+            }
+        }
+
+        function isSolid(type) {
+            return type !== null;
+        }
+
+        function wouldCollidePlayer(bx, by, bz) {
+            const halfW = PLAYER.width / 2;
+            const minX = PLAYER.pos.x - halfW;
+            const maxX = PLAYER.pos.x + halfW;
+            const minY = PLAYER.pos.y;
+            const maxY = PLAYER.pos.y + PLAYER.height;
+            const minZ = PLAYER.pos.z - halfW;
+            const maxZ = PLAYER.pos.z + halfW;
+            const bMinX = bx;
+            const bMaxX = bx + 1;
+            const bMinY = by;
+            const bMaxY = by + 1;
+            const bMinZ = bz;
+            const bMaxZ = bz + 1;
+            const overlaps = (minX < bMaxX && maxX > bMinX) && (minY < bMaxY && maxY > bMinY) && (minZ < bMaxZ && maxZ > bMinZ);
+            return overlaps;
+        }
+
+        function generateWorld() {
+            blockMap.clear();
+            worldSeed = (Math.random() * 1e9) | 0;
+            for (let x = -HALF; x < HALF; x++) {
+                for (let z = -HALF; z < HALF; z++) {
+                    const h = 2 + Math.floor(fbm2D(x, z, worldSeed) * 5);
+                    for (let y = 0; y <= h; y++) {
+                        if (y === 0) {
+                            setBlock(x, y, z, EXTRA_BLOCKS.bedrock.id);
+                        } else if (y < h - 2) {
+                            setBlock(x, y, z, 'stone');
+                        } else if (y < h) {
+                            setBlock(x, y, z, 'dirt');
+                        } else {
+                            setBlock(x, y, z, 'grass');
+                        }
+                    }
+
+                    for (let y = 2; y <= h - 3; y++) {
+                        if (getBlock(x, y, z) !== 'stone') continue;
+                        if (hash3D(x, y, z, worldSeed) > 0.9988) {
+                            setBlock(x, y, z, EXTRA_BLOCKS.glow.id);
+                        }
+                    }
+
+                    const topY = h;
+                    const chance = hash2D(x, z, worldSeed);
+                    if (chance > 0.985 && topY + 6 < WORLD_H) {
+                        placeTree(x, topY + 1, z);
+                    }
+                }
+            }
+        }
+
+        function placeTree(x, y, z) {
+            for (let i = 0; i < 4; i++) {
+                setBlock(x, y + i, z, 'wood');
+            }
+            const cy = y + 3;
+            for (let dx = -2; dx <= 2; dx++) {
+                for (let dz = -2; dz <= 2; dz++) {
+                    for (let dy = -1; dy <= 1; dy++) {
+                        const ax = x + dx;
+                        const ay = cy + dy;
+                        const az = z + dz;
+                        if (!isInsideWorld(ax, ay, az)) continue;
+                        const dist = Math.abs(dx) + Math.abs(dz) + Math.abs(dy);
+                        if (dist > 4) continue;
+                        if (getBlock(ax, ay, az) !== null) continue;
+                        setBlock(ax, ay, az, EXTRA_BLOCKS.leaves.id);
+                    }
+                }
+            }
+        }
+
+        function rebuildMeshes() {
+            for (const mesh of worldMeshes) {
+                scene.remove(mesh);
+                if (mesh.material) mesh.material.dispose();
+            }
+            raycastTargets.length = 0;
+            worldMeshes.length = 0;
+            instancedByType.clear();
+            instancePosByType.clear();
+            dynamicMaterials.length = 0;
+
+            const types = new Map();
+            for (const [k, type] of blockMap.entries()) {
+                const [x, y, z] = k.split(',').map(Number);
+                if (!types.has(type)) types.set(type, []);
+                types.get(type).push({ x, y, z });
+            }
+
+            const geom = BLOCK_GEOM;
+
+            for (const [type, positions] of types.entries()) {
+                let color = 0xffffff;
+                let opacity = 1.0;
+                let transparent = false;
+                let emissive = 0x000000;
+                let emissiveIntensity = 0.06;
+
+                const base = BLOCKS.find((b) => b.id === type);
+                if (base) color = base.color;
+                if (type === EXTRA_BLOCKS.leaves.id) color = EXTRA_BLOCKS.leaves.color;
+                if (type === EXTRA_BLOCKS.bedrock.id) color = EXTRA_BLOCKS.bedrock.color;
+                if (type === EXTRA_BLOCKS.glow.id) {
+                    color = EXTRA_BLOCKS.glow.color;
+                    emissive = EXTRA_BLOCKS.glow.color;
+                    emissiveIntensity = 2.0;
+                }
+                if (type === 'glass') {
+                    opacity = 0.35;
+                    transparent = true;
+                    emissiveIntensity = 0.12;
+                }
+                if (type !== EXTRA_BLOCKS.glow.id) {
+                    emissive = color;
+                    if (type === EXTRA_BLOCKS.bedrock.id) emissiveIntensity = 0.035;
+                    if (type === 'stone') emissiveIntensity = 0.05;
+                }
+
+                const mat = new THREE.MeshStandardMaterial({
+                    color,
+                    emissive,
+                    emissiveIntensity,
+                    roughness: transparent ? 0.35 : 0.72,
+                    metalness: transparent ? 0.08 : 0.02,
+                    polygonOffset: true,
+                    polygonOffsetFactor: 1,
+                    polygonOffsetUnits: 1,
+                    transparent,
+                    opacity
+                });
+
+                const mesh = new THREE.InstancedMesh(geom, mat, positions.length);
+                mesh.userData.type = type;
+                mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+                mesh.frustumCulled = false;
+
+                const edgeMat = new THREE.MeshBasicMaterial({
+                    color: EXTRA_BLOCKS.glow.color,
+                    transparent: true,
+                    opacity: 0.14,
+                    depthWrite: false
+                });
+                const edges = new THREE.InstancedMesh(EDGE_GEOM, edgeMat, positions.length);
+                edges.frustumCulled = false;
+                edges.renderOrder = 1;
+                edges.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+                dynamicMaterials.push({ mat, edgeMat, baseEmissiveIntensity: emissiveIntensity });
+
+                for (let i = 0; i < positions.length; i++) {
+                    tmpMat.makeTranslation(positions[i].x + 0.5, positions[i].y + 0.5, positions[i].z + 0.5);
+                    mesh.setMatrixAt(i, tmpMat);
+                    edges.setMatrixAt(i, tmpMat);
+                }
+                mesh.instanceMatrix.needsUpdate = true;
+                edges.instanceMatrix.needsUpdate = true;
+                scene.add(mesh);
+                scene.add(edges);
+
+                if (type === EXTRA_BLOCKS.glow.id) {
+                    const maxLights = 28;
+                    for (let i = 0; i < Math.min(maxLights, positions.length); i++) {
+                        const light = new THREE.PointLight(EXTRA_BLOCKS.glow.color, 0.65, 7.5, 2.0);
+                        light.position.set(positions[i].x + 0.5, positions[i].y + 0.5, positions[i].z + 0.5);
+                        scene.add(light);
+                        worldMeshes.push(light);
+                    }
+                }
+
+                raycastTargets.push(mesh);
+                worldMeshes.push(mesh, edges);
+                instancedByType.set(type, mesh);
+                instancePosByType.set(type, positions);
+            }
+        }
+
+        function hash2D(x, z, seed) {
+            const s = Math.sin((x * 127.1 + z * 311.7 + seed * 0.01) * 0.1) * 43758.5453123;
+            return s - Math.floor(s);
+        }
+
+        function hash3D(x, y, z, seed) {
+            const s = Math.sin((x * 127.1 + y * 269.5 + z * 311.7 + seed * 0.01) * 0.1) * 43758.5453123;
+            return s - Math.floor(s);
+        }
+
+        function smoothstep(t) {
+            return t * t * (3 - 2 * t);
+        }
+
+        function valueNoise2D(x, z, seed) {
+            const xi = Math.floor(x);
+            const zi = Math.floor(z);
+            const xf = x - xi;
+            const zf = z - zi;
+
+            const v00 = hash2D(xi, zi, seed);
+            const v10 = hash2D(xi + 1, zi, seed);
+            const v01 = hash2D(xi, zi + 1, seed);
+            const v11 = hash2D(xi + 1, zi + 1, seed);
+
+            const u = smoothstep(xf);
+            const v = smoothstep(zf);
+
+            const a = v00 * (1 - u) + v10 * u;
+            const b = v01 * (1 - u) + v11 * u;
+            return a * (1 - v) + b * v;
+        }
+
+        function fbm2D(x, z, seed) {
+            let sum = 0;
+            let amp = 0.55;
+            let freq = 0.06;
+            for (let i = 0; i < 4; i++) {
+                sum += amp * valueNoise2D(x * freq, z * freq, seed + i * 101);
+                amp *= 0.5;
+                freq *= 2.0;
+            }
+            return Math.min(1, Math.max(0, sum));
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            update();
+            renderer.render(scene, camera);
+        }
+        function update() {
+            const now = performance.now();
+            const dt = Math.min(0.05, (now - lastTime) / 1000);
+            lastTime = now;
+            updateSky(now, false);
+
+            if (isPlaying && pauseEl.style.display !== 'flex') {
+                if (isTouchMode) {
+                    yaw -= touchState.lookX * TOUCH_LOOK_SPEED * dt;
+                    pitch -= touchState.lookY * TOUCH_LOOK_SPEED * dt;
+                    applyLookFallback();
+                } else if (!controls.isLocked) {
+                    const turn = (keyState.get('KeyE') ? 1 : 0) - (keyState.get('KeyQ') ? 1 : 0);
+                    const tilt = (keyState.get('KeyR') ? 1 : 0) - (keyState.get('KeyF') ? 1 : 0);
+                    yaw += turn * LOOK_SPEED * dt;
+                    pitch += tilt * LOOK_SPEED * dt;
+                    applyLookFallback();
+                } else {
+                    lookEuler.setFromQuaternion(camera.quaternion);
+                    yaw = lookEuler.y;
+                    pitch = lookEuler.x;
+                    applyLookFallback();
+                }
+                stepPlayer(dt);
+            }
+
+            syncCameraToPlayer();
+            updateHud();
+        }
+
+        function updateHud() {}
+
+        function stepPlayer(dt) {
+            const forward = getForwardXZ();
+            const right = getRightXZ(forward);
+
+            let moveX = 0;
+            let moveZ = 0;
+            if (keyState.get('KeyW') || keyState.get('ArrowUp')) moveZ += 1;
+            if (keyState.get('KeyS') || keyState.get('ArrowDown')) moveZ -= 1;
+            if (keyState.get('KeyD') || keyState.get('ArrowRight')) moveX += 1;
+            if (keyState.get('KeyA') || keyState.get('ArrowLeft')) moveX -= 1;
+            if (isTouchMode) {
+                moveX += touchState.moveX;
+                moveZ += touchState.moveZ;
+            }
+
+            tmpDir.set(0, 0, 0);
+            tmpDir.addScaledVector(forward, moveZ);
+            tmpDir.addScaledVector(right, moveX);
+            if (tmpDir.lengthSq() > 0) tmpDir.normalize();
+
+            const touchSprint = isTouchMode && Math.hypot(touchState.moveX, touchState.moveZ) > 0.85;
+            const speed = (wantSprint || touchSprint) ? MOVEMENT.sprint : MOVEMENT.walk;
+            const targetVX = tmpDir.x * speed;
+            const targetVZ = tmpDir.z * speed;
+            PLAYER.vel.x = THREE.MathUtils.damp(PLAYER.vel.x, targetVX, MOVEMENT.friction, dt);
+            PLAYER.vel.z = THREE.MathUtils.damp(PLAYER.vel.z, targetVZ, MOVEMENT.friction, dt);
+
+            PLAYER.vel.y -= MOVEMENT.gravity * dt;
+
+            const jump = wantJump || touchState.jumpQueued;
+            if (jump && PLAYER.onGround) {
+                PLAYER.vel.y = MOVEMENT.jump;
+                PLAYER.onGround = false;
+            }
+            touchState.jumpQueued = false;
+
+            moveAndCollide(dt);
+            keepInsideWorld();
+        }
+
+        function keepInsideWorld() {
+            const limit = HALF - 0.6;
+            PLAYER.pos.x = Math.min(limit, Math.max(-limit, PLAYER.pos.x));
+            PLAYER.pos.z = Math.min(limit, Math.max(-limit, PLAYER.pos.z));
+            PLAYER.pos.y = Math.min(WORLD_H - 2, Math.max(0.01, PLAYER.pos.y));
+        }
+
+        function getForwardXZ() {
+            camera.getWorldDirection(tmpVec3);
+            tmpVec3.y = 0;
+            if (tmpVec3.lengthSq() < 1e-6) tmpVec3.set(0, 0, -1);
+            tmpVec3.normalize();
+            return tmpVec3;
+        }
+
+        function getRightXZ(forward) {
+            tmpRight.crossVectors(forward, new THREE.Vector3(0, 1, 0));
+            tmpRight.normalize();
+            return tmpRight;
+        }
+
+        function moveAndCollide(dt) {
+            PLAYER.onGround = false;
+
+            PLAYER.pos.x += PLAYER.vel.x * dt;
+            resolveCollisions('x');
+
+            PLAYER.pos.z += PLAYER.vel.z * dt;
+            resolveCollisions('z');
+
+            PLAYER.pos.y += PLAYER.vel.y * dt;
+            resolveCollisions('y');
+        }
+
+        function resolveCollisions(axis) {
+            const halfW = PLAYER.width / 2;
+            const minX = PLAYER.pos.x - halfW;
+            const maxX = PLAYER.pos.x + halfW;
+            const minY = PLAYER.pos.y;
+            const maxY = PLAYER.pos.y + PLAYER.height;
+            const minZ = PLAYER.pos.z - halfW;
+            const maxZ = PLAYER.pos.z + halfW;
+
+            tmpAabbMin.set(minX, minY, minZ);
+            tmpAabbMax.set(maxX, maxY, maxZ);
+
+            const bx0 = Math.floor(tmpAabbMin.x);
+            const bx1 = Math.floor(tmpAabbMax.x);
+            const by0 = Math.floor(tmpAabbMin.y);
+            const by1 = Math.floor(tmpAabbMax.y);
+            const bz0 = Math.floor(tmpAabbMin.z);
+            const bz1 = Math.floor(tmpAabbMax.z);
+
+            for (let bx = bx0; bx <= bx1; bx++) {
+                for (let by = by0; by <= by1; by++) {
+                    for (let bz = bz0; bz <= bz1; bz++) {
+                        if (!isInsideWorld(bx, by, bz)) continue;
+                        const t = getBlock(bx, by, bz);
+                        if (!isSolid(t)) continue;
+
+                        const bMinX = bx;
+                        const bMaxX = bx + 1;
+                        const bMinY = by;
+                        const bMaxY = by + 1;
+                        const bMinZ = bz;
+                        const bMaxZ = bz + 1;
+
+                        const overlaps = (tmpAabbMin.x < bMaxX && tmpAabbMax.x > bMinX) && (tmpAabbMin.y < bMaxY && tmpAabbMax.y > bMinY) && (tmpAabbMin.z < bMaxZ && tmpAabbMax.z > bMinZ);
+                        if (!overlaps) continue;
+
+                        if (axis === 'x') {
+                            if (PLAYER.vel.x > 0) {
+                                PLAYER.pos.x = bMinX - halfW - EPS;
+                            } else if (PLAYER.vel.x < 0) {
+                                PLAYER.pos.x = bMaxX + halfW + EPS;
+                            }
+                            PLAYER.vel.x = 0;
+                            tmpAabbMin.x = PLAYER.pos.x - halfW;
+                            tmpAabbMax.x = PLAYER.pos.x + halfW;
+                        } else if (axis === 'z') {
+                            if (PLAYER.vel.z > 0) {
+                                PLAYER.pos.z = bMinZ - halfW - EPS;
+                            } else if (PLAYER.vel.z < 0) {
+                                PLAYER.pos.z = bMaxZ + halfW + EPS;
+                            }
+                            PLAYER.vel.z = 0;
+                            tmpAabbMin.z = PLAYER.pos.z - halfW;
+                            tmpAabbMax.z = PLAYER.pos.z + halfW;
+                        } else if (axis === 'y') {
+                            if (PLAYER.vel.y > 0) {
+                                PLAYER.pos.y = bMinY - PLAYER.height - EPS;
+                                PLAYER.vel.y = 0;
+                            } else if (PLAYER.vel.y < 0) {
+                                PLAYER.pos.y = bMaxY + EPS;
+                                PLAYER.vel.y = 0;
+                                PLAYER.onGround = true;
+                            }
+                            tmpAabbMin.y = PLAYER.pos.y;
+                            tmpAabbMax.y = PLAYER.pos.y + PLAYER.height;
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

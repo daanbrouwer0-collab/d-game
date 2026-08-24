@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>RobotRun — Tactical Robot Board Game</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/nav.css">
+  <link rel="stylesheet" href="css/menu.css">
+  <link rel="stylesheet" href="css/hud.css">
+  <link rel="stylesheet" href="css/board.css">
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+  <script type="module" src="p2p-bridge.js"></script>
+</head>
+  <body>
+  <div id="app">
+    <!-- ===== SPEL TAB ===== -->
+    <section id="screen-play" class="view-screen active">
+      <div id="game-wrap">
+        <div id="player-status-bar" class="player-status-bar" aria-label="Spelerstatus"></div>
+
+        <!-- Canvas Area -->
+        <div id="canvas-container">
+          <div id="playback-overlay" class="playback-overlay hidden">
+            <div class="playback-status-card">
+              <div id="playback-title" class="playback-title">Programma Klaar</div>
+              <div id="playback-text" class="playback-text">Alle spelers hebben hun kaarten gekozen.</div>
+            </div>
+            <button id="btn-start-execution" class="btn success playback-btn hidden" type="button">Play ▶</button>
+          </div>
+          <div id="board-frame" class="board-frame">
+            <canvas id="board-canvas"></canvas>
+          </div>
+        </div>
+
+        <!-- Programming Cards Panel -->
+        <div id="programming-panel">
+          <div class="registers-row">
+            <div class="register-slot" data-index="0"><span class="register-num">1</span></div>
+            <div class="register-slot" data-index="1"><span class="register-num">2</span></div>
+            <div class="register-slot" data-index="2"><span class="register-num">3</span></div>
+            <div class="register-slot" data-index="3"><span class="register-num">4</span></div>
+            <div class="register-slot" data-index="4"><span class="register-num">5</span></div>
+          </div>
+
+          <div id="program-board" class="program-board"></div>
+
+          <div id="cards-hand" class="cards-hand-wrap"></div>
+
+          <button id="btn-confirm-program" class="btn success below-cards-action hidden" type="button">Bevestig Programma</button>
+          <button id="btn-power-down" class="btn alt below-cards-action" type="button">Power Down Volgende Ronde</button>
+
+          <div id="upgrade-shop" class="upgrade-shop"></div>
+          <div id="turn-summary" class="program-info-card turn-summary-card"></div>
+
+          <!-- Hidden HUD fields kept for JS updates -->
+          <span id="hud-turn-player" class="hidden"></span>
+          <span id="hud-checkpoint" class="hidden"></span>
+          <span id="hud-hp" class="hidden"></span>
+          <span id="hud-energy" class="hidden"></span>
+          <span id="hud-register" class="hidden"></span>
+        </div>
+
+        <!-- Game Over / Win Overlay -->
+        <div id="game-over-overlay" class="hidden">
+          <div id="go-card" class="go-card">
+            <h2 id="go-title">FINISH!</h2>
+            <p id="go-stats">Statistieken</p>
+            <div class="go-actions">
+              <button id="btn-go-restart" class="btn success" type="button">Opnieuw Spelen</button>
+              <button id="btn-go-menu" class="btn alt" type="button">Kies Parcours</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="upgrade-choice-overlay" class="hidden">
+          <div class="upgrade-choice-card">
+            <div class="upgrade-choice-label">Upgrade Vakje</div>
+            <h2 id="upgrade-choice-title">Kies 1 upgrade</h2>
+            <p id="upgrade-choice-text">Je bent geeindigd op een upgrade-vakje. Kies 1 upgrade voor de rest van de game.</p>
+            <div id="upgrade-choice-list" class="upgrade-choice-list"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== PARCOURS TAB ===== -->
+    <section id="screen-courses" class="view-screen">
+      <div class="panel-scroll">
+        <div class="menu-page-head">
+          <button class="btn-back" type="button" data-menu-back aria-label="Terug">← Terug</button>
+          <h2>Parcours</h2>
+        </div>
+        <p style="color:var(--text-secondary);font-size:14px;">Elke sessie krijgt een random bord. Starts staan naast elkaar aan één rand. Sla op via het huisje.</p>
+        <div id="course-list" class="course-grid"></div>
+      </div>
+    </section>
+
+    <!-- ===== KARAKTER TAB ===== -->
+    <section id="screen-character" class="view-screen">
+      <div class="panel-scroll">
+        <div class="menu-page-head">
+          <button class="btn-back" type="button" data-menu-back aria-label="Terug">← Terug</button>
+          <h2>Robots Aanpassen</h2>
+        </div>
+        <p class="character-intro">Pas alleen het karakter aan van de speler die nu kaarten kiest.</p>
+        <div id="character-editor" class="glass-card">
+          <div id="player-tabs" class="player-tabs" aria-label="Speler aan de beurt"></div>
+
+          <div class="character-name-block">
+            <label class="menu-label" for="character-display-name">Naam</label>
+            <input id="character-display-name" class="input" maxlength="24" placeholder="Bijv. Bliksem Bot">
+          </div>
+
+          <div class="character-preview-wrap">
+            <canvas id="character-preview" width="240" height="200" aria-label="Robot preview"></canvas>
+            <p id="character-front-hint" class="character-front-hint">Speler 1 · de witte pijl wijst naar de voorkant</p>
+          </div>
+
+          <div class="menu-label" style="margin-top:14px;">Robot-stijl</div>
+          <div id="robot-style-grid" class="robot-style-grid"></div>
+
+          <div class="character-color-list" style="margin-top:14px;">
+            <div class="color-row">
+              <span>Kleur</span>
+              <div class="character-color-pick">
+                <span id="swatch-color" class="character-swatch"></span>
+                <span id="value-color" class="character-color-value">#00ffff</span>
+                <input type="color" id="color-primary" class="color-input" value="#00ffff" aria-label="Robotkleur">
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:16px;text-align:right;">
+            <button id="btn-reset-colors" class="btn alt" type="button">Reset deze speler</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== UITLEG TAB ===== -->
+    <section id="screen-help" class="view-screen">
+      <div class="panel-scroll">
+        <div class="menu-page-head">
+          <button class="btn-back" type="button" data-menu-back aria-label="Terug">← Terug</button>
+          <h2>Speluitleg RoboRally</h2>
+        </div>
+
+        <div class="help-stack">
+          <article class="glass-card help-card">
+            <h3 class="help-heading">Doel</h3>
+            <p>Bereik als eerste alle genummerde checkpoints (🚩1, 🚩2, …) in de juiste volgorde. Het aantal vlaggen (2–6) kies je bij het starten van een sessie.</p>
+          </article>
+
+          <article class="glass-card help-card">
+            <h3 class="help-heading">Spelers &amp; sessie</h3>
+            <p>Speel met 2–5 robots op één toestel (hotseat), of solo tegen de computer. Elke sessie krijgt een random bord; starts S1–Sn staan naast elkaar aan één rand.</p>
+            <ul class="help-list">
+              <li><strong>Moeilijkheid</strong> bepaalt hoeveel banden, muren, lasers, draaischijven, pits en upgrade-vakjes er liggen.</li>
+              <li>Sessie opslaan/laden via Home of het menu (huisje).</li>
+              <li>Namen, kleuren en robotstijl stel je in bij Karakter — alleen voor de speler die aan de beurt is.</li>
+            </ul>
+          </article>
+
+          <article class="glass-card help-card">
+            <h3 class="help-heading">Verloop van een ronde</h3>
+            <ol class="help-list help-list-ordered">
+              <li><strong>Doorgeven</strong> — De knop toont alleen de naam van de speler die mag programmeren. Kaarten blijven verborgen tot die speler op de knop drukt.</li>
+              <li><strong>Programmeren</strong> — Kies 5 kaarten voor de 5 registers. Bevestig als je klaar bent; daarna is de volgende speler aan de beurt.</li>
+              <li><strong>Play</strong> — Als iedereen klaar is, speelt de ronde af op het bord (registers 1→5).</li>
+              <li><strong>Prioriteit</strong> — Per register handelt eerst de robot met het hoogste kaartnummer (prioriteit).</li>
+            </ol>
+          </article>
+
+          <article class="glass-card help-card">
+            <h3 class="help-heading">Kaarten</h3>
+            <p>Standaard trek je 9 bewegingskaarten per ronde. Typische kaarten:</p>
+            <ul class="help-list">
+              <li><strong>MOVE 1 / 2 / 3</strong> — stappen vooruit</li>
+              <li><strong>BACK 1</strong> — één stap achteruit</li>
+              <li><strong>TURN L / R</strong> — 90° draaien</li>
+              <li><strong>U-TURN</strong> — 180° draaien</li>
+            </ul>
+            <p>Sommige upgrades voegen speciale kaarten toe (MOVE 4, BACK 2, zijwaarts).</p>
+          </article>
+
+          <article class="glass-card help-card">
+            <h3 class="help-heading">Schade, lives &amp; power down</h3>
+            <ul class="help-list">
+              <li>Robotlasers en boardlasers doen schade. Hoe meer schade, hoe minder kaarten je trekt.</li>
+              <li>Met weinig kaarten kunnen registers <strong>vast</strong> staan (niet meer te wijzigen).</li>
+              <li>De hartjes in de balk zijn je lives (bij sessie-aanmaak kies je 3–6). Bij vernietiging (pit) respawn je op je archive/start met 1 life minder.</li>
+              <li><strong>Power down</strong> — plan dit in; de volgende ronde programmeer je niet en herstel je volledig.</li>
+              <li>Je kunt <strong>niet van het bord vallen</strong>: de rand stopt je. In een <strong>pit</strong> vallen kan wel.</li>
+            </ul>
+          </article>
+
+          <article class="glass-card help-card">
+            <h3 class="help-heading">Bord-elementen</h3>
+            <ul class="help-list">
+              <li><strong>Lopende banden</strong> — Cyan = snelheid 1, magenta = snelheid 2 (express). Verplaatsen je na registers; bochten draaien je mee.</li>
+              <li><strong>Tandwielen</strong> — Draaien je 90° linksom of rechtsom.</li>
+              <li><strong>Muren</strong> — Blokkeren beweging en lasers (tenzij je Ghost hebt).</li>
+              <li><strong>Boardlasers</strong> — Schieten in een rechte lijn; raken doet schade.</li>
+              <li><strong>Pits</strong> — Vernietigen je robot meteen.</li>
+              <li><strong>Upgrade-vakjes</strong> — Eindig je erop, kies je 1 upgrade (max. 4 tegelijk).</li>
+              <li><strong>Checkpoints</strong> — Raak ze in volgorde om te winnen.</li>
+            </ul>
+          </article>
+
+          <article class="glass-card help-card">
+            <h3 class="help-heading">Statusbalk</h3>
+            <p>Boven het bord zie je per speler: kleur, behaalde vlaggen, lives (♥), upgrade-icoontjes en integrity (levensbalk). De upgrade-icoontjes hebben geen tekst — zie hieronder welk icoon bij welke upgrade hoort.</p>
+          </article>
+
+          <article class="glass-card help-card">
+            <h3 class="help-heading">Upgrades — icoontjes</h3>
+            <p class="help-lede">Eindig op een upgrade-vakje om te kiezen. Upgrades blijven de hele game actief. Maximaal 4 per robot. Schild, Geheugen, Repair Kit en Versterkt Romp mag je meerdere keren kiezen (effect stapelt). De rest maar één keer. Dit zijn dezelfde icoontjes als in de statusbalk:</p>
+            <div id="help-upgrade-list" class="help-upgrade-list"></div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== INSTELLINGEN TAB ===== -->
+    <section id="screen-settings" class="view-screen">
+      <div class="panel-scroll">
+        <div class="menu-page-head">
+          <button class="btn-back" type="button" data-menu-back aria-label="Terug">← Terug</button>
+          <h2>Instellingen</h2>
+        </div>
+        <div class="glass-card">
+          <div class="setting-row" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div>
+              <strong style="display:block;">Geluidseffecten</strong>
+              <span style="font-size:13px;color:var(--text-secondary);">Audio feedback tijdens stappen</span>
+            </div>
+            <button id="toggle-sound-settings" class="btn alt" type="button">Geluid: UIT</button>
+          </div>
+          <div class="setting-row" style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <strong style="display:block;">Geheugen Wissen</strong>
+              <span style="font-size:13px;color:var(--text-secondary);">Verwijder alle voortgang en sessies</span>
+            </div>
+            <button id="btn-reset-progress" class="btn danger" type="button">Reset Alles</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Menu dropdown (onderaan) -->
+  <div id="menu-scrim" class="menu-scrim hidden" aria-hidden="true"></div>
+  <div id="menu-popup" class="menu-popup" aria-hidden="true">
+    <button type="button" class="menu-popup-item" data-menu-page="courses">
+      <span class="mpi-icon">🏁</span>
+      <span>Parcoursen</span>
+    </button>
+    <button type="button" class="menu-popup-item" data-menu-page="help">
+      <span class="mpi-icon">❓</span>
+      <span>Uitleg</span>
+    </button>
+    <button type="button" class="menu-popup-item" data-menu-page="settings">
+      <span class="mpi-icon">⚙</span>
+      <span>Instellingen</span>
+    </button>
+  </div>
+
+  <!-- Bottom Navigatie -->
+  <nav class="bottom-nav" aria-label="Hoofdnavigatie">
+    <div class="bottom-nav-inner">
+      <button class="nav-item active" data-tab="play" type="button" aria-label="Spel">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"/></svg>
+      </button>
+      <button class="nav-item" data-tab="courses" type="button" aria-label="Parcoursen">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503-14.25c-4.498 0-8.997 1.5-13.496 0v15c4.499 1.5 8.998 0 13.496 0s8.997 1.5 13.496 0v-15c-4.499 1.5-8.998 0-13.496 0z"/></svg>
+      </button>
+      <button class="nav-item" data-tab="character" type="button" aria-label="Karakter">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+      </button>
+      <button class="nav-item" data-tab="start" type="button" aria-label="Startscherm">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg>
+      </button>
+      <button class="nav-item" data-tab="menu" type="button" aria-label="Menu">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Session Overlay -->
+  <div id="menu-overlay" class="hidden">
+    <div class="menu-card glass-card">
+      <h1>RobotRun</h1>
+      <p class="subtitle">Tactische robotrace — hotseat of P2P multiplayer</p>
+
+      <div id="menu-view-new" class="menu-view">
+        <h2 class="menu-view-title">Nieuwe Sessie</h2>
+        <div class="menu-field-stack">
+          <label class="menu-label">Speelwijze</label>
+          <div class="transport-toggle" role="group" aria-label="Speelwijze">
+            <button type="button" class="transport-btn active" data-transport="local" id="transport-local">1 toestel</button>
+            <button type="button" class="transport-btn" data-transport="p2p" id="transport-p2p">P2P</button>
+          </div>
+          <p id="session-transport-help" class="menu-helper">Op één toestel: om de beurt programmeren. Via P2P: iedereen tegelijk op eigen device.</p>
+
+          <div id="local-session-fields">
+            <label class="menu-label" for="session-player-count">Aantal spelers</label>
+            <select id="session-player-count" class="input">
+              <option value="1">1 speler tegen computer</option>
+              <option value="2" selected>2 spelers</option>
+              <option value="3">3 spelers</option>
+              <option value="4">4 spelers</option>
+              <option value="5">5 spelers</option>
+            </select>
+            <p id="session-player-help" class="menu-helper">2–5 spelers programmeren om de beurt. Stel namen, kleuren en robotjes in bij Karakter.</p>
+          </div>
+
+          <label class="menu-label" for="session-name">Sessie Naam</label>
+          <input id="session-name" class="input" placeholder="Bijv. Robot Cup 1">
+          <label class="menu-label" for="session-checkpoints">Aantal vlaggen</label>
+          <select id="session-checkpoints" class="input">
+            <option value="2">2 vlaggen</option>
+            <option value="3" selected>3 vlaggen</option>
+            <option value="4">4 vlaggen</option>
+            <option value="5">5 vlaggen</option>
+            <option value="6">6 vlaggen</option>
+          </select>
+          <p class="menu-helper">Hoeveel checkpoints (🚩) je in volgorde moet halen op het random bord.</p>
+          <label class="menu-label" for="session-lives">Aantal levens</label>
+          <select id="session-lives" class="input">
+            <option value="3" selected>3 levens</option>
+            <option value="4">4 levens</option>
+            <option value="5">5 levens</option>
+            <option value="6">6 levens</option>
+          </select>
+          <p class="menu-helper">Hoe vaak je mag respawnen na een pit (hartjes in de statusbalk).</p>
+          <label class="menu-label" for="session-difficulty">Moeilijkheid (alleen bord)</label>
+          <select id="session-difficulty" class="input">
+            <option value="easy">Easy — rustiger random bord</option>
+            <option value="normal" selected>Normal — standaard random bord</option>
+            <option value="hard">Hard — gevaarlijker random bord</option>
+          </select>
+          <p id="session-difficulty-help" class="menu-helper">Moeilijkheid bepaalt hoeveel lopende banden, muren, lasers en draaischijven het random bord krijgt.</p>
+        </div>
+        <div class="menu-actions">
+          <button id="btn-session-new-go" class="btn success" type="button">Start Game</button>
+          <button id="btn-session-p2p-lobby" class="btn alt" type="button">P2P lobby / join</button>
+        </div>
+      </div>
+
+      <div id="menu-view-p2p-lobby" class="menu-view hidden">
+        <h2 class="menu-view-title">P2P lobby</h2>
+
+        <div id="p2p-join-panel" class="menu-field-stack">
+          <p class="menu-helper">Join een bestaande lobby met code of QR-scan.</p>
+          <label class="menu-label" for="p2p-join-input">Kamercode</label>
+          <div class="share-actions">
+            <input id="p2p-join-input" class="input" maxlength="12" placeholder="CODE">
+            <button type="button" class="btn success" id="btn-p2p-join-code">Join</button>
+            <button type="button" class="btn alt" id="btn-p2p-scan-join">Scan QR</button>
+          </div>
+        </div>
+
+        <div id="p2p-lobby-panel" class="hidden">
+          <p id="p2p-conn-status" class="matrix-conn-status" aria-live="polite"></p>
+          <p id="p2p-lobby-you" class="menu-helper"></p>
+          <p id="p2p-lobby-status" class="menu-helper"></p>
+          <p id="p2p-lobby-counts" class="menu-helper"></p>
+          <ul id="p2p-seat-list" class="matrix-lobby-list"></ul>
+
+          <div id="p2p-host-controls" class="menu-field-stack">
+            <label class="menu-label">Deel uitnodiging</label>
+            <p class="menu-helper">Laat anderen scannen of open de link. Start als er genoeg spelers Ready zijn.</p>
+            <div class="invite-qr-wrap qr-canvas-wrap">
+              <canvas id="p2p-invite-qr" width="200" height="200"></canvas>
+            </div>
+            <div class="share-actions">
+              <button type="button" class="btn alt" id="btn-p2p-share-copy">Kopieer link</button>
+            </div>
+            <input id="p2p-share-link" class="input" readonly aria-label="Uitnodigingslink">
+            <button type="button" class="btn success" id="btn-p2p-start">Start race</button>
+          </div>
+
+          <div class="menu-actions">
+            <button type="button" class="btn success" id="btn-p2p-ready">Ready</button>
+            <button type="button" class="btn alt" id="btn-p2p-rejoin">Opnieuw verbinden</button>
+            <button type="button" class="btn alt" id="btn-p2p-leave-lobby">Lobby verlaten</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="menu-view-home" class="menu-view hidden">
+        <h2 class="menu-view-title">Home · Kies Sessie</h2>
+        <p class="menu-helper" style="margin-bottom:12px;">Laad een sessie om verder te spelen waar je was. Na een refresh kom je altijd hier.</p>
+        <div class="menu-field-stack">
+          <label class="menu-label" for="session-select">Selecteer Sessie</label>
+          <select id="session-select" class="input"></select>
+        </div>
+        <div class="menu-actions">
+          <button id="btn-session-home-go" class="btn success" type="button">Laad / Hervat</button>
+          <button id="btn-session-home-new" class="btn alt" type="button">Nieuw</button>
+        </div>
+      </div>
+
+      <div id="menu-view-pause" class="menu-view hidden">
+        <h2 id="pause-session-title" class="menu-view-title">Sessie</h2>
+        <p id="pause-session-meta" style="font-size:13px;color:var(--text-secondary);"></p>
+        <div class="menu-actions menu-actions-pause">
+          <button id="btn-session-resume" class="btn success" type="button">Hervatten</button>
+          <button id="btn-session-save" class="btn alt" type="button">Opslaan in Home</button>
+          <button id="btn-session-pause-new" class="btn alt" type="button">Nieuw</button>
+          <button id="btn-session-pause-load" class="btn alt" type="button">Laad</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" aria-hidden="true">
+    <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+    <span id="toast-text"></span>
+  </div>
+
+  <!-- JS Dependencies -->
+  <script src="js/config.js"></script>
+  <script src="js/upgrade-icons.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/toast.js"></script>
+  <script src="js/robot-draw.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/p2p-session.js"></script>
+  <script src="js/p2p-lobby.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/app-menu.js"></script>
+  <script src="js/character.js"></script>
+  <script src="js/robotrally-engine.js"></script>
+  <script src="js/robotrally-ai.js"></script>
+  <script src="js/robotrally-ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

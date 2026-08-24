@@ -1,0 +1,2602 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>D-BRIDGE // SYSTEM</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <style>
+        :root {
+            --bg: #020205;
+            --prim: #00f3ff;
+            --acc: #ff00ff;
+            --danger: #ff3333;
+            --succ: #71fa71;
+            --warn: #fafa7d;
+            --void: #102c27;
+            --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--prim);
+            font-family: var(--font);
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+            touch-action: none;
+            background: radial-gradient(circle at center, #051015 0%, #020205 100%);
+        }
+
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom) 20px;
+            box-sizing: border-box;
+        }
+
+        .hud-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            text-shadow: 0 0 10px var(--prim);
+            pointer-events: none;
+        }
+
+        .btn {
+            background: rgba(0, 243, 255, 0.05);
+            border: 1px solid var(--prim);
+            color: var(--prim);
+            padding: 10px 20px;
+            font-family: var(--mono);
+            cursor: pointer;
+            border-radius: 4px;
+            transition: 0.2s;
+            pointer-events: auto;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 14px;
+        }
+
+        .btn:hover,
+        .btn.active {
+            background: var(--prim);
+            color: #000;
+            box-shadow: 0 0 15px var(--prim);
+        }
+
+        .btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            box-shadow: none;
+            filter: grayscale(0.2);
+            background: rgba(255, 255, 255, 0.03);
+            border-color: rgba(255, 255, 255, 0.18);
+            color: rgba(255, 255, 255, 0.35);
+        }
+
+        .btn:disabled:hover {
+            background: rgba(255, 255, 255, 0.03);
+            border-color: rgba(255, 255, 255, 0.18);
+            color: rgba(255, 255, 255, 0.35);
+        }
+
+        .btn.danger {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .btn.danger:hover {
+            background: var(--danger);
+            color: #000;
+            box-shadow: 0 0 15px var(--danger);
+        }
+
+        #tool-road {
+            border-color: rgba(255, 255, 255, 0.65);
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        #tool-road:hover,
+        #tool-road.active {
+            background: rgba(255, 255, 255, 0.92);
+            color: #000;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.55);
+        }
+
+        #tool-wood {
+            border-color: rgba(113, 250, 113, 0.65);
+            color: rgba(113, 250, 113, 0.95);
+        }
+
+        #tool-wood:hover,
+        #tool-wood.active {
+            background: rgba(113, 250, 113, 0.92);
+            color: #000;
+            box-shadow: 0 0 15px rgba(113, 250, 113, 0.55);
+        }
+
+        #tool-cable {
+            border-color: rgba(0, 243, 255, 0.65);
+            color: rgba(0, 243, 255, 0.95);
+        }
+
+        #tool-cable:hover,
+        #tool-cable.active {
+            background: rgba(0, 243, 255, 0.92);
+            color: #000;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.55);
+        }
+
+        #stats {
+            display: flex;
+            gap: 20px;
+            font-size: 18px;
+        }
+
+        #cursor-hint {
+            position: absolute;
+            transform: translate(14px, -38px);
+            pointer-events: none;
+            font-family: var(--mono);
+            font-size: 12px;
+            padding: 6px 8px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            background: rgba(0, 0, 0, 0.55);
+            color: rgba(255, 255, 255, 0.88);
+            display: none;
+            white-space: nowrap;
+        }
+
+        .tool-bar {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            padding-bottom: 20px;
+        }
+
+        #bottom-bar {
+            pointer-events: auto;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            background: #0b0f14;
+            box-shadow: 0 0 26px rgba(0, 0, 0, 0.55);
+            padding: 10px;
+            margin-top: auto;
+        }
+
+        #msg-overlay {
+            position: relative;
+            margin-top: 8px;
+            align-self: center;
+            text-align: center;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        #msg-overlay h2 {
+            font-size: 3em;
+            margin: 0;
+            text-shadow: 0 0 20px var(--prim);
+        }
+
+        /* Scanline effect */
+        body::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 2;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        #menu {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.92);
+            z-index: 50;
+            padding: 24px;
+            box-sizing: border-box;
+            touch-action: pan-y;
+        }
+
+        #menu .card {
+            width: min(920px, 100%);
+            border: 1px solid rgba(0, 243, 255, 0.22);
+            border-radius: 14px;
+            background: rgba(0, 0, 0, 0.72);
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.12);
+            padding: 18px;
+            box-sizing: border-box;
+            text-align: center;
+            max-height: calc(100vh - 48px);
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        #menu h1 {
+            margin: 0 0 10px;
+            font-size: clamp(28px, 5vw, 52px);
+            color: var(--prim);
+            text-shadow: 0 0 30px rgba(0, 243, 255, 0.25);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        #menu .sub {
+            margin: 0 0 16px;
+            color: rgba(255, 255, 255, 0.78);
+            font-size: 14px;
+        }
+
+        .choices {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .choice {
+            width: 220px;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 243, 255, 0.25);
+            background: rgba(0, 243, 255, 0.06);
+            cursor: pointer;
+            transition: 0.15s;
+            user-select: none;
+            box-sizing: border-box;
+            pointer-events: auto;
+        }
+
+        .choice.active {
+            border-color: rgba(255, 0, 255, 0.65);
+            background: rgba(255, 0, 255, 0.08);
+            box-shadow: 0 0 22px rgba(255, 0, 255, 0.18);
+        }
+
+        .choice .name {
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            color: rgba(255, 255, 255, 0.92);
+            font-size: 13px;
+        }
+
+        .choice .meta {
+            font-size: 12px;
+            opacity: 0.82;
+            line-height: 1.4;
+        }
+
+        .menu-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 16px;
+            pointer-events: auto;
+        }
+
+        .btn.alt {
+            background: rgba(255, 0, 255, 0.14);
+            color: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(255, 0, 255, 0.75);
+        }
+
+        body.touch .btn {
+            padding: 10px 12px;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        body.touch #stats {
+            font-size: 14px;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        body.touch .tool-bar {
+            flex-wrap: nowrap;
+            justify-content: flex-start;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 10px;
+            gap: 8px;
+        }
+
+        body.touch .tool-bar .btn {
+            flex: 0 0 auto;
+        }
+
+        body.touch #ui {
+            padding: env(safe-area-inset-top) 10px calc(env(safe-area-inset-bottom) + 8px) 10px;
+        }
+
+        body.touch .hud-row {
+            padding: 10px 0;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        body.touch .hud-row > div:last-child {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .field {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 12px;
+            align-items: center;
+            pointer-events: auto;
+        }
+
+        .input {
+            width: min(360px, 100%);
+            box-sizing: border-box;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(0, 243, 255, 0.25);
+            background: rgba(0, 0, 0, 0.55);
+            color: rgba(255, 255, 255, 0.92);
+            font-family: var(--mono);
+            outline: none;
+        }
+
+        .input:focus {
+            border-color: rgba(255, 0, 255, 0.7);
+            box-shadow: 0 0 0 2px rgba(255, 0, 255, 0.18);
+        }
+
+        .toggle {
+            display: inline-flex;
+            gap: 10px;
+            align-items: center;
+            border: 1px solid rgba(0, 243, 255, 0.25);
+            background: rgba(0, 243, 255, 0.06);
+            border-radius: 999px;
+            padding: 8px 12px;
+            color: rgba(255, 255, 255, 0.85);
+            font-family: var(--mono);
+            font-size: 13px;
+            user-select: none;
+            cursor: pointer;
+        }
+
+        .toggle.active {
+            border-color: rgba(255, 0, 255, 0.65);
+            background: rgba(255, 0, 255, 0.08);
+        }
+
+        .modal {
+            position: absolute;
+            inset: 0;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 60;
+            padding: 18px;
+            box-sizing: border-box;
+        }
+
+        .modal.open {
+            display: flex;
+        }
+
+        .modal-card {
+            width: min(860px, 100%);
+            background: rgba(0, 0, 0, 0.92);
+            border: 1px solid rgba(255, 0, 255, 0.35);
+            border-radius: 14px;
+            box-shadow: 0 0 34px rgba(255, 0, 255, 0.18);
+            padding: 16px;
+            box-sizing: border-box;
+            color: rgba(255, 255, 255, 0.88);
+            pointer-events: auto;
+        }
+
+        .modal-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-head h2 {
+            margin: 0;
+            color: rgba(255, 0, 255, 0.92);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-size: 18px;
+        }
+
+        .modal-body {
+            margin-top: 12px;
+            font-size: 13px;
+            line-height: 1.55;
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .sliders {
+            margin: 14px 0 6px;
+            padding: 12px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            background: rgba(255, 255, 255, 0.03);
+            text-align: left;
+        }
+
+        .slider-row {
+            display: grid;
+            grid-template-columns: 160px 1fr 76px;
+            gap: 10px;
+            align-items: center;
+            margin: 10px 0;
+            font-family: var(--mono);
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.82);
+        }
+
+        .slider-row .val {
+            text-align: right;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .slider-row input[type="range"] {
+            width: 100%;
+        }
+
+        body.touch .slider-row {
+            grid-template-columns: 128px 1fr 68px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="c"></canvas>
+
+    <div id="ui">
+        <div class="hud-row">
+            <div id="stats">
+                <div id="level">LVL: 1</div>
+                <div id="budget">$: 1000</div>
+                <div id="stress" style="color: var(--warn)">STRESS: 0%</div>
+                <div id="beammax" style="opacity:0.85; display:none;"></div>
+            </div>
+            <div>
+                <button id="menu-btn" class="btn">MENU</button>
+                <button id="zoom-out" class="btn alt" aria-label="Zoom out">-</button>
+                <button id="zoom-in" class="btn alt" aria-label="Zoom in">+</button>
+                <button id="reset-btn" class="btn danger">REBOOT</button>
+            </div>
+        </div>
+
+        <div id="msg-overlay">
+            <h2 id="msg-text">just build</h2>
+        </div>
+
+        <div id="bottom-bar">
+            <div class="tool-bar hud-row" style="pointer-events: auto; padding: 0; justify-content: flex-start;">
+                <button id="tool-road" class="btn active">ROAD (20)</button>
+                <button id="tool-wood" class="btn">STRUT (10)</button>
+                <button id="tool-cable" class="btn">CABLE (15)</button>
+                <button id="tool-delete" class="btn danger" style="margin-left: 10px;">DELETE</button>
+                <div style="width: 14px;"></div>
+                <button id="test-btn" class="btn" style="border-color: var(--succ); color: var(--succ);">SIMULATE</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="cursor-hint"></div>
+
+    <div id="menu">
+        <div class="card">
+            <h1>D-BRIDGE</h1>
+            <div class="choices" id="choice-grid"></div>
+            <div id="menu-msg" style="margin: 10px 0 12px; color: rgba(255,255,255,0.85); font-size: 13px; display:none;"></div>
+            <div class="field">
+                <input id="username" class="input" maxlength="18" autocomplete="nickname" placeholder="Username (optional)" />
+                <div id="toggle-sound" class="toggle" role="button" tabindex="0" aria-pressed="false">Sound: OFF</div>
+            </div>
+            <div class="sliders" style="display:none">
+                <div class="slider-row">
+                    <div>CAR WEIGHT</div>
+                    <input id="slider-car-weight" type="range" min="0.5" max="3.0" step="0.05" value="1.0" />
+                    <div id="val-car-weight" class="val">1.00x</div>
+                </div>
+                <div class="slider-row">
+                    <div>BEAM WEIGHT</div>
+                    <input id="slider-beam-weight" type="range" min="0.000" max="0.030" step="0.001" value="0.012" />
+                    <div id="val-beam-weight" class="val">0.012</div>
+                </div>
+                <div class="slider-row">
+                    <div>BREAK</div>
+                    <input id="slider-break" type="range" min="0.50" max="2.00" step="0.05" value="1.00" />
+                    <div id="val-break" class="val">1.00x</div>
+                </div>
+                <div class="slider-row">
+                    <div>FLEX</div>
+                    <input id="slider-flex" type="range" min="0.70" max="1.80" step="0.05" value="1.00" />
+                    <div id="val-flex" class="val">1.00x</div>
+                </div>
+            </div>
+            <div class="menu-actions">
+                <button id="btn-start" class="btn" style="margin-top:0;">START</button>
+                <button id="btn-resume" class="btn" style="margin-top:0; display:none; border-color: var(--succ); color: var(--succ);">RESUME</button>
+                <button id="btn-save" class="btn alt" style="margin-top:0;">SAVE</button>
+                <button id="btn-load" class="btn alt" style="margin-top:0;">LOAD</button>
+                <button id="btn-rules" class="btn alt" style="margin-top:0;">RULES</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="rules-modal" class="modal" aria-hidden="true">
+        <div class="modal-card">
+            <div class="modal-head">
+                <h2>Rules</h2>
+                <button id="btn-rules-close" class="btn" style="margin-top:0;">Sluiten</button>
+            </div>
+            <div class="modal-body">
+                - Doel: bouw een brug en klik <b>Simulate</b> zodat de auto veilig oversteekt.<br>
+                - In <b>Build</b>: klik om nodes te plaatsen.<br>
+                - Desktop: sleep van node naar node om beams te maken.<br>
+                - Phone: tik een node, tik een tweede node om te verbinden.<br>
+                - Phone: sleep over lege ruimte om de camera te verschuiven (bij brede bruggen).<br>
+                - Elke beam kost <b>$</b>. Als je $ op is, kun je niet meer bouwen.<br>
+                - Met de <b>DELETE</b> tool klik je op beams of nodes om ze te verwijderen en $ terug te krijgen.<br>
+                - <b>Stress</b> te hoog = beams breken in simulate.<br>
+                - <b>Save</b> bewaart je build lokaal op dit device. <b>Load</b> toont je saved bridges.
+            </div>
+        </div>
+    </div>
+
+    <div id="load-modal" class="modal" aria-hidden="true">
+        <div class="modal-card">
+            <div class="modal-head">
+                <h2>Load</h2>
+                <div style="display:flex; gap:10px;">
+                    <button id="btn-forget" class="btn danger" style="margin-top:0;">FORGET</button>
+                    <button id="btn-load-close" class="btn" style="margin-top:0;">Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="choices" id="load-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * D-BRIDGE // CYBERNETIC BRIDGE BUILDER
+         * Physics-based structural simulation
+         */
+
+        const canvas = document.getElementById('c');
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        let gameState = 'menu';
+        const menuEl = document.getElementById('menu');
+        const choiceGridEl = document.getElementById('choice-grid');
+        const btnStart = document.getElementById('btn-start');
+        const btnResume = document.getElementById('btn-resume');
+        const btnRules = document.getElementById('btn-rules');
+        const rulesModal = document.getElementById('rules-modal');
+        const btnRulesClose = document.getElementById('btn-rules-close');
+        const loadModal = document.getElementById('load-modal');
+        const btnLoadClose = document.getElementById('btn-load-close');
+        const btnForget = document.getElementById('btn-forget');
+        const loadListEl = document.getElementById('load-list');
+        const menuBtn = document.getElementById('menu-btn');
+        const zoomOutBtn = document.getElementById('zoom-out');
+        const zoomInBtn = document.getElementById('zoom-in');
+        const resetBtn = document.getElementById('reset-btn');
+        const testBtn = document.getElementById('test-btn');
+        const btnSave = document.getElementById('btn-save');
+        const btnLoad = document.getElementById('btn-load');
+        const usernameInput = document.getElementById('username');
+        const toggleSound = document.getElementById('toggle-sound');
+        const menuMsgEl = document.getElementById('menu-msg');
+        const slidersWrap = document.querySelector('#menu .sliders');
+        const sliderCarWeight = document.getElementById('slider-car-weight');
+        const sliderBeamWeight = document.getElementById('slider-beam-weight');
+        const sliderBreak = document.getElementById('slider-break');
+        const sliderFlex = document.getElementById('slider-flex');
+        const valCarWeight = document.getElementById('val-car-weight');
+        const valBeamWeight = document.getElementById('val-beam-weight');
+        const valBreak = document.getElementById('val-break');
+        const valFlex = document.getElementById('val-flex');
+
+        let w, h, worldW, worldH;
+        const GAME_SLUG = 'D-Bridge';
+        const STORAGE_KEYS = {
+            username: `game:${GAME_SLUG}:username`,
+            settings: `game:${GAME_SLUG}:settings`,
+            save: `game:${GAME_SLUG}:save`,
+            saves: `game:${GAME_SLUG}:saves`
+        };
+
+        let hasStarted = false;
+        let isTouchMode = false;
+        let menuMode = 'main';
+        let soundEnabled = false;
+        let audioCtx = null;
+        let lastFrameTime = performance.now();
+        let simTime = 0;
+        const CFG = {
+            colors: {
+                bg: '#020205',
+                node: '#00f3ff',
+                fixed: '#ff00ff',
+                wood: '#71fa71',
+                cable: '#00f3ff',
+                road: '#ffffff',
+                land: '#102c27',
+                water: '#002288'
+            },
+            build: {
+                maxLen: { road: 130, wood: 140, cable: 240 },
+                minLen: 18,
+                snapRadius: 16
+            },
+            physics: {
+                gravity: 0.22,
+                friction: 0.98,
+                iterations: 10,
+                stressLimit: 0.2,
+                baseStressLimit: 0.2,
+                boundsPad: 120,
+                beamWeightPerPx: 0.012,
+                breakMul: 1,
+                flexibility: 1,
+                carWeightMul: 1
+            }
+        };
+
+        const PROFILES = [
+            { id: 'architect', name: 'Architect', budgetBonus: 250, stressLimit: 0.18, meta: 'Meer $.\nBudget + | Stress-tolerantie -' },
+            { id: 'engineer', name: 'Engineer', budgetBonus: 0, stressLimit: 0.2, meta: 'Gebalanceerd.\nBudget ~ | Stress-tolerantie ~' },
+            { id: 'hacker', name: 'Hacker', budgetBonus: -120, stressLimit: 0.24, meta: 'Sterkere beams.\nBudget - | Stress-tolerantie +' }
+        ];
+        let selectedProfile = PROFILES[1];
+
+        function getLevelDef(lvl) {
+            const n = Math.max(1, Math.floor(Number(lvl) || 1));
+            const gapBase = 170;
+            const gapStep = 55;
+            const gapPx = gapBase + (n - 1) * gapStep;
+            const wind = n < 4 ? 0 : Math.min(5.5, (n - 3) * 0.9);
+            const budgets = [40, 100, 120, 170, 200, 240];
+            const budget = n <= budgets.length ? budgets[n - 1] : (budgets[budgets.length - 1] + (n - budgets.length) * 40);
+            const carWeight = Math.min(12, 3.0 + (n - 1) * 0.55);
+            const carSpeed = 0.5 * Math.min(1.55, 0.85 + (n - 1) * 0.03);
+            const roadMaxLen = Math.max(55, 120 - (n - 1) * 6);
+            return {
+                budget,
+                carWeight,
+                carSpeed,
+                wind,
+                gapPx,
+                maxLen: { road: roadMaxLen }
+            };
+        }
+
+        function clamp01(v) {
+            return Math.max(0, Math.min(1, v));
+        }
+
+        function hexToRgb(hex) {
+            if (typeof hex !== 'string') return null;
+            const h = hex.trim();
+            if (!h.startsWith('#')) return null;
+            const raw = h.slice(1);
+            if (raw.length === 3) {
+                const r = parseInt(raw[0] + raw[0], 16);
+                const g = parseInt(raw[1] + raw[1], 16);
+                const b = parseInt(raw[2] + raw[2], 16);
+                if ([r, g, b].some(n => !Number.isFinite(n))) return null;
+                return [r, g, b];
+            }
+            if (raw.length === 6) {
+                const r = parseInt(raw.slice(0, 2), 16);
+                const g = parseInt(raw.slice(2, 4), 16);
+                const b = parseInt(raw.slice(4, 6), 16);
+                if ([r, g, b].some(n => !Number.isFinite(n))) return null;
+                return [r, g, b];
+            }
+            return null;
+        }
+
+        function mixRgb(a, b, t) {
+            const tt = clamp01(t);
+            return [
+                Math.round(a[0] + (b[0] - a[0]) * tt),
+                Math.round(a[1] + (b[1] - a[1]) * tt),
+                Math.round(a[2] + (b[2] - a[2]) * tt)
+            ];
+        }
+
+        function buildAnchorsForLevel(lvlDef, lvl) {
+            const anchors = [];
+            anchors.push({ x: lvlDef.leftX, y: lvlDef.groundLeftY, pier: false });
+            anchors.push({ x: lvlDef.rightX, y: lvlDef.groundRightY, pier: false });
+
+            return anchors;
+        }
+
+        // --- CLASSES ---
+
+        class Node {
+            constructor(x, y, fixed = false) {
+                this.pos = { x, y };
+                this.oldPos = { x, y };
+                this.origPos = { x, y };
+                this.fixed = fixed;
+                this.vel = { x: 0, y: 0 };
+                this.force = { x: 0, y: 0 };
+            }
+
+            addForce(fx, fy) {
+                this.force.x += fx;
+                this.force.y += fy;
+            }
+
+            save() {
+                this.origPos.x = this.pos.x;
+                this.origPos.y = this.pos.y;
+            }
+
+            restore() {
+                this.pos.x = this.origPos.x;
+                this.pos.y = this.origPos.y;
+                this.oldPos.x = this.pos.x;
+                this.oldPos.y = this.pos.y;
+            }
+
+            update(dt) {
+                if (this.fixed) return;
+
+                const vx = (this.pos.x - this.oldPos.x) * CFG.physics.friction;
+                const vy = (this.pos.y - this.oldPos.y) * CFG.physics.friction;
+
+                this.oldPos.x = this.pos.x;
+                this.oldPos.y = this.pos.y;
+
+                const fx = this.force.x;
+                const fy = this.force.y + CFG.physics.gravity;
+                this.force.x = 0;
+                this.force.y = 0;
+
+                this.pos.x += vx + fx;
+                this.pos.y += vy + fy;
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.pos.x, this.pos.y, this.fixed ? 5 : 3, 0, Math.PI * 2);
+                ctx.fillStyle = this.fixed ? CFG.colors.fixed : CFG.colors.node;
+                ctx.fill();
+                if (this.fixed) {
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+            }
+        }
+
+        class Beam {
+            constructor(n1, n2, type = 'wood') {
+                this.n1 = n1;
+                this.n2 = n2;
+                this.type = type;
+                this.length = Math.hypot(n2.pos.x - n1.pos.x, n2.pos.y - n1.pos.y);
+                this.stress = 0;
+                this.strain = 0;
+                this.dead = false;
+
+                const stats = {
+                    wood: { strength: 1, cost: 10, color: CFG.colors.wood, stiff: 0.72, maxLen: CFG.build.maxLen.wood, weight: 1.4 },
+                    cable: { strength: 1.5, cost: 15, color: CFG.colors.cable, cable: true, stiff: 0.84, maxLen: CFG.build.maxLen.cable, weight: 0.9 },
+                    road: { strength: 1.2, cost: 20, color: CFG.colors.road, road: true, stiff: 0.88, maxLen: CFG.build.maxLen.road, weight: 2.0 }
+                };
+                this.stats = stats[type];
+            }
+
+            relax() {
+                this.length = Math.hypot(this.n2.pos.x - this.n1.pos.x, this.n2.pos.y - this.n1.pos.y);
+                this.strain = 0;
+                this.stress = 0;
+                this.dead = false;
+            }
+
+            resolve() {
+                if (this.dead) return;
+                const dx = this.n2.pos.x - this.n1.pos.x;
+                const dy = this.n2.pos.y - this.n1.pos.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist < 0.0001) return;
+
+                this.strain = (dist - this.length) / this.length;
+                this.stress = Math.abs(this.strain);
+
+                const maxStrain = CFG.physics.stressLimit * this.stats.strength;
+                if (this.stress > maxStrain) {
+                    this.dead = true;
+                    return;
+                }
+
+                const diff = (this.length - dist) / dist;
+
+                // Cables only resist TENSION (dist > length)
+                if (this.stats.cable && dist < this.length) return;
+
+                const flex = Math.max(0.4, Number(CFG.physics.flexibility) || 1);
+                const k = this.stats.stiff / flex;
+                const offsetX = dx * diff * 0.5 * k;
+                const offsetY = dy * diff * 0.5 * k;
+
+                if (!this.n1.fixed) {
+                    this.n1.pos.x -= offsetX;
+                    this.n1.pos.y -= offsetY;
+                }
+                if (!this.n2.fixed) {
+                    this.n2.pos.x += offsetX;
+                    this.n2.pos.y += offsetY;
+                }
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.moveTo(this.n1.pos.x, this.n1.pos.y);
+                ctx.lineTo(this.n2.pos.x, this.n2.pos.y);
+
+                const maxStrain = CFG.physics.stressLimit * this.stats.strength;
+                const ratio = Math.min(1, Math.abs(this.strain) / maxStrain);
+                const hot = 0.68 + 0.32 * ratio;
+                const alpha = 0.18 + 0.82 * hot;
+                const core = 1 + ratio * (this.type === 'road' ? 2.5 : 2.0);
+
+                const base = hexToRgb(this.stats.color) || [245, 245, 245];
+                const t0 = (typeof G !== 'undefined' && G.mode === 'TEST') ? ratio : 0;
+                const t = Math.pow(Math.max(0, Math.min(1, t0)), 0.22);
+                const warn = [255, 200, 60];
+                const danger = [255, 60, 60];
+                const rgb = t < 0.6 ? mixRgb(base, warn, t / 0.6) : mixRgb(warn, danger, (t - 0.6) / 0.4);
+                ctx.save();
+                ctx.shadowColor = `rgba(${danger[0]}, ${danger[1]}, ${danger[2]}, ${0.75 * t})`;
+                ctx.shadowBlur = 6 + 32 * t;
+                ctx.strokeStyle = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${Math.min(1, alpha + 0.15 * t)})`;
+                ctx.lineWidth = (this.type === 'road') ? (3 + core) : (2 + core * 0.75);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, vx, vy, life, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.life = life;
+                this.maxLife = life;
+                this.color = color;
+            }
+
+            update() {
+                this.vy += CFG.physics.gravity * 0.65;
+                this.vx *= 0.985;
+                this.vy *= 0.985;
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= 1;
+            }
+
+            draw() {
+                const t = Math.max(0, this.life / this.maxLife);
+                ctx.globalAlpha = 0.9 * t;
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x - 1.5, this.y - 1.5, 3, 3);
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        class Car {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                const lvlDef = G.currentLevel;
+                const leftX = (lvlDef && Number.isFinite(lvlDef.leftX)) ? lvlDef.leftX : (w * 0.35);
+                const startX = leftX - 70;
+                const gy = (typeof G !== 'undefined' && G.groundAtX) ? G.groundAtX(startX) : null;
+                this.pos = { x: startX, y: (gy ?? (h * 0.62)) - 12 };
+                this.vel = { x: 0, y: 0 };
+                this.active = true;
+                this.onBridge = false;
+                this.angle = 0;
+                if (!Number.isFinite(this.weight)) this.weight = 1.65;
+                if (!Number.isFinite(this.speed)) this.speed = 1.8;
+            }
+
+            update(dt) {
+                if (!this.active) return;
+
+                // Support from the ground (landmasses)
+                let onGround = false;
+                const lvlDef = G.currentLevel;
+                const leftX = (lvlDef && Number.isFinite(lvlDef.leftX)) ? lvlDef.leftX : (w * 0.35);
+                const rightX = (lvlDef && Number.isFinite(lvlDef.rightX)) ? lvlDef.rightX : (w * 0.65);
+                const groundRef = (lvlDef && Number.isFinite(lvlDef.groundLeftY) && Number.isFinite(lvlDef.groundRightY)) ? Math.max(lvlDef.groundLeftY, lvlDef.groundRightY) : (h * 0.72);
+                
+                // Allow some tolerance to enter/leave ground safely
+                if (this.pos.x <= leftX + 15 || this.pos.x >= rightX - 15) {
+                    const gy = (typeof G !== 'undefined' && G.groundAtX) ? G.groundAtX(this.pos.x) : null;
+                    const g = gy ?? groundRef;
+                    if (this.pos.y >= g - 12) {
+                        this.pos.y = g - 12;
+                        onGround = true;
+                    }
+                }
+
+                const snap = G.sampleRoadAtX(this.pos.x);
+                if (snap && snap.y < groundRef + 5) {
+                    this.onBridge = true;
+                    const targetY = snap.y - 12;
+                    this.pos.y = this.pos.y * 0.4 + targetY * 0.6;
+                    this.vel.y = 0;
+                    this.vel.x = this.speed;
+                    this.angle = snap.angle;
+                    G.applyCarLoad(snap, this.weight);
+                } else if (onGround) {
+                    this.onBridge = false;
+                    this.vel.y = 0;
+                    this.vel.x = this.speed;
+                    this.angle = 0;
+                } else {
+                    this.onBridge = false;
+                    this.vel.y += CFG.physics.gravity;
+                    this.vel.x *= 0.985;
+                    this.angle += this.vel.x * 0.1;
+                }
+
+                this.pos.x += this.vel.x;
+                this.pos.y += this.vel.y;
+
+                if (this.pos.y > h + 100) this.active = false;
+            }
+
+            draw() {
+                if (!this.active) return;
+                ctx.save();
+                ctx.translate(this.pos.x, this.pos.y);
+                ctx.rotate(this.angle);
+
+                // Cyber-Car Body
+                const hot = G.mode === 'TEST';
+                const neon = hot ? CFG.colors.node : 'rgba(255,255,255,0.22)';
+                const body = ctx.createLinearGradient(-22, 0, 22, 0);
+                body.addColorStop(0, 'rgba(5, 16, 21, 0.95)');
+                body.addColorStop(0.55, hot ? 'rgba(0, 243, 255, 0.22)' : 'rgba(255, 255, 255, 0.08)');
+                body.addColorStop(1, 'rgba(5, 16, 21, 0.95)');
+                ctx.fillStyle = body;
+                ctx.fillRect(-22, -11, 44, 12);
+                ctx.fillRect(-11, -20, 22, 9);
+
+                ctx.shadowColor = neon;
+                ctx.shadowBlur = hot ? 14 : 8;
+                ctx.strokeStyle = neon;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(-22, -11, 44, 12);
+
+                ctx.shadowBlur = hot ? 18 : 10;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(-14, 0, 5.5, 0, Math.PI * 2);
+                ctx.arc(14, 0, 5.5, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                ctx.beginPath();
+                ctx.arc(-14, 0, 3.6, 0, Math.PI * 2);
+                ctx.arc(14, 0, 3.6, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Glow
+                ctx.shadowColor = neon;
+                ctx.shadowBlur = hot ? 22 : 10;
+                ctx.globalAlpha = hot ? 0.9 : 0.55;
+                ctx.strokeStyle = neon;
+                ctx.lineWidth = 1;
+                ctx.strokeRect(-24, -13, 48, 15);
+                ctx.globalAlpha = 1;
+
+                ctx.restore();
+            }
+
+            distToSegment(p, a, b) {
+                const l2 = Math.hypot(a.x - b.x, a.y - b.y) ** 2;
+                if (l2 === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+                let t = ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / l2;
+                t = Math.max(0, Math.min(1, t));
+                return Math.hypot(p.x - (a.x + t * (b.x - a.x)), p.y - (a.y + t * (b.y - a.y)));
+            }
+        }
+
+        // --- GAME ENGINE ---
+
+        const G = {
+            nodes: [],
+            beams: [],
+            car: null,
+            mode: 'BUILD', // BUILD, TEST
+            selectedTool: 'road',
+            budget: 1000,
+            lvl: 1,
+            maxStress: 0,
+            particles: [],
+            savedBeams: [],
+            levelStartBudget: 0,
+            simStartMs: 0,
+            panDrag: null,
+            camera: { x: 0, y: 0, scale: 1 },
+
+            // Interaction
+            dragStart: null,
+            touchLinkStart: null,
+            touchDownPos: null,
+            touchDownTime: 0,
+            mouseNode: null,
+            mousePos: { x: 0, y: 0 },
+            mouseScreenPos: { x: 0, y: 0 },
+            activePointers: new Map(),
+            pinch: null,
+
+            relaxAllBeams() {
+                for (const b of this.beams) {
+                    if (!b) continue;
+                    b.relax();
+                }
+                this.maxStress = 0;
+                this.updateUI();
+            },
+
+            applyCarConfig() {
+                if (!this.car) return;
+                const lvlDef = this.currentLevel || getLevelDef(1);
+                const cw = Math.max(0.2, Number(CFG.physics.carWeightMul) || 1);
+                this.car.weight = (Number(lvlDef.carWeight) || 1) * cw;
+                this.car.speed = (Number(lvlDef.carSpeed) || 1);
+            },
+
+            fail(msg) {
+                this.showMsg(msg || "FAILURE");
+                beep(160, 140, 0.05);
+                this.mode = 'BUILD';
+                const btn = document.getElementById('test-btn');
+                if (btn) btn.innerText = 'SIMULATE';
+                simTime = 0;
+                this.restoreState();
+            },
+
+            init() {
+                this.car = new Car();
+                this.resize();
+                this.setupLevel();
+                this.loop();
+            },
+
+            screenToWorld(sx, sy) {
+                const cam = this.camera || { x: w * 0.5, y: h * 0.5, scale: 1 };
+                const s = Math.max(0.25, Number(cam.scale) || 1);
+                return {
+                    x: (sx - w * 0.5) / s + cam.x,
+                    y: (sy - h * 0.5) / s + cam.y
+                };
+            },
+
+            getWaterY() {
+                return h * 0.7;
+            },
+
+            getWaterlineScreenY() {
+                const cam = this.camera || { x: w * 0.5, y: h * 0.5, scale: 1 };
+                const s = Math.max(0.25, Number(cam.scale) || 1);
+                const waterY = this.getWaterY();
+                return (waterY - cam.y) * s + h * 0.5;
+            },
+
+            setZoomAt(sx, sy, newScale) {
+                const cam = this.camera || { x: w * 0.5, y: h * 0.5, scale: 1 };
+                const oldS = Math.max(0.25, Number(cam.scale) || 1);
+                const ns = Math.max(0.5, Math.min(2.5, Number(newScale) || oldS));
+                if (Math.abs(ns - oldS) < 0.0001) return;
+                const wx = (sx - w * 0.5) / oldS + cam.x;
+                const wy = (sy - h * 0.5) / oldS + cam.y;
+                cam.scale = ns;
+                cam.x = wx - (sx - w * 0.5) / ns;
+                cam.y = wy - (sy - h * 0.5) / ns;
+                this.camera = cam;
+                this.clampCamera();
+            },
+
+            zoomBy(factor, sx = w * 0.5, sy = null) {
+                const cam = this.camera || { x: w * 0.5, y: h * 0.5, scale: 1 };
+                const oldS = Math.max(0.25, Number(cam.scale) || 1);
+                const f = Math.max(0.5, Math.min(2.0, Number(factor) || 1));
+                const anchorSy = (sy === null || typeof sy === 'undefined') ? this.getWaterlineScreenY() : sy;
+                this.setZoomAt(sx, anchorSy, oldS * f);
+            },
+
+            clampCamera() {
+                const cam = this.camera || { x: w * 0.5, y: h * 0.5, scale: 1 };
+                const s = Math.max(0.25, Number(cam.scale) || 1);
+                const ww = Number.isFinite(worldW) && worldW > 0 ? worldW : w;
+                const wh = Number.isFinite(worldH) && worldH > 0 ? worldH : h;
+                const halfW = (w * 0.5) / s;
+                const halfH = (h * 0.5) / s;
+                cam.x = Math.max(halfW, Math.min(ww - halfW, cam.x));
+                cam.y = Math.max(halfH, Math.min(wh - halfH, cam.y));
+                this.camera = cam;
+            },
+
+            resize() {
+                const prevW = w;
+                const prevH = h;
+                w = window.innerWidth;
+                h = window.innerHeight;
+                canvas.width = w * dpr;
+                canvas.height = h * dpr;
+                canvas.style.width = w + 'px';
+                canvas.style.height = h + 'px';
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.scale(dpr, dpr);
+                if (prevW && prevH && this.nodes && this.nodes.length) {
+                    const sx = w / prevW;
+                    const sy = h / prevH;
+                    for (const n of this.nodes) {
+                        n.pos.x *= sx;
+                        n.pos.y *= sy;
+                        n.oldPos.x *= sx;
+                        n.oldPos.y *= sy;
+                        n.origPos.x *= sx;
+                        n.origPos.y *= sy;
+                    }
+                    if (this.car) {
+                        this.car.pos.x *= sx;
+                        this.car.pos.y *= sy;
+                    }
+                    if (this.camera) {
+                        this.camera.x *= sx;
+                        this.camera.y *= sy;
+                    }
+                }
+                worldH = h;
+                this.clampCamera();
+            },
+
+            setupLevel() {
+                this.nodes = [];
+                this.beams = [];
+                this.dragStart = null;
+                this.touchLinkStart = null;
+                this.particles = [];
+                const baseDef = getLevelDef(this.lvl);
+                const gapPx = Math.max(120, Math.min(2600, Number(baseDef.gapPx || 0)));
+                const margin = 220;
+                worldW = Math.max(w, gapPx + margin * 2);
+                worldH = h;
+                const centerX = worldW * 0.5;
+                const leftX = centerX - gapPx * 0.5;
+                const rightX = centerX + gapPx * 0.5;
+                const groundBaseY = h * 0.62;
+                const groundDiff = this.lvl <= 1 ? 0 : Math.min(140, 18 + (this.lvl - 2) * 10);
+                const tilt = (this.lvl % 2 === 0) ? 1 : -1;
+                const groundLeftY = Math.max(h * 0.45, Math.min(h * 0.88, groundBaseY - tilt * groundDiff * 0.5));
+                const groundRightY = Math.max(h * 0.45, Math.min(h * 0.88, groundBaseY + tilt * groundDiff * 0.5));
+                let lvlDef = {
+                    ...baseDef,
+                    gapPx,
+                    leftX,
+                    rightX,
+                    groundLeftY,
+                    groundRightY
+                };
+                this.currentLevel = lvlDef;
+                this.budget = (lvlDef.budget + (selectedProfile?.budgetBonus ?? 0));
+                this.levelStartBudget = this.budget;
+                this.simStartMs = 0;
+                this.panDrag = null;
+                this.camera = { x: worldW * 0.5, y: h * 0.5, scale: 1 };
+                this.car.reset();
+                this.applyCarConfig();
+                this.updateUI();
+
+                const anchors = buildAnchorsForLevel(lvlDef, this.lvl);
+                lvlDef = {
+                    ...lvlDef,
+                    piers: anchors.filter(a => a.pier).map(a => ({ x: a.x }))
+                };
+                this.currentLevel = lvlDef;
+
+                for (const a of anchors) {
+                    this.nodes.push(new Node(a.x, a.y, true));
+                }
+                this.clampCamera();
+            },
+
+            updateUI() {
+                document.getElementById('level').innerText = `LVL: ${this.lvl}`;
+                document.getElementById('budget').innerText = `$: ${this.budget}`;
+                document.getElementById('stress').innerText = `STRESS: ${Math.floor(this.maxStress * 100)}%`;
+                document.getElementById('stress').style.color = this.maxStress > 0.8 ? 'var(--danger)' : (this.maxStress > 0.5 ? 'var(--warn)' : 'var(--succ)');
+                const mx = (this.selectedTool === 'delete') ? '--' : this.getMaxLen(this.selectedTool);
+                const el = document.getElementById('beammax');
+                if (el) el.textContent = '';
+                this.updateToolButtons();
+            },
+
+            updateToolButtons() {
+                const costs = { road: 20, wood: 10, cable: 15 };
+                for (const t of ['road', 'wood', 'cable']) {
+                    const btn = document.getElementById(`tool-${t}`);
+                    if (!btn) continue;
+                    const disabled = (this.budget < costs[t]) && (this.selectedTool !== t);
+                    btn.disabled = disabled;
+                    btn.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+                }
+                const delBtn = document.getElementById('tool-delete');
+                if (delBtn) {
+                    delBtn.disabled = false;
+                    delBtn.setAttribute('aria-disabled', 'false');
+                }
+            },
+
+            getMaxLen(type) {
+                if (type === 'delete') return Infinity;
+                const lvlMax = this.currentLevel?.maxLen?.[type];
+                if (Number.isFinite(lvlMax) && lvlMax > 0) return lvlMax;
+                return (CFG.build.maxLen[type] ?? 160);
+            },
+
+            findNodeNear(x, y, radius = 15) {
+                const r = radius;
+                for (const n of this.nodes) {
+                    if (Math.hypot(n.pos.x - x, n.pos.y - y) < r) return n;
+                }
+                return null;
+            },
+
+            findBeamNear(x, y, padding = 10) {
+                let bestBeam = null;
+                let minDist = padding;
+                for (const b of this.beams) {
+                    const d = this.distToSegment({ x, y }, b.n1.pos, b.n2.pos);
+                    if (d < minDist) {
+                        minDist = d;
+                        bestBeam = b;
+                    }
+                }
+                return bestBeam;
+            },
+
+            distToSegment(p, a, b) {
+                const l2 = Math.hypot(a.x - b.x, a.y - b.y) ** 2;
+                if (l2 === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+                let t = ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / l2;
+                t = Math.max(0, Math.min(1, t));
+                return Math.hypot(p.x - (a.x + t * (b.x - a.x)), p.y - (a.y + t * (b.y - a.y)));
+            },
+
+            createNode(x, y) {
+                const near = this.findNodeNear(x, y, CFG.build.snapRadius);
+                if (near) return near;
+                let ny = y;
+                const gy = this.groundAtX(x);
+                if (gy !== null && ny > gy - 6) ny = gy - 6;
+                const newNode = new Node(x, ny);
+                this.nodes.push(newNode);
+                return newNode;
+            },
+
+            tryConnect(n1, n2) {
+                if (!n1 || !n2 || n1 === n2) return false;
+                const beamType = this.selectedTool;
+                if (!['road', 'wood', 'cable'].includes(beamType)) return false;
+                const cost = { wood: 10, cable: 15, road: 20 }[beamType];
+                const dist = Math.hypot(n2.pos.x - n1.pos.x, n2.pos.y - n1.pos.y);
+                const maxLen = this.getMaxLen(beamType);
+                if (dist > maxLen) {
+                    this.showMsg(`MAX LENGTH ${maxLen}px`);
+                    beep(180, 110, 0.04);
+                    return false;
+                }
+                if (dist < CFG.build.minLen) {
+                    this.showMsg(`TOO SHORT`);
+                    beep(220, 90, 0.035);
+                    return false;
+                }
+                for (const b of this.beams) {
+                    if ((b.n1 === n1 && b.n2 === n2) || (b.n1 === n2 && b.n2 === n1)) {
+                        this.showMsg("ALREADY LINKED");
+                        beep(240, 45, 0.02);
+                        return false;
+                    }
+                }
+                if (this.budget < cost) {
+                    this.showMsg("INSUFFICIENT $");
+                    beep(220, 90, 0.035);
+                    return false;
+                }
+                const newBeam = new Beam(n1, n2, beamType);
+                this.beams.push(newBeam);
+                this.budget -= cost;
+                this.updateUI();
+                beep(660, 40, 0.03);
+                return true;
+            },
+
+            clampWorld() {
+                const pad = CFG.physics.boundsPad;
+                const ww = Number.isFinite(worldW) && worldW > 0 ? worldW : w;
+                const wh = Number.isFinite(worldH) && worldH > 0 ? worldH : h;
+                for (const n of this.nodes) {
+                    if (n.fixed) continue;
+                    n.pos.x = Math.max(-pad, Math.min(ww + pad, n.pos.x));
+                    n.pos.y = Math.max(-pad, Math.min(wh + pad, n.pos.y));
+                }
+            },
+
+            groundAtX(x) {
+                const lvlDef = this.currentLevel;
+                if (!lvlDef) return null;
+                const leftX = Number.isFinite(lvlDef.leftX) ? lvlDef.leftX : null;
+                const rightX = Number.isFinite(lvlDef.rightX) ? lvlDef.rightX : null;
+                if (leftX === null || rightX === null) return null;
+                const leftY = Number.isFinite(lvlDef.groundLeftY) ? lvlDef.groundLeftY : null;
+                const rightY = Number.isFinite(lvlDef.groundRightY) ? lvlDef.groundRightY : null;
+                if (leftY === null || rightY === null) return null;
+                if (x <= leftX) return leftY;
+                if (x >= rightX) return rightY;
+                return null;
+            },
+
+            clampToGround() {
+                const eps = 2;
+                for (const n of this.nodes) {
+                    if (n.fixed) continue;
+                    const gy = this.groundAtX(n.pos.x);
+                    if (gy === null) continue;
+                    if (n.pos.y > gy - eps) {
+                        n.pos.y = gy - eps;
+                        n.oldPos.y = n.pos.y;
+                    }
+                }
+            },
+
+            sampleRoadAtX(x) {
+                let best = null;
+                let bestD = 18;
+                for (const b of this.beams) {
+                    if (b.dead || b.type !== 'road') continue;
+                    const ax = b.n1.pos.x;
+                    const bx = b.n2.pos.x;
+                    const minx = Math.min(ax, bx) - 8;
+                    const maxx = Math.max(ax, bx) + 8;
+                    if (x < minx || x > maxx) continue;
+                    const l2 = (ax - bx) * (ax - bx) + (b.n1.pos.y - b.n2.pos.y) * (b.n1.pos.y - b.n2.pos.y);
+                    if (l2 < 0.0001) continue;
+                    let t = ((x - ax) * (bx - ax) + (this.car.pos.y - b.n1.pos.y) * (b.n2.pos.y - b.n1.pos.y)) / l2;
+                    t = Math.max(0, Math.min(1, t));
+                    const y = b.n1.pos.y + (b.n2.pos.y - b.n1.pos.y) * t;
+                    const dx = ax + (bx - ax) * t - x;
+                    const dy = y - this.car.pos.y;
+                    const d = Math.hypot(dx, dy);
+                    if (d < bestD) {
+                        bestD = d;
+                        best = { beam: b, t, x, y, angle: Math.atan2(b.n2.pos.y - b.n1.pos.y, b.n2.pos.x - b.n1.pos.x) };
+                    }
+                }
+                return best;
+            },
+
+            applyCarLoad(snap, weight) {
+                if (!snap || !snap.beam) return;
+                const b = snap.beam;
+                const t = snap.t;
+                const k = 1.35 * weight;
+                b.n1.addForce(0, k * (1 - t));
+                b.n2.addForce(0, k * t);
+            },
+
+            spawnBreakFx(b) {
+                const mx = (b.n1.pos.x + b.n2.pos.x) * 0.5;
+                const my = (b.n1.pos.y + b.n2.pos.y) * 0.5;
+                const base = b.type === 'road' ? 'rgba(255,255,255,0.95)' : (b.type === 'cable' ? 'rgba(0,243,255,0.95)' : 'rgba(113,250,113,0.95)');
+                const count = 12 + Math.floor(Math.random() * 10);
+                for (let i = 0; i < count; i++) {
+                    const a = (Math.random() * Math.PI * 2);
+                    const sp = 1.6 + Math.random() * 3.4;
+                    const vx = Math.cos(a) * sp;
+                    const vy = Math.sin(a) * sp - 2.2;
+                    this.particles.push(new Particle(mx, my, vx, vy, 24 + Math.floor(Math.random() * 16), base));
+                }
+                beep(140 + Math.random() * 60, 70, 0.035);
+            },
+
+            stepPhysics() {
+                this.maxStress = 0;
+                const lvlDef = this.currentLevel || getLevelDef(1);
+                if (lvlDef.wind) {
+                    const wv = Math.sin(simTime * 0.012) * lvlDef.wind;
+                    for (const n of this.nodes) {
+                        if (n.fixed) continue;
+                        n.addForce(wv * 0.04, 0);
+                    }
+                }
+                const wK = CFG.physics.beamWeightPerPx || 0;
+                if (wK > 0) {
+                    for (const b of this.beams) {
+                        if (!b || b.dead) continue;
+                        const bw = (b.stats?.weight ?? 0);
+                        if (bw <= 0) continue;
+                        const load = bw * b.length * wK;
+                        if (!Number.isFinite(load) || load <= 0) continue;
+                        b.n1.addForce(0, load * 0.5);
+                        b.n2.addForce(0, load * 0.5);
+                    }
+                }
+                for (const n of this.nodes) n.update(1);
+                this.clampWorld();
+                this.clampToGround();
+
+                for (let i = 0; i < CFG.physics.iterations; i++) {
+                    for (const b of this.beams) {
+                        b.resolve();
+                        const denom = (CFG.physics.stressLimit * b.stats.strength) || 1;
+                        const r = b.stress / denom;
+                        if (r > this.maxStress) this.maxStress = r;
+                    }
+                    this.clampWorld();
+                    this.clampToGround();
+                }
+
+                let anyBroken = false;
+                for (const b of this.beams) {
+                    if (!b.dead) continue;
+                    anyBroken = true;
+                    this.spawnBreakFx(b);
+                }
+                if (anyBroken) {
+                    this.beams = this.beams.filter(b => !b.dead);
+                    if (this.mode === 'TEST') this.fail("STRUCTURE FAILURE");
+                }
+            },
+
+            update() {
+                if (gameState !== 'playing') return;
+                if (this.mode === 'TEST') {
+                    simTime += 1;
+                    for (let s = 0; s < 2; s++) {
+                        if (this.mode !== 'TEST') break;
+                        this.car.update();
+                        if (this.mode !== 'TEST') break;
+                        this.stepPhysics();
+                    }
+                    this.updateUI();
+
+                    const lvlDef = this.currentLevel;
+                    const rightX = (lvlDef && Number.isFinite(lvlDef.rightX)) ? lvlDef.rightX : (w * 0.65);
+                    if (this.car.pos.x > rightX + 30 && this.car.active && !this.car.onBridge) {
+                        this.win();
+                    } else if (!this.car.active) {
+                        this.fail("FAILURE");
+                    }
+                }
+            },
+
+            saveState() {
+                this.nodes.forEach(n => n.save());
+                this.savedBeams = JSON.parse(JSON.stringify(this.beams.map(b => ({
+                    n1Idx: this.nodes.indexOf(b.n1),
+                    n2Idx: this.nodes.indexOf(b.n2),
+                    type: b.type
+                }))));
+            },
+
+            restoreState() {
+                this.nodes.forEach(n => n.restore());
+                // Reconstruct beams from index mappings to restore connections
+                this.beams = this.savedBeams.map(sb => new Beam(this.nodes[sb.n1Idx], this.nodes[sb.n2Idx], sb.type));
+                this.car.reset();
+                this.applyCarConfig();
+                this.maxStress = 0;
+                this.updateUI();
+            },
+
+            exportSave() {
+                const ww = (Number.isFinite(worldW) && worldW > 0) ? worldW : w;
+                const wh = (Number.isFinite(worldH) && worldH > 0) ? worldH : h;
+                return {
+                    v: 2,
+                    t: Date.now(),
+                    viewport: { w, h },
+                    world: { w: ww, h: wh },
+                    profileId: selectedProfile?.id ?? 'engineer',
+                    lvl: this.lvl,
+                    budget: this.budget,
+                    levelStartBudget: this.levelStartBudget,
+                    selectedTool: this.selectedTool,
+                    camera: this.camera ? {
+                        x: (this.camera.x || 0) / ww,
+                        y: (this.camera.y || 0) / wh,
+                        scale: Number(this.camera.scale) || 1
+                    } : null,
+                    nodes: this.nodes.map(n => ({
+                        x: n.pos.x / ww,
+                        y: n.pos.y / wh,
+                        fixed: Boolean(n.fixed)
+                    })),
+                    beams: this.beams.map(b => ({
+                        n1: this.nodes.indexOf(b.n1),
+                        n2: this.nodes.indexOf(b.n2),
+                        type: b.type
+                    }))
+                };
+            },
+
+            importSave(save) {
+                if (!save || !Array.isArray(save.nodes) || !Array.isArray(save.beams)) return false;
+                const profileId = String(save.profileId || 'engineer');
+                const p = PROFILES.find(pp => pp.id === profileId) || PROFILES[1];
+                selectedProfile = p;
+                applyProfile();
+                if (choiceGridEl && choiceGridEl.children.length) selectProfile(p.id);
+
+                const lvl = Math.max(1, Number(save.lvl) || 1);
+                const budget = Math.max(0, Number(save.budget) || 0);
+                this.lvl = lvl;
+                this.budget = budget;
+                this.levelStartBudget = Math.max(0, Number(save.levelStartBudget) || 0);
+                this.selectedTool = ['road', 'wood', 'cable', 'delete'].includes(save.selectedTool) ? save.selectedTool : 'road';
+                this.mode = 'BUILD';
+                if (testBtn) testBtn.innerText = 'SIMULATE';
+
+                const baseDef = getLevelDef(this.lvl);
+                const gapPx = Math.max(120, Math.min(2600, Number(baseDef.gapPx || 0)));
+                const margin = 220;
+                worldW = Math.max(w, gapPx + margin * 2);
+                worldH = h;
+                const centerX = worldW * 0.5;
+                const leftX = centerX - gapPx * 0.5;
+                const rightX = centerX + gapPx * 0.5;
+                const groundBaseY = h * 0.62;
+                const groundDiff = this.lvl <= 1 ? 0 : Math.min(140, 18 + (this.lvl - 2) * 10);
+                const tilt = (this.lvl % 2 === 0) ? 1 : -1;
+                const groundLeftY = Math.max(h * 0.45, Math.min(h * 0.88, groundBaseY - tilt * groundDiff * 0.5));
+                const groundRightY = Math.max(h * 0.45, Math.min(h * 0.88, groundBaseY + tilt * groundDiff * 0.5));
+                let lvlDef = {
+                    ...baseDef,
+                    gapPx,
+                    leftX,
+                    rightX,
+                    groundLeftY,
+                    groundRightY
+                };
+                const anchors = buildAnchorsForLevel(lvlDef, this.lvl);
+                lvlDef = {
+                    ...lvlDef,
+                    piers: anchors.filter(a => a.pier).map(a => ({ x: a.x }))
+                };
+                this.currentLevel = lvlDef;
+                if (!Number.isFinite(this.levelStartBudget) || this.levelStartBudget <= 0) {
+                    this.levelStartBudget = (lvlDef.budget + (selectedProfile?.budgetBonus ?? 0));
+                }
+                const ww = (Number.isFinite(worldW) && worldW > 0) ? worldW : w;
+                const wh = (Number.isFinite(worldH) && worldH > 0) ? worldH : h;
+
+                this.nodes = save.nodes.map(n => {
+                    const nx = clamp01(Number(n.x) || 0);
+                    const ny = clamp01(Number(n.y) || 0);
+                    return new Node(nx * ww, ny * wh, Boolean(n.fixed));
+                });
+
+                const beams = [];
+                for (const b of save.beams) {
+                    const i1 = Number(b.n1);
+                    const i2 = Number(b.n2);
+                    if (!Number.isInteger(i1) || !Number.isInteger(i2)) continue;
+                    if (!this.nodes[i1] || !this.nodes[i2]) continue;
+                    const type = ['road', 'wood', 'cable'].includes(b.type) ? b.type : 'wood';
+                    beams.push(new Beam(this.nodes[i1], this.nodes[i2], type));
+                }
+                this.beams = beams;
+
+                const cam = save.camera;
+                if (cam && Number.isFinite(Number(cam.x)) && Number.isFinite(Number(cam.y))) {
+                    this.camera = {
+                        x: clamp01(Number(cam.x) || 0) * ww,
+                        y: clamp01(Number(cam.y) || 0) * wh,
+                        scale: Math.max(0.5, Math.min(2.5, Number(cam.scale) || 1))
+                    };
+                } else if (!this.camera) {
+                    this.camera = { x: ww * 0.5, y: h * 0.5, scale: 1 };
+                } else {
+                    this.camera.x = ww * 0.5;
+                    this.camera.y = h * 0.5;
+                    this.camera.scale = 1;
+                }
+
+                this.dragStart = null;
+                this.touchLinkStart = null;
+                this.maxStress = 0;
+                this.car.reset();
+                this.applyCarConfig();
+                this.updateUI();
+                this.clampCamera();
+                return true;
+            },
+
+            win() {
+                this.mode = 'BUILD';
+                this.lvl++;
+                this.showMsg("SYSTEM OPTIMIZED");
+                beep(1040, 70, 0.035);
+                if (testBtn) testBtn.innerText = 'SIMULATE';
+
+                const bridgeCost = this.beams.reduce((sum, b) => sum + (b?.stats?.cost || 0), 0);
+                const used = Math.max(0, (this.levelStartBudget || 0) - this.budget);
+                const raw = (this.levelStartBudget || 1);
+                const ratio = Math.min(1, bridgeCost / raw);
+                let grade = ratio <= 0.32 ? 'S' : (ratio <= 0.48 ? 'A' : (ratio <= 0.66 ? 'B' : 'C'));
+                if (this.maxStress > 0.9 && grade === 'S') grade = 'A';
+                if (this.maxStress > 0.9 && grade === 'A') grade = 'B';
+
+                const elapsedS = this.simStartMs ? ((performance.now() - this.simStartMs) / 1000) : 0;
+                setMenuMessage(`GOOD ${grade} — COST ${bridgeCost} $ — USED ${used} — ${elapsedS.toFixed(1)}s — next level loading...`);
+                this.simStartMs = 0;
+                setTimeout(() => this.setupLevel(), 2000);
+            },
+
+            showMsg(txt) {
+                const el = document.getElementById('msg-overlay');
+                document.getElementById('msg-text').innerText = txt;
+                el.style.opacity = 1;
+                setTimeout(() => el.style.opacity = 0, 1500);
+                if (menuEl && menuEl.style.display !== 'none') {
+                    setMenuMessage(txt);
+                }
+            },
+
+            draw() {
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                ctx.clearRect(0, 0, w, h);
+
+                // Draw Environment
+                const groundY = h * 0.7;
+                const sky = ctx.createLinearGradient(0, 0, 0, groundY);
+                sky.addColorStop(0, 'rgba(5, 16, 21, 1)');
+                sky.addColorStop(0.65, 'rgba(2, 2, 5, 1)');
+                ctx.fillStyle = sky;
+                ctx.fillRect(0, 0, w, groundY);
+
+                const glowX = w * 0.5;
+                const glowY = groundY * 0.35;
+                const sun = ctx.createRadialGradient(glowX, glowY, 10, glowX, glowY, Math.max(w, h) * 0.6);
+                sun.addColorStop(0, 'rgba(0, 243, 255, 0.07)');
+                sun.addColorStop(0.35, 'rgba(255, 0, 255, 0.03)');
+                sun.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = sun;
+                ctx.fillRect(0, 0, w, groundY);
+
+                ctx.fillStyle = 'rgba(2, 2, 5, 1)';
+                ctx.fillRect(0, groundY, w, h - groundY);
+
+                const cam = this.camera || { x: w * 0.5, y: h * 0.5, scale: 1 };
+                const s = Math.max(0.25, Number(cam.scale) || 1);
+                ctx.setTransform(dpr * s, 0, 0, dpr * s, dpr * (w * 0.5 - cam.x * s), dpr * (h * 0.5 - cam.y * s));
+
+                const ww = (Number.isFinite(worldW) && worldW > 0) ? worldW : w;
+                const wh = (Number.isFinite(worldH) && worldH > 0) ? worldH : h;
+                const waterY = groundY;
+                const waterPad = 8000;
+                ctx.fillStyle = CFG.colors.water;
+                ctx.fillRect(-waterPad, waterY, ww + waterPad * 2, wh - waterY);
+
+                const wave = 0.5 + 0.5 * Math.sin(simTime * 0.02);
+                ctx.globalAlpha = 0.06 + 0.05 * wave;
+                ctx.fillStyle = 'rgba(0, 243, 255, 1)';
+                for (let x = -waterPad; x < ww + waterPad; x += 22) {
+                    ctx.fillRect(x, waterY + 18 + Math.sin((x + simTime * 1.4) * 0.03) * 2, 10, 1);
+                }
+                ctx.globalAlpha = 1;
+
+                ctx.fillStyle = CFG.colors.land;
+                ctx.beginPath();
+                const lvlDef = this.currentLevel;
+                const leftX = (lvlDef && Number.isFinite(lvlDef.leftX)) ? lvlDef.leftX : (w * 0.35);
+                const rightX = (lvlDef && Number.isFinite(lvlDef.rightX)) ? lvlDef.rightX : (w * 0.65);
+                const groundLeftY = (lvlDef && Number.isFinite(lvlDef.groundLeftY)) ? lvlDef.groundLeftY : groundY;
+                const groundRightY = (lvlDef && Number.isFinite(lvlDef.groundRightY)) ? lvlDef.groundRightY : groundY;
+                const landW = 8000;
+                ctx.rect(leftX - landW, groundLeftY, landW, h - groundLeftY);
+                ctx.rect(rightX, groundRightY, landW, h - groundRightY);
+                ctx.fill();
+
+                if (lvlDef && lvlDef.piers) {
+                    ctx.fillStyle = 'rgba(16, 44, 39, 0.88)';
+                    for (const p of lvlDef.piers) {
+                        const px = p.x;
+                        ctx.fillRect(px - 26, groundY, 52, h - groundY);
+                    }
+                }
+
+                // Draw Bridge
+                this.beams.forEach(b => b.draw());
+                this.nodes.forEach(n => n.draw());
+                this.car.draw();
+                for (const p of this.particles) p.draw();
+                this.particles = this.particles.filter(pp => (pp.update(), pp.life > 0));
+
+                // Construction helper
+                const helperStart = this.dragStart || this.touchLinkStart;
+                if (this.touchLinkStart) {
+                    ctx.beginPath();
+                    ctx.arc(this.touchLinkStart.pos.x, this.touchLinkStart.pos.y, 10, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 0, 255, 0.8)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+
+                if (helperStart) {
+                    const maxLen = this.getMaxLen(this.selectedTool);
+                    const segLen = Math.hypot(this.mousePos.x - helperStart.pos.x, this.mousePos.y - helperStart.pos.y);
+                    ctx.beginPath();
+                    ctx.moveTo(helperStart.pos.x, helperStart.pos.y);
+                    ctx.lineTo(this.mousePos.x, this.mousePos.y);
+                    ctx.strokeStyle = segLen > maxLen ? 'rgba(255, 60, 60, 0.9)' : 'rgba(255, 255, 255, 0.5)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([5, 5]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            },
+
+            loop(ts) {
+                const now = Number.isFinite(ts) ? ts : performance.now();
+                let dtMs = now - lastFrameTime;
+                if (!Number.isFinite(dtMs)) dtMs = 16.666;
+                dtMs = Math.min(80, Math.max(0, dtMs));
+                lastFrameTime = now;
+
+                const steps = Math.max(1, Math.min(5, Math.round(dtMs / 16.666)));
+                for (let i = 0; i < steps; i++) this.update();
+                this.draw();
+                requestAnimationFrame((t) => this.loop(t));
+            },
+
+            deleteNodeOrBeam(x, y) {
+                const node = this.findNodeNear(x, y, 15);
+                if (node && !node.fixed) {
+                    // Check if connected to any beams
+                    const connected = this.beams.some(b => b.n1 === node || b.n2 === node);
+                    if (!connected) {
+                        this.nodes = this.nodes.filter(n => n !== node);
+                        beep(240, 45, 0.02);
+                        return true;
+                    }
+                }
+                
+                const beam = this.findBeamNear(x, y, 12);
+                if (beam) {
+                    this.beams = this.beams.filter(b => b !== beam);
+                    this.budget += beam.stats.cost;
+                    this.updateUI();
+                    
+                    // Also delete any now-orphaned unfixed nodes
+                    for (let i = this.nodes.length - 1; i >= 0; i--) {
+                        const n = this.nodes[i];
+                        if (!n.fixed && !this.beams.some(b => b.n1 === n || b.n2 === n)) {
+                            this.nodes.splice(i, 1);
+                        }
+                    }
+                    
+                    beep(240, 45, 0.02);
+                    return true;
+                }
+                
+                return false;
+            },
+
+            handlePointer(e, type) {
+                if (gameState !== 'playing') return;
+                if (e.cancelable) e.preventDefault();
+                const rect = canvas.getBoundingClientRect();
+                const sx = e.clientX - rect.left;
+                const sy = e.clientY - rect.top;
+                this.mouseScreenPos = { x: sx, y: sy };
+                const wp = this.screenToWorld(sx, sy);
+                const x = wp.x;
+                const y = wp.y;
+                this.mousePos = { x, y };
+                const hint = document.getElementById('cursor-hint');
+                if (hint && (this.dragStart || this.touchLinkStart) && this.mode === 'BUILD') {
+                    const st = this.dragStart || this.touchLinkStart;
+                    const segLen = Math.hypot(x - st.pos.x, y - st.pos.y);
+                    const maxLen = this.getMaxLen(this.selectedTool);
+                    if (segLen > maxLen) {
+                        hint.style.left = sx + 'px';
+                        hint.style.top = sy + 'px';
+                        hint.style.display = 'block';
+                        hint.style.borderColor = 'rgba(255, 60, 60, 0.65)';
+                        hint.textContent = 'TOO LONG';
+                    } else {
+                        hint.style.display = 'none';
+                    }
+                } else if (hint) {
+                    hint.style.display = 'none';
+                }
+                if (this.mode !== 'BUILD') {
+                    if (type === 'up') {
+                        this.dragStart = null;
+                        this.touchDownPos = null;
+                        this.panDrag = null;
+                    }
+                    return;
+                }
+
+                if (this.selectedTool === 'delete') {
+                    if (type === 'down') {
+                        this.deleteNodeOrBeam(x, y);
+                    }
+                    return;
+                }
+
+                if (isTouchMode) {
+                    if (type === 'down') {
+                        try { canvas.setPointerCapture(e.pointerId); } catch { }
+                        this.activePointers.set(e.pointerId, { x: sx, y: sy });
+                        if (this.activePointers.size >= 2) {
+                            const ids = Array.from(this.activePointers.keys()).slice(0, 2);
+                            const p1 = this.activePointers.get(ids[0]);
+                            const p2 = this.activePointers.get(ids[1]);
+                            const dist = Math.hypot((p2?.x ?? 0) - (p1?.x ?? 0), (p2?.y ?? 0) - (p1?.y ?? 0));
+                            const cam = this.camera || { x: w * 0.5, y: h * 0.5, scale: 1 };
+                            const startScale = Math.max(0.25, Number(cam.scale) || 1);
+                            const midSx = ((p1?.x ?? sx) + (p2?.x ?? sx)) * 0.5;
+                            this.pinch = {
+                                id1: ids[0],
+                                id2: ids[1],
+                                startDist: Math.max(10, dist),
+                                startScale,
+                                anchorSx: midSx
+                            };
+                            this.touchDownPos = null;
+                            this.panDrag = null;
+                            this.dragStart = null;
+                            this.touchLinkStart = null;
+                            return;
+                        }
+                    }
+                    if (type === 'move') {
+                        if (this.activePointers.has(e.pointerId)) this.activePointers.set(e.pointerId, { x: sx, y: sy });
+                        if (this.pinch) {
+                            const p1 = this.activePointers.get(this.pinch.id1);
+                            const p2 = this.activePointers.get(this.pinch.id2);
+                            if (!p1 || !p2) return;
+                            const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                            const ratio = dist / Math.max(10, this.pinch.startDist);
+                            const newScale = this.pinch.startScale * ratio;
+                            const ns = Math.max(0.5, Math.min(2.5, newScale));
+                            const waterSy = this.getWaterlineScreenY();
+                            this.setZoomAt(Number(this.pinch.anchorSx) || (w * 0.5), waterSy, ns);
+                            return;
+                        }
+                    }
+                    if (type === 'up') {
+                        this.activePointers.delete(e.pointerId);
+                        if (this.pinch && (e.pointerId === this.pinch.id1 || e.pointerId === this.pinch.id2)) {
+                            this.pinch = null;
+                            this.touchDownPos = null;
+                            this.panDrag = null;
+                            return;
+                        }
+                    }
+                    if (type === 'down') {
+                        this.touchDownPos = { x: sx, y: sy };
+                        this.touchDownTime = performance.now();
+                        this.dragStart = null;
+                        const downOnNode = Boolean(this.findNodeNear(x, y, 18));
+                        this.panDrag = { startSx: sx, startSy: sy, startCamX: this.camera.x, startCamY: this.camera.y, active: false, allow: !downOnNode };
+                        return;
+                    }
+                    if (type === 'move') {
+                        if (!this.touchDownPos || !this.panDrag) return;
+                        if (!this.panDrag.allow) return;
+                        const dd = Math.hypot(sx - this.touchDownPos.x, sy - this.touchDownPos.y);
+                        if (!this.panDrag.active && dd > 12) {
+                            this.panDrag.active = true;
+                        }
+                        if (!this.panDrag.active) return;
+                        const cam = this.camera || { x: w * 0.5, y: h * 0.5, scale: 1 };
+                        const scale = Math.max(0.25, Number(cam.scale) || 1);
+                        cam.x = this.panDrag.startCamX - (sx - this.panDrag.startSx) / scale;
+                        cam.y = this.panDrag.startCamY - (sy - this.panDrag.startSy) / scale;
+                        this.camera = cam;
+                        this.clampCamera();
+                        return;
+                    }
+                    if (type !== 'up') return;
+                    if (!this.touchDownPos) return;
+                    const dist = Math.hypot(sx - this.touchDownPos.x, sy - this.touchDownPos.y);
+                    const wasPanning = Boolean(this.panDrag && this.panDrag.active);
+                    this.touchDownPos = null;
+                    this.panDrag = null;
+                    if (wasPanning) return;
+                    if (dist > 12) return;
+
+                    const tappedNode = this.findNodeNear(x, y, 18);
+                    if (tappedNode) {
+                        if (!this.touchLinkStart) {
+                            this.touchLinkStart = tappedNode;
+                            beep(520, 35, 0.02);
+                            return;
+                        }
+                        if (tappedNode === this.touchLinkStart) {
+                            this.touchLinkStart = null;
+                            beep(240, 35, 0.02);
+                            return;
+                        }
+                        this.tryConnect(this.touchLinkStart, tappedNode);
+                        this.touchLinkStart = tappedNode;
+                        return;
+                    }
+
+                    const newNode = this.createNode(x, y);
+                    if (this.touchLinkStart) {
+                        this.tryConnect(this.touchLinkStart, newNode);
+                    }
+                    this.touchLinkStart = newNode;
+                    return;
+                }
+
+                if (type === 'down') {
+                    this.touchLinkStart = null;
+                    this.mouseNode = this.findNodeNear(x, y, 15);
+                    if (this.mouseNode) {
+                        this.dragStart = this.mouseNode;
+                        return;
+                    }
+                    const newNode = this.createNode(x, y);
+                    this.dragStart = newNode;
+                    beep(520, 30, 0.02);
+                    return;
+                }
+
+                if (type === 'up') {
+                    if (this.dragStart) {
+                        const targetNode = this.findNodeNear(x, y, 15);
+                        if (targetNode && targetNode !== this.dragStart) {
+                            this.tryConnect(this.dragStart, targetNode);
+                        }
+                    }
+                    this.dragStart = null;
+                }
+            }
+        };
+
+        // --- UI HANDLERS ---
+        function safeJsonParse(str, fallback) {
+            try {
+                return JSON.parse(str);
+            } catch {
+                return fallback;
+            }
+        }
+
+        function readStorageJson(key, fallback) {
+            try {
+                const raw = localStorage.getItem(key);
+                if (!raw) return fallback;
+                return safeJsonParse(raw, fallback);
+            } catch {
+                return fallback;
+            }
+        }
+
+        function writeStorageJson(key, value) {
+            try {
+                localStorage.setItem(key, JSON.stringify(value));
+                return true;
+            } catch {
+                return false;
+            }
+        }
+
+        function readBridgeSaves() {
+            const list = readStorageJson(STORAGE_KEYS.saves, []);
+            if (!Array.isArray(list)) return [];
+            return list.filter(s => s && typeof s === 'object' && s.id && s.name && s.save);
+        }
+
+        function writeBridgeSaves(list) {
+            return writeStorageJson(STORAGE_KEYS.saves, Array.isArray(list) ? list : []);
+        }
+
+        function migrateLegacySaveIfNeeded() {
+            const existing = readBridgeSaves();
+            if (existing.length) return;
+            const legacy = readStorageJson(STORAGE_KEYS.save, null);
+            if (!legacy) return;
+            const entry = {
+                id: `legacy-${Date.now()}`,
+                name: 'Legacy Save',
+                t: Date.now(),
+                save: legacy
+            };
+            writeBridgeSaves([entry]);
+            try { localStorage.removeItem(STORAGE_KEYS.save); } catch { }
+        }
+
+        function formatTs(ts) {
+            const d = new Date(Number(ts) || 0);
+            if (Number.isNaN(d.getTime())) return '';
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            return `${y}-${m}-${day} ${hh}:${mm}`;
+        }
+
+        function forgetAllGameMemory() {
+            try {
+                const prefix = `game:${GAME_SLUG}:`;
+                const toRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const k = localStorage.key(i);
+                    if (k && k.startsWith(prefix)) toRemove.push(k);
+                }
+                for (const k of toRemove) localStorage.removeItem(k);
+            } catch { }
+        }
+
+        function renderLoadMenu() {
+            if (!loadListEl) return;
+            const saves = readBridgeSaves().sort((a, b) => (Number(b.t) || 0) - (Number(a.t) || 0));
+            loadListEl.innerHTML = '';
+            if (!saves.length) {
+                const empty = document.createElement('div');
+                empty.style.opacity = '0.82';
+                empty.textContent = 'No saved bridges yet. Press SAVE while building.';
+                loadListEl.appendChild(empty);
+                return;
+            }
+            for (const s of saves) {
+                const el = document.createElement('div');
+                el.className = 'choice';
+                const nm = document.createElement('div');
+                nm.className = 'name';
+                nm.textContent = s.name;
+                const meta = document.createElement('div');
+                meta.className = 'meta';
+                const lvl = Number(s?.save?.lvl) || 1;
+                const beams = Array.isArray(s?.save?.beams) ? s.save.beams.length : 0;
+                meta.textContent = `LVL ${lvl} • beams ${beams} • ${formatTs(s.t)}`;
+                el.appendChild(nm);
+                el.appendChild(meta);
+                el.addEventListener('click', () => {
+                    const ok = G.importSave(s.save);
+                    if (!ok) {
+                        setMenuMessage('Save is invalid or incompatible.');
+                        beep(160, 120, 0.05);
+                        return;
+                    }
+                    document.querySelectorAll('.tool-bar .btn').forEach(b => b.classList.remove('active'));
+                    const toolBtn = document.getElementById(`tool-${G.selectedTool}`);
+                    if (toolBtn) toolBtn.classList.add('active');
+                    hasStarted = true;
+                    setModal(loadModal, false);
+                    hideMenu();
+                    beep(740, 45, 0.03);
+                });
+                loadListEl.appendChild(el);
+            }
+        }
+
+        function recomputeStressLimit() {
+            const base = Number(CFG.physics.baseStressLimit);
+            const bm = Number.isFinite(base) && base > 0 ? base : 0.2;
+            const mul = Math.max(0.25, Number(CFG.physics.breakMul) || 1);
+            CFG.physics.stressLimit = Math.max(0.05, bm * mul);
+        }
+
+        function applyTuningToRuntime() {
+            if (!hasStarted || !G || !G.car) return;
+            const lvlDef = G.currentLevel || getLevelDef(G.lvl);
+            const cw = Math.max(0.2, Number(CFG.physics.carWeightMul) || 1);
+            G.car.weight = (lvlDef?.carWeight || 1) * cw;
+        }
+
+        function updateTuningUi() {
+            if (valCarWeight && sliderCarWeight) valCarWeight.textContent = `${Number(sliderCarWeight.value).toFixed(2)}x`;
+            if (valBeamWeight && sliderBeamWeight) valBeamWeight.textContent = `${Number(sliderBeamWeight.value).toFixed(3)}`;
+            if (valBreak && sliderBreak) valBreak.textContent = `${Number(sliderBreak.value).toFixed(2)}x`;
+            if (valFlex && sliderFlex) valFlex.textContent = `${Number(sliderFlex.value).toFixed(2)}x`;
+        }
+
+        function isZilver() {
+            return String(usernameInput?.value || '').trim() === 'Zilver';
+        }
+
+        function applyTuningAccess() {
+            const allow = isZilver();
+            if (slidersWrap) slidersWrap.style.display = allow ? '' : 'none';
+
+            if (!allow) {
+                CFG.physics.carWeightMul = 1;
+                CFG.physics.beamWeightPerPx = 0.012;
+                CFG.physics.breakMul = 1;
+                CFG.physics.flexibility = 1;
+                recomputeStressLimit();
+                if (sliderCarWeight) sliderCarWeight.value = '1';
+                if (sliderBeamWeight) sliderBeamWeight.value = '0.012';
+                if (sliderBreak) sliderBreak.value = '1';
+                if (sliderFlex) sliderFlex.value = '1';
+                updateTuningUi();
+                applyTuningToRuntime();
+                return;
+            }
+
+            const settings = readStorageJson(STORAGE_KEYS.settings, {
+                carWeightMul: 1,
+                beamWeightPerPx: CFG.physics.beamWeightPerPx,
+                breakMul: 1,
+                flexibility: 1
+            });
+            const cw = Math.max(0.2, Number(settings?.carWeightMul) || 1);
+            const bw = Math.max(0, Number(settings?.beamWeightPerPx));
+            const br = Math.max(0.25, Number(settings?.breakMul) || 1);
+            const fx = Math.max(0.4, Number(settings?.flexibility) || 1);
+            CFG.physics.carWeightMul = cw;
+            if (Number.isFinite(bw)) CFG.physics.beamWeightPerPx = bw;
+            CFG.physics.breakMul = br;
+            CFG.physics.flexibility = fx;
+            recomputeStressLimit();
+            if (sliderCarWeight) sliderCarWeight.value = String(cw);
+            if (sliderBeamWeight && Number.isFinite(bw)) sliderBeamWeight.value = String(bw);
+            if (sliderBreak) sliderBreak.value = String(br);
+            if (sliderFlex) sliderFlex.value = String(fx);
+            updateTuningUi();
+            applyTuningToRuntime();
+        }
+
+        function setMenuMessage(text) {
+            if (!menuMsgEl) return;
+            if (!text) {
+                menuMsgEl.style.display = 'none';
+                menuMsgEl.textContent = '';
+                return;
+            }
+            menuMsgEl.style.display = 'block';
+            menuMsgEl.textContent = text;
+        }
+
+        function ensureAudio() {
+            if (audioCtx) return audioCtx;
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return null;
+            audioCtx = new Ctx();
+            return audioCtx;
+        }
+
+        function beep(freq, durationMs, gainValue) {
+            if (!soundEnabled) return;
+            const ctxa = ensureAudio();
+            if (!ctxa) return;
+            if (ctxa.state === 'suspended') {
+                ctxa.resume().catch(() => { });
+            }
+            const osc = ctxa.createOscillator();
+            const gain = ctxa.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.value = gainValue;
+            osc.connect(gain);
+            gain.connect(ctxa.destination);
+            const now = ctxa.currentTime;
+            gain.gain.setValueAtTime(gainValue, now);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + durationMs / 1000);
+            osc.start(now);
+            osc.stop(now + durationMs / 1000);
+        }
+
+        function detectTouchMode() {
+            const params = new URLSearchParams(location.search);
+            if (params.has('desktop')) return false;
+            if (params.has('touch')) return true;
+            const touchCapable = (navigator.maxTouchPoints || 0) > 0 || 'ontouchstart' in window;
+            const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+            const small = Math.min(window.innerWidth, window.innerHeight) < 900;
+            return touchCapable && (coarse || small);
+        }
+
+        function applyMode() {
+            isTouchMode = detectTouchMode();
+            document.body.classList.toggle('touch', isTouchMode);
+        }
+
+        function loadPreferences() {
+            migrateLegacySaveIfNeeded();
+            const savedName = (() => {
+                try { return localStorage.getItem(STORAGE_KEYS.username) || ''; } catch { return ''; }
+            })();
+            if (usernameInput) usernameInput.value = savedName;
+
+            const settings = readStorageJson(STORAGE_KEYS.settings, {
+                soundEnabled: false,
+                carWeightMul: 1,
+                beamWeightPerPx: CFG.physics.beamWeightPerPx,
+                breakMul: 1,
+                flexibility: 1
+            });
+            soundEnabled = Boolean(settings?.soundEnabled);
+            if (toggleSound) {
+                toggleSound.classList.toggle('active', soundEnabled);
+                toggleSound.setAttribute('aria-pressed', soundEnabled ? 'true' : 'false');
+                toggleSound.textContent = `Sound: ${soundEnabled ? 'ON' : 'OFF'}`;
+            }
+            applyTuningAccess();
+        }
+
+        function setModal(el, open) {
+            if (open) el.classList.add('open');
+            else el.classList.remove('open');
+            el.setAttribute('aria-hidden', open ? 'false' : 'true');
+        }
+
+        function showMenu(mode = 'main') {
+            menuMode = mode;
+            gameState = 'menu';
+            menuEl.style.display = 'flex';
+            setModal(rulesModal, false);
+            if (btnResume) btnResume.style.display = hasStarted ? '' : 'none';
+            setMenuMessage('');
+        }
+
+        function hideMenu() {
+            gameState = 'playing';
+            menuEl.style.display = 'none';
+            setModal(rulesModal, false);
+            setMenuMessage('');
+        }
+
+        function selectProfile(id) {
+            selectedProfile = PROFILES.find(p => p.id === id) || PROFILES[1];
+            choiceGridEl.querySelectorAll('.choice').forEach(n => n.classList.toggle('active', n.dataset.id === selectedProfile.id));
+        }
+
+        function applyProfile() {
+            CFG.physics.baseStressLimit = selectedProfile.stressLimit;
+            recomputeStressLimit();
+        }
+
+        function startGame() {
+            applyProfile();
+            G.lvl = 1;
+            G.mode = 'BUILD';
+            document.getElementById('test-btn').innerText = 'SIMULATE';
+            G.selectedTool = 'road';
+            document.querySelectorAll('.tool-bar .btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tool-road').classList.add('active');
+            G.setupLevel();
+            G.showMsg("just build");
+            hasStarted = true;
+            if (btnResume) btnResume.style.display = hasStarted ? '' : 'none';
+            hideMenu();
+            beep(880, 60, 0.03);
+        }
+
+        function persistUsername() {
+            if (!usernameInput) return;
+            const raw = String(usernameInput.value || '').trim();
+            const value = raw.slice(0, 18);
+            usernameInput.value = value;
+            try {
+                localStorage.setItem(STORAGE_KEYS.username, value);
+            } catch { }
+        }
+
+        function persistSettings() {
+            writeStorageJson(STORAGE_KEYS.settings, {
+                soundEnabled,
+                carWeightMul: Number(CFG.physics.carWeightMul) || 1,
+                beamWeightPerPx: Number(CFG.physics.beamWeightPerPx) || 0,
+                breakMul: Number(CFG.physics.breakMul) || 1,
+                flexibility: Number(CFG.physics.flexibility) || 1
+            });
+        }
+
+        function saveGame() {
+            if (!hasStarted) {
+                setMenuMessage('Nothing to save yet. Press START first.');
+                beep(220, 90, 0.035);
+                return;
+            }
+            persistUsername();
+            persistSettings();
+            if (G && G.mode === 'TEST') {
+                G.mode = 'BUILD';
+                if (testBtn) testBtn.innerText = 'SIMULATE';
+                simTime = 0;
+                if (Array.isArray(G.savedBeams) && G.savedBeams.length) {
+                    G.restoreState();
+                }
+                G.simStartMs = 0;
+            }
+            const defaultName = `Bridge LVL ${G.lvl}`;
+            const nameRaw = window.prompt('Save name:', defaultName);
+            if (nameRaw === null) return;
+            const name = String(nameRaw || '').trim().slice(0, 40) || defaultName;
+            const saves = readBridgeSaves();
+            const entry = {
+                id: `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`,
+                name,
+                t: Date.now(),
+                save: G.exportSave()
+            };
+            saves.unshift(entry);
+            const ok = writeBridgeSaves(saves.slice(0, 50));
+            if (!ok) {
+                setMenuMessage('Save failed (storage blocked or full).');
+                beep(160, 120, 0.05);
+                return;
+            }
+            setMenuMessage(`Saved: ${name}`);
+            beep(740, 45, 0.03);
+        }
+
+        function loadGame() {
+            renderLoadMenu();
+            setModal(loadModal, true);
+        }
+
+        function initMenu() {
+            applyMode();
+            loadPreferences();
+            choiceGridEl.innerHTML = '';
+            for (const p of PROFILES) {
+                const el = document.createElement('div');
+                el.className = 'choice';
+                el.dataset.id = p.id;
+                const nm = document.createElement('div');
+                nm.className = 'name';
+                nm.textContent = p.name;
+                const meta = document.createElement('div');
+                meta.className = 'meta';
+                meta.innerHTML = p.meta.split('\n').join('<br>');
+                el.appendChild(nm);
+                el.appendChild(meta);
+                el.addEventListener('click', () => selectProfile(p.id));
+                choiceGridEl.appendChild(el);
+            }
+            selectProfile(selectedProfile.id);
+
+            btnRules.addEventListener('click', () => setModal(rulesModal, true));
+            btnRulesClose.addEventListener('click', () => setModal(rulesModal, false));
+            rulesModal.addEventListener('click', (e) => {
+                if (e.target === rulesModal) setModal(rulesModal, false);
+            });
+            if (btnLoadClose) btnLoadClose.addEventListener('click', () => setModal(loadModal, false));
+            if (btnResume) {
+                btnResume.addEventListener('click', () => {
+                    if (!hasStarted) return;
+                    hideMenu();
+                    beep(520, 35, 0.02);
+                });
+            }
+            if (btnForget) {
+                btnForget.addEventListener('click', () => {
+                    const ok = window.confirm('Forget everything? This deletes all saved bridges and settings on this device.');
+                    if (!ok) return;
+                    forgetAllGameMemory();
+                    location.reload();
+                });
+            }
+            if (loadModal) {
+                loadModal.addEventListener('click', (e) => {
+                    if (e.target === loadModal) setModal(loadModal, false);
+                });
+            }
+            btnStart.addEventListener('click', startGame);
+            if (btnSave) btnSave.addEventListener('click', saveGame);
+            if (btnLoad) btnLoad.addEventListener('click', loadGame);
+
+            if (usernameInput) {
+                usernameInput.addEventListener('input', () => {
+                    applyTuningAccess();
+                });
+                usernameInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        persistUsername();
+                        applyTuningAccess();
+                        usernameInput.blur();
+                        setMenuMessage('Username saved.');
+                        beep(660, 30, 0.02);
+                    }
+                });
+                usernameInput.addEventListener('blur', () => {
+                    persistUsername();
+                    applyTuningAccess();
+                });
+            }
+
+            if (toggleSound) {
+                const applySoundUi = () => {
+                    toggleSound.classList.toggle('active', soundEnabled);
+                    toggleSound.setAttribute('aria-pressed', soundEnabled ? 'true' : 'false');
+                    toggleSound.textContent = `Sound: ${soundEnabled ? 'ON' : 'OFF'}`;
+                };
+                const toggle = () => {
+                    ensureAudio();
+                    soundEnabled = !soundEnabled;
+                    persistSettings();
+                    applySoundUi();
+                    beep(soundEnabled ? 900 : 240, 50, 0.03);
+                };
+                toggleSound.addEventListener('click', toggle);
+                toggleSound.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') toggle();
+                });
+                applySoundUi();
+            }
+
+            const onTuningChange = () => {
+                if (!isZilver()) return;
+                if (sliderCarWeight) CFG.physics.carWeightMul = Math.max(0.2, Number(sliderCarWeight.value) || 1);
+                if (sliderBeamWeight) CFG.physics.beamWeightPerPx = Math.max(0, Number(sliderBeamWeight.value) || 0);
+                if (sliderBreak) CFG.physics.breakMul = Math.max(0.25, Number(sliderBreak.value) || 1);
+                if (sliderFlex) CFG.physics.flexibility = Math.max(0.4, Number(sliderFlex.value) || 1);
+                recomputeStressLimit();
+                updateTuningUi();
+                applyTuningToRuntime();
+                persistSettings();
+            };
+
+            const onTuningInput = () => {
+                if (!isZilver()) return;
+                if (sliderCarWeight) CFG.physics.carWeightMul = Math.max(0.2, Number(sliderCarWeight.value) || 1);
+                if (sliderBeamWeight) CFG.physics.beamWeightPerPx = Math.max(0, Number(sliderBeamWeight.value) || 0);
+                if (sliderBreak) CFG.physics.breakMul = Math.max(0.25, Number(sliderBreak.value) || 1);
+                if (sliderFlex) CFG.physics.flexibility = Math.max(0.4, Number(sliderFlex.value) || 1);
+                recomputeStressLimit();
+                updateTuningUi();
+                applyTuningToRuntime();
+            };
+
+            for (const el of [sliderCarWeight, sliderBeamWeight, sliderBreak, sliderFlex]) {
+                if (!el) continue;
+                el.addEventListener('input', onTuningInput);
+                el.addEventListener('change', onTuningChange);
+            }
+
+            menuBtn.addEventListener('click', () => {
+                showMenu('main');
+                beep(360, 40, 0.025);
+            });
+
+            setMenuMessage(isTouchMode ? 'Mode: PHONE (touch)' : 'Mode: DESKTOP');
+            showMenu('main');
+        }
+
+        window.addEventListener('resize', () => {
+            applyMode();
+            G.resize();
+        });
+
+        applyMode();
+        canvas.addEventListener('pointerdown', (e) => G.handlePointer(e, 'down'));
+        canvas.addEventListener('pointerup', (e) => G.handlePointer(e, 'up'));
+        canvas.addEventListener('pointercancel', (e) => G.handlePointer(e, 'up'));
+        canvas.addEventListener('pointermove', (e) => G.handlePointer(e, 'move'));
+
+        resetBtn.onclick = () => {
+            if (gameState !== 'playing') return;
+            G.mode = 'BUILD';
+            if (testBtn) testBtn.innerText = 'SIMULATE';
+            G.simStartMs = 0;
+            G.setupLevel();
+            G.showMsg("CORE REBOOTED");
+            beep(420, 40, 0.03);
+        };
+
+        if (zoomInBtn) {
+            zoomInBtn.addEventListener('click', () => {
+                if (gameState !== 'playing') return;
+                G.zoomBy(1.15);
+                beep(660, 20, 0.015);
+            });
+        }
+        if (zoomOutBtn) {
+            zoomOutBtn.addEventListener('click', () => {
+                if (gameState !== 'playing') return;
+                G.zoomBy(1 / 1.15);
+                beep(520, 20, 0.015);
+            });
+        }
+
+        testBtn.onclick = () => {
+            if (gameState !== 'playing') return;
+            if (G.mode === 'BUILD') {
+                G.relaxAllBeams();
+                simTime = 0;
+                G.mode = 'TEST';
+                testBtn.innerText = 'EDIT';
+                G.saveState();
+                G.simStartMs = performance.now();
+                beep(980, 40, 0.03);
+            } else {
+                G.mode = 'BUILD';
+                testBtn.innerText = 'SIMULATE';
+                G.restoreState();
+                G.simStartMs = 0;
+                beep(520, 35, 0.02);
+            }
+        };
+
+        // Tools
+        ['road', 'wood', 'cable', 'delete'].forEach(t => {
+            document.getElementById(`tool-${t}`).onclick = () => {
+                if (gameState !== 'playing') return;
+                G.selectedTool = t;
+                document.querySelectorAll('.tool-bar .btn').forEach(b => b.classList.remove('active'));
+                document.getElementById(`tool-${t}`).classList.add('active');
+                G.updateUI();
+            };
+        });
+
+        G.init();
+        initMenu();
+    </script>
+</body>
+
+</html>

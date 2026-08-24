@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>D-Game — Games</title>
+    <meta
+      name="description"
+      content="Sandbox voor simpele games met verschillende multiplayer-communicatie."
+    />
+    <link rel="stylesheet" href="css/site.css" />
+  </head>
+  <body>
+    <div class="app app-home">
+      <header class="header">
+        <h1 class="brand">D-Game</h1>
+        <p class="tagline">
+          Multiplayer-sandbox: simpele games, wisselende communicatie.
+        </p>
+      </header>
+
+      <main>
+        <p id="pref-hint" class="pref-hint"></p>
+        <section class="panel">
+          <h2>Spellen</h2>
+          <p class="lede">
+            Kies een spel. Multiplayer test je op het tabblad Netwerk (P2P).
+          </p>
+          <ul id="game-list" class="game-list"></ul>
+        </section>
+      </main>
+    </div>
+
+    <script type="module">
+      import { GAMES } from "./js/core/catalog.js";
+      import { getPreferredTransport, listTransportMeta } from "./js/core/prefs.js";
+      import { mountShellNav } from "./js/shell/nav.js";
+
+      mountShellNav({ active: "games", base: "" });
+
+      const pref = getPreferredTransport();
+      const meta = listTransportMeta().find((t) => t.id === pref);
+      document.getElementById("pref-hint").innerHTML =
+        `Multiplayer: <strong>${meta?.label || "P2P"}</strong> — test op Netwerk.`;
+
+      const list = document.getElementById("game-list");
+      list.innerHTML = GAMES.map(
+        (g) => `
+        <li>
+          <a href="${g.path}">
+            <strong>${g.title}</strong>
+            <span>${g.blurb}</span>
+            <span class="game-meta-line">${g.minPlayers}–${g.maxPlayers} spelers</span>
+          </a>
+        </li>`,
+      ).join("");
+    </script>
+  </body>
+</html>

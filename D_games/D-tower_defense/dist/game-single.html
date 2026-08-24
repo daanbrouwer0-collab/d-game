@@ -1,0 +1,1828 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>D_Tower</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<style>
+:root {
+    --bg: #020205;
+    --prim: #00f3ff;
+    --acc: #ff00ff;
+    --danger: #ff3333;
+    --succ: #71fa71;
+    --warn: #fafa7d;
+    --void: #102c27;
+    --font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+body {
+    margin: 0;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--prim);
+    font-family: var(--font);
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    touch-action: none;
+    overscroll-behavior: none;
+}
+
+canvas {
+    display: block;
+    touch-action: none;
+}
+
+#ui {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    box-sizing: border-box;
+}
+
+.hud-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    text-shadow: 0 0 10px var(--prim);
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent);
+    pointer-events: none;
+    font-size: clamp(10px, 3vw, 16px);
+    border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+}
+
+.hud-btm {
+    justify-content: center;
+    align-items: flex-end;
+    padding: 15px;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
+    pointer-events: none;
+}
+
+.btn-grp {
+    display: flex;
+    gap: 4px;
+    pointer-events: auto;
+    flex-wrap: wrap;
+    /* Changed to wrap for 2 rows */
+    justify-content: space-evenly;
+    width: 100%;
+}
+
+.btn {
+    background: rgba(0, 243, 255, 0.05);
+    border: 1px solid var(--prim);
+    color: var(--prim);
+    padding: 8px 2px;
+    font-family: var(--font);
+    cursor: pointer;
+    min-width: 0;
+    flex: 1 0 21%;
+    /* Approx 1/4 width */
+    text-align: center;
+    border-radius: 4px;
+    position: relative;
+    transition: 0.2s;
+    pointer-events: auto;
+    font-size: clamp(10px, 2.5vw, 13px);
+    -webkit-tap-highlight-color: transparent;
+    margin-bottom: 4px;
+    touch-action: manipulation;
+}
+
+.btn:hover,
+.btn.active {
+    background: var(--prim);
+    color: #000;
+    box-shadow: 0 0 15px var(--prim);
+}
+
+.btn .cost {
+    display: block;
+    font-size: 0.75em;
+    opacity: 0.8;
+    margin-top: 2px;
+}
+
+.reset-btn {
+    background: none;
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    font-family: var(--font);
+    padding: 4px 8px;
+    cursor: pointer;
+    pointer-events: auto;
+    font-size: 0.7em;
+    border-radius: 4px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.fs-btn {
+    display: none;
+}
+
+/* Verwijderd: Media query die knop verborg op touchscreens */
+#center-msg {
+    position: absolute;
+    top: 30%;
+    width: 100%;
+    text-align: center;
+    font-size: 1.5em;
+    pointer-events: none;
+    transition: opacity 0.5s;
+    opacity: 0;
+}
+
+#over {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 99;
+}
+
+#over h1 {
+    color: var(--danger);
+    font-size: clamp(2em, 8vw, 4em);
+    text-shadow: 0 0 30px var(--danger);
+    margin: 0;
+}
+
+#start-menu {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+
+#start-menu h1 {
+    color: var(--prim);
+    font-size: clamp(2em, 8vw, 4em);
+    text-shadow: 0 0 30px var(--prim);
+    margin: 0 0 30px 0;
+}
+
+.lvl-select-container {
+    width: 100%;
+    max-width: 500px;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+#lvl-dropdown {
+    background: rgba(0, 243, 255, 0.1);
+    border: 1px solid var(--prim);
+    color: var(--prim);
+    padding: 10px 20px;
+    font-family: var(--font);
+    font-size: 1.2em;
+    border-radius: 4px;
+    width: 100%;
+    cursor: pointer;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    text-align: center;
+}
+
+#lvl-dropdown:focus {
+    box-shadow: 0 0 15px var(--prim);
+    background: rgba(0, 243, 255, 0.2);
+}
+
+#lvl-dropdown option {
+    background: #000;
+    color: var(--prim);
+}
+
+/* Oude grid styles verwijderd */
+
+#over p {
+    font-size: clamp(1em, 4vw, 1.5em);
+    margin-bottom: 30px;
+}
+</style>
+</head>
+
+<body>
+    <canvas id="c"></canvas>
+    <div id="ui">
+        <div class="hud-row">
+            <div style="display:flex; gap:20px; align-items:center">
+                <div id="hp">HP: 100%</div>
+                <div id="money">$: 700</div>
+                <div id="t-points" style="color:var(--succ)">T: 0%</div>
+                <div id="wave">LVL: 1 - WAVE: 1</div>
+            </div>
+            <div style="display:flex; align-items:center">
+                <!-- FS button removed -->
+                <button id="sys-btn" class="reset-btn">SYSTEM</button>
+            </div>
+        </div>
+        <div id="center-msg"></div>
+        <div class="hud-row hud-btm">
+            <div class="btn-grp" id="build-menu"></div>
+        </div>
+    </div>
+
+    <div id="start-menu">
+        <h1>D-Tower</h1>
+        <div class="lvl-select-container">
+            <select id="lvl-dropdown">
+                <option value="1" selected>LEVEL 1</option>
+                <option value="2">LEVEL 2</option>
+                <option value="3">LEVEL 3</option>
+                <option value="4">LEVEL 4</option>
+                <option value="5">LEVEL 5</option>
+                <option value="6">LEVEL 6</option>
+                <option value="7">LEVEL 7</option>
+                <option value="8">LEVEL 8</option>
+                <option value="9">LEVEL 9</option>
+                <option value="10">LEVEL 10</option>
+                <option value="11">LEVEL 11</option>
+                <option value="12">LEVEL 12</option>
+                <option value="13">LEVEL 13</option>
+                <option value="14">LEVEL 14</option>
+                <option value="15">LEVEL 15</option>
+                <option value="16">LEVEL 16</option>
+                <option value="17">LEVEL 17</option>
+                <option value="18">LEVEL 18</option>
+                <option value="19">LEVEL 19</option>
+                <option value="20">LEVEL 20</option>
+            </select>
+        </div>
+        <button id="cont-btn" class="btn"
+            style="font-size:1.5em; padding: 15px 40px; width: auto; flex: none; display:none; margin-bottom:10px; border-color: #33ff33; color: #33ff33;">CONTINUE
+            SYSTEM</button>
+        <button id="start-game-btn" class="btn"
+            style="font-size:1.5em; padding: 15px 40px; width: auto; flex: none;">INITIATE SYSTEM</button>
+    </div>
+
+    <div id="over">
+        <h1>SYSTEM FAILURE</h1>
+        <p>Compromised at <span id="score"></span></p>
+    </div>
+
+<script>
+// --- COMPLETE CONFIGURATION (INSTELLINGEN) ---
+const CFG = {
+    // SYSTEEM INSTELLINGEN
+    SYS: {
+        mapCols: 9,      // Aantal kolommen (breedte kaart)
+        mapRows: 17,     // Aantal rijen (hoogte kaart)
+        hexSize: 22,     // Grootte van de zeshoekige tegels
+        maxWaves: 20,    // Totaal aantal waves om te winnen
+        startMoney: 700, // Start geld bij begin level/restart
+        lvlMoney: 10,    // Extra start geld per level (startMoney + lvl * lvlMoney)
+    },
+
+    // KLEUREN
+    COLORS: {
+        bg: '#020205',          // Achtergrondkleur
+        p: '#10f3ff',           // Primair (UI, Speler)
+        a: '#ff00ff',           // Accent
+        d: '#ff3333',           // Gevaar/Vijand
+        s: '#33ff33',           // Succes/Geld
+        w: '#ffff33',           // Waarschuwing/Sniper
+        v: '#0a0a14',           // Void/Donker
+        node: '#4a4a25',        // Donker voor resource nodes
+        water: '#002288',       // Water kleur
+        waterStroke: '#002255',  // Water rand
+        ruin: '#442222'         // Grijs voor ruin/obstakel
+    },
+
+    // KASTEEL (De basis die je moet beschermen)
+    CASTLE: {
+        hp: 20,             // Levenspunten van het kasteel
+        color: '#00f3ff'    // Kleur van het kasteel
+    },
+
+    // GOLF (WAVE) INSTELLINGEN (Binnen een level)
+    WAVE: {
+        time: 12,           // Tijd tussen waves in seconden
+        inc: {              // Toename per WAVE
+            spd: 0.0,       // Snelheid (+0 per wave)
+            rate: 0.06,     // Spawn snelheid (sneller spawnen: -0.05s per wave)
+            hp: 0.1,        // HP multiplier (+10% per wave)
+            dmg: 0.0        // Schade multiplier (+0% per wave)
+        }
+    },
+
+    // LEVEL INSTELLINGEN (Progressie tussen levels)
+    LEVEL: {
+        baseWater: 0.12,    // Basis kans op water (5%)
+        baseNode: 0.2,     // Basis kans op miner node (20%)
+        baseRuin: 0.05,     // Basis kans op ruin/obstakel (5%)
+        inc: {              // Toename per LEVEL
+            spd: 0.1,       // Snelheid (+5 per level)
+            rate: 0.01,      // Spawn snelheid (sneller spawnen: -0.1s per level)
+            hp: 0.01,        // HP multiplier (+50% per level)
+            dmg: 0.02,       // Schade multiplier (+20% per level)
+            water: -0.006,    // Water kans (+2% per level)
+            ruin: 0.02,       // Ruin kans (+2% per level)
+            node: -0.001        // Node kans (+1% per level)
+        }
+    },
+
+    // VIJANDEN SPAWN KANSEN (Vanaf welke wave en hoe vaak)
+    SPAWN: {
+        tankStart: 8, tankChance: 0.15,
+        kamiStart: 5, kamiChance: 0.3,
+        swarmStart: 3, swarmChance: 0.5,
+        baseRate: 2.0,      // Start tijd tussen vijanden (seconden)
+        minRate: 0.3,       // Minimum tijd tussen vijanden (sneller kan niet)
+        bottomBias: 0.5,      // Hoeveel keer vaker vijanden van onder komen
+        topBias: 2          // Hoeveel keer vaker vijanden van boven komen
+    },
+
+    // GEBOUWEN / TORENS
+    BUILDINGS: {
+        turret: {
+            name: 'Turret', desc: 'Snelvuur basis verdediging.',
+            cost: 100,      // Kosten
+            hp: 100,         // Levenspunten (kan kapot)
+            range: 90,      // Bereik
+            cd: 0.4,        // Cooldown (vuursnelheid: lager is sneller)
+            dmg: 30,         // Schade per schot
+            color: '#00f3ff'
+        },
+        sniper: {
+            name: 'Sniper', desc: 'Groot bereik, hoge schade.',
+            cost: 180, hp: 50, range: 180, cd: 1.5, dmg: 100, color: '#ffff33',
+            projSpeed: 1200 // Snelheid van de kogel
+        },
+        wall: {
+            name: 'Wall', desc: 'Sterke barrière met splash schade.',
+            cost: 160, hp: 1000, range: 40, cd: 1.0, dmg: 60, splash: 60, color: '#ff3333'
+        },
+        jam: {
+            name: 'Jammer', desc: 'Vertraagt vijanden.',
+            cost: 250, hp: 50, range: 150, cd: 0, dmg: 0, color: '#aa00ff',
+            slowFactor: 0.5 // Vijand snelheid x 0.5 (50% trager)
+        },
+        generator: {
+            name: 'Miner', desc: 'Genereert DATA. Heeft Node nodig.',
+            cost: 110, hp: 50, range: 0, cd: 2.0, amt: 4, color: '#33ff33', btnColor: '#ff9900'
+            // amt = hoeveelheid geld per keer
+        },
+        tech: {
+            name: 'Tech', desc: 'Genereert T-Points. Boost globale DMG.',
+            cost: 100, hp: 50, range: 0, cd: 7.0, amt: 1, color: '#33ff33', btnColor: '#ff9900',
+            dmgBoost: 0.1 // 10% extra schade per level van dit gebouw
+        },
+        fill: {
+            name: 'Fill', desc: 'Verandert WATER in LAND.',
+            cost: 100, hp: 0, range: 0, cd: 0, dmg: 0, color: '#3399ff', btnColor: '#3399ff'
+        },
+        heal: {
+            name: 'Heal', desc: 'Repareert gebouwen in de buurt.',
+            cost: 210, hp: 50, range: 80, cd: 1.0, amt: 5, color: '#50ff80'
+            // amt = hoeveelheid HP herstel
+        }
+    },
+
+    // UPGRADES
+    UPGRADE: {
+        costMult: 0.5,   // Kosten upgrade = basis kosten * 0.5 * huidig level
+        hpMult: 1.5,     // HP x 1.5 per level
+        dmgMult: 1.2,    // Schade x 1.2 per level
+        rangeMult: 1.1,  // Bereik x 1.1 per level
+        cdMult: 0.9      // Cooldown x 0.9 per level (sneller)
+    },
+
+    // PROJECTIELEN ALGEMEEN
+    PROJ: {
+        baseSpeed: 140,    // Standaard kogelsnelheid (was hardcoded 600)
+        sniperMult: 4.0    // Snelheid vermenigvuldiger voor sniper (1200 / 600 = 2)
+    },
+
+    // VIJANDEN
+    ENEMIES: {
+        drone: { hp: 80, spd: 50, val: 15, size: 12, color: '#ff00ff', force: 200, fly: true, dmg: 40, castleDmg: 1 },
+        tank: { hp: 300, spd: 20, val: 50, size: 24, color: '#ff9900', force: 100, fly: false, dmg: 30, castleDmg: 3 },
+        swarm: { hp: 40, spd: 50, val: 5, size: 8, color: '#6633ff', force: 300, count: 3, fly: true, dmg: 15, castleDmg: 1 },
+        kamikaze: { hp: 40, spd: 100, val: 25, size: 12, color: '#ff3333', force: 400, boom: 5, fly: true, dmg: 70, castleDmg: 2 }
+    }
+};
+
+// --- UTILS ---
+const $ = id => document.getElementById(id);
+const Rnd = (min, max) => Math.random() * (max - min) + min;
+
+// Axial Hex Coordinates
+class Hex {
+    constructor(q, r) { this.q = q; this.r = r; }
+    static add(a, b) { return new Hex(a.q + b.q, a.r + b.r); }
+    static sub(a, b) { return new Hex(a.q - b.q, a.r - b.r); }
+    static scale(a, k) { return new Hex(a.q * k, a.r * k); }
+    static neighbor(hex, dir) {
+        return Hex.add(hex, Hex.DIRS[dir]);
+    }
+    static dist(a, b) { return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2; }
+    static toPixel(hex, size) {
+        const x = size * (3 / 2 * hex.q);
+        const y = size * (Math.sqrt(3) / 2 * hex.q + Math.sqrt(3) * hex.r);
+        return new Vec(x, y);
+    }
+    static fromPixel(p, size) {
+        const q = (2 / 3 * p.x) / size;
+        const r = (-1 / 3 * p.x + Math.sqrt(3) / 3 * p.y) / size;
+        return Hex.round(q, r);
+    }
+    static fromPixelToTmp(p, size) {
+        const q = (2 / 3 * p.x) / size;
+        const r = (-1 / 3 * p.x + Math.sqrt(3) / 3 * p.y) / size;
+        return Hex.roundToTmp(q, r);
+    }
+    static round(q, r) {
+        let s = -q - r;
+        let rq = Math.round(q), rr = Math.round(r), rs = Math.round(s);
+        const q_diff = Math.abs(rq - q), r_diff = Math.abs(rr - r), s_diff = Math.abs(rs - s);
+        if (q_diff > r_diff && q_diff > s_diff) rq = -rr - rs;
+        else if (r_diff > s_diff) rr = -rq - rs;
+        return new Hex(rq, rr);
+    }
+    static roundToTmp(q, r) {
+        let s = -q - r;
+        let rq = Math.round(q), rr = Math.round(r), rs = Math.round(s);
+        const q_diff = Math.abs(rq - q), r_diff = Math.abs(rr - r), s_diff = Math.abs(rs - s);
+        if (q_diff > r_diff && q_diff > s_diff) rq = -rr - rs;
+        else if (r_diff > s_diff) rr = -rq - rs;
+        Hex.tmp.q = rq; Hex.tmp.r = rr;
+        return Hex.tmp;
+    }
+    static key(h) { return `${h.q},${h.r}`; }
+}
+Hex.DIRS = [new Hex(1, 0), new Hex(1, -1), new Hex(0, -1), new Hex(-1, 0), new Hex(-1, 1), new Hex(0, 1)];
+Hex.tmp = new Hex(0, 0);
+
+class Vec {
+    constructor(x, y) { this.x = x; this.y = y; }
+    add(v) { return new Vec(this.x + v.x, this.y + v.y); }
+    sub(v) { return new Vec(this.x - v.x, this.y - v.y); }
+    mult(s) { return new Vec(this.x * s, this.y * s); }
+    mag() { return Math.sqrt(this.x ** 2 + this.y ** 2); }
+    magSq() { return this.x ** 2 + this.y ** 2; }
+    norm() { const m = this.mag(); return m === 0 ? new Vec(0, 0) : new Vec(this.x / m, this.y / m); }
+    dist(v) { return Math.sqrt((this.x - v.x) ** 2 + (this.y - v.y) ** 2); }
+    distSq(v) { return (this.x - v.x) ** 2 + (this.y - v.y) ** 2; }
+    limit(m) { const ms = this.magSq(); return ms > m * m ? this.norm().mult(m) : this; }
+
+    // Mutable methods to reduce GC
+    addMut(v) { this.x += v.x; this.y += v.y; return this; }
+    subMut(v) { this.x -= v.x; this.y -= v.y; return this; }
+    multMut(s) { this.x *= s; this.y *= s; return this; }
+    normMut() { const m = this.mag(); if (m !== 0) { this.x /= m; this.y /= m; } else { this.x = 0; this.y = 0; } return this; }
+    limitMut(m) { const ms = this.magSq(); if (ms > m * m) { this.normMut().multMut(m); } return this; }
+    copy() { return new Vec(this.x, this.y); }
+    set(v) { this.x = v.x; this.y = v.y; return this; }
+    setXY(x, y) { this.x = x; this.y = y; return this; }
+}
+Vec.tmp1 = new Vec(0, 0);
+Vec.tmp2 = new Vec(0, 0);
+Vec.tmp3 = new Vec(0, 0);
+
+// --- OBJECT POOLING ---
+const Pool = {
+    particles: [],
+    projs: [],
+    units: [],
+    getPart(x, y, c, s, sz, l) {
+        let p = this.particles.pop() || new Particle(x, y, c, s, sz, l);
+        p.reset(x, y, c, s, sz, l);
+        return p;
+    },
+    recycle(p) { this.particles.push(p); },
+
+    getProj(x, y, t, type, lvl) {
+        let p = this.projs.pop() || new Proj(x, y, t, type, lvl);
+        p.reset(x, y, t, type, lvl);
+        return p;
+    },
+    recycleProj(p) { this.projs.push(p); },
+
+    getUnit(type, wave, lvl) {
+        let u = this.units.pop() || new Unit(type, wave, lvl);
+        u.reset(type, wave, lvl);
+        return u;
+    },
+    recycleUnit(u) { this.units.push(u); }
+};
+
+// --- ENGINE ---
+const cvs = $('c');
+const ctx = cvs.getContext('2d', { alpha: false });
+
+class Obj {
+    constructor(x, y) { this.pos = new Vec(x, y); this.dead = false; }
+    up(dt) { } draw(ctx) { }
+}
+
+class Particle extends Obj {
+    constructor(x, y, c, s, sz, l) {
+        super(x, y);
+        this.reset(x, y, c, s, sz, l);
+    }
+    reset(x, y, c, s, sz, l) {
+        this.pos.x = x; this.pos.y = y;
+        const a = Math.random() * 6.28;
+        if (this.vel) this.vel.setXY(Math.cos(a) * s, Math.sin(a) * s);
+        else this.vel = new Vec(Math.cos(a) * s, Math.sin(a) * s);
+        this.c = c; this.sz = sz; this.l = l; this.ml = l;
+    }
+    up(dt) {
+        Vec.tmp1.set(this.vel).multMut(dt * 60);
+        this.pos.addMut(Vec.tmp1);
+        this.l -= dt; this.sz *= 0.95;
+    }
+    draw(ctx) {
+        ctx.globalAlpha = Math.max(0, this.l / this.ml);
+        ctx.fillStyle = this.c;
+        ctx.fillRect(this.pos.x - this.sz, this.pos.y - this.sz, this.sz * 2, this.sz * 2);
+        ctx.globalAlpha = 1;
+    }
+}
+
+class Unit extends Obj {
+    constructor(type, wave, level) {
+        super(0, 0);
+        this.vel = new Vec(0, 0);
+        this.acc = new Vec(0, 0);
+        this.reset(type, wave, level);
+    }
+
+    reset(type, wave, level) {
+        this.dead = false;
+        const data = CFG.ENEMIES[type];
+        Object.assign(this, data);
+        this.type = type;
+
+        // Scale stats
+        const s = G.scale || 1;
+        this.spd *= s;
+        this.force *= s;
+        this.size *= s;
+
+        // Spawn at edge of hex map
+        const bBias = CFG.SPAWN.bottomBias || 1;
+        const tBias = CFG.SPAWN.topBias || 1;
+
+        const span = Math.PI * 0.5;
+        const wBottom = span * bBias;
+        const wTop = span * tBias;
+        const wOther = Math.PI;
+        const totalW = wBottom + wTop + wOther;
+
+        let rndW = Math.random() * totalW;
+        let angle;
+
+        if (rndW < wBottom) {
+            angle = (Math.PI * 0.25) + (rndW / wBottom) * span;
+        } else if (rndW < wBottom + wTop) {
+            let localR = (rndW - wBottom);
+            angle = (Math.PI * 1.25) + (localR / wTop) * span;
+        } else {
+            let localR = (rndW - wBottom - wTop);
+            if (localR < wOther / 2) {
+                angle = (Math.PI * 0.75) + (localR / (wOther / 2)) * (Math.PI * 0.5);
+            } else {
+                angle = (Math.PI * 1.75) + ((localR - wOther / 2) / (wOther / 2)) * (Math.PI * 0.5);
+            }
+        }
+
+        const maxDim = Math.max(CFG.SYS.mapCols, CFG.SYS.mapRows);
+        let r = (maxDim / 2 + 2) * CFG.SYS.hexSize * 1.7;
+
+        if (!this.pos) this.pos = new Vec(0, 0);
+        this.pos.x = (G.w / 2 + G.offX) + Math.cos(angle) * r;
+        this.pos.y = (G.h / 2 + G.offY) + Math.sin(angle) * r;
+
+        // HP Calculation
+        const hpMult = 1 + (wave * CFG.WAVE.inc.hp) + (level * CFG.LEVEL.inc.hp);
+        this.hp *= hpMult;
+
+        // Speed Calculation
+        const spdAdd = (wave * CFG.WAVE.inc.spd) + (level * CFG.LEVEL.inc.spd);
+        this.spd += spdAdd;
+
+        // Damage Calculation
+        const dmgMult = 1 + (wave * CFG.WAVE.inc.dmg) + (level * CFG.LEVEL.inc.dmg);
+        this.dmg *= dmgMult;
+        this.castleDmg *= dmgMult;
+
+        if (this.vel) { this.vel.x = 0; this.vel.y = 0; } else this.vel = new Vec(0, 0);
+        if (this.acc) { this.acc.x = 0; this.acc.y = 0; } else this.acc = new Vec(0, 0);
+        this.atkCd = 0;
+        this.slowed = 0;
+        this.angle = 0;
+    }
+
+    takeDmg(a) {
+        this.hp -= a;
+        if (this.hp <= 0) {
+            this.dead = true;
+            G.addMoney(this.val);
+            for (let i = 0; i < 3; i++) G.fx.push(Pool.getPart(this.pos.x, this.pos.y, this.color, Rnd(1, 3), 2, 0.4));
+        }
+    }
+
+    up(dt) {
+        this.atkCd -= dt;
+
+        let speed = this.spd;
+        let wobble = 15;
+        if (this.type === 'tank') wobble = 0;
+        if (this.slowed > 0) {
+            this.slowed -= dt;
+            speed *= 0.5;
+            if (this.type !== 'tank') wobble = 100;
+        }
+
+        // Attack logic
+        let target = null;
+        const rangeSq = (this.size + CFG.SYS.hexSize) ** 2;
+        for (let b of G.builds) {
+            if (this.pos.distSq(b.pos) < rangeSq) { target = b; break; }
+        }
+
+        if (target) {
+            this.vel.multMut(0);
+            if (this.type === 'kamikaze') { this.takeDmg(999); target.takeDmg(CFG.ENEMIES.kamikaze.boom); return; }
+            if (this.atkCd <= 0) {
+                target.takeDmg(this.dmg);
+                this.atkCd = 1.0;
+                G.fx.push(Pool.getPart(target.pos.x, target.pos.y, '#fff', 2, 2, 0.2));
+            }
+            return;
+        }
+
+        let goal = G.castle;
+
+        // Pathfinding
+        let desired = Vec.tmp1.setXY(0, 0);
+        if (this.fly) {
+            desired.set(goal.pos).subMut(this.pos).normMut().multMut(speed);
+        } else {
+            // Flow Field
+            if (G.center) Vec.tmp2.set(this.pos).subMut(G.center);
+            else Vec.tmp2.setXY(0, 0);
+
+            const h = Hex.fromPixelToTmp(Vec.tmp2, CFG.SYS.hexSize);
+            const key = Hex.key(h);
+            const flowVec = G.flow[key];
+
+            if (flowVec) {
+                desired.set(flowVec).multMut(speed);
+            } else {
+                desired.set(goal.pos).subMut(this.pos).normMut().multMut(speed);
+            }
+        }
+
+        // Steering
+        desired.subMut(this.vel).limitMut(this.force);
+        this.acc.addMut(desired);
+
+        // Separation
+        let sum = Vec.tmp2.setXY(0, 0);
+        let c = 0;
+
+        if (this._hexKey) {
+            const checkList = (list) => {
+                if (!list) return;
+                for (let o of list) {
+                    if (o === this || o.dead) continue;
+                    let d = this.pos.distSq(o.pos);
+                    if (d > 0 && d < (this.size * 2.5) ** 2) {
+                        Vec.tmp3.set(this.pos).subMut(o.pos).normMut();
+                        sum.addMut(Vec.tmp3);
+                        c++;
+                    }
+                }
+            };
+
+            checkList(G.spatial.get(this._hexKey));
+
+            const parts = this._hexKey.split(',');
+            const q = parseInt(parts[0]);
+            const r = parseInt(parts[1]);
+            const nDiffs = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+            for (let d of nDiffs) {
+                checkList(G.spatial.get(`${q + d[0]},${r + d[1]}`));
+            }
+        }
+
+        if (c > 0) {
+            sum.multMut(1 / c).normMut().multMut(speed).subMut(this.vel).limitMut(this.force * 1.5);
+            this.acc.addMut(sum);
+        }
+
+        Vec.tmp3.setXY(Rnd(-wobble, wobble), Rnd(-wobble, wobble));
+        this.acc.addMut(Vec.tmp3);
+
+        this.vel.x += this.acc.x * dt;
+        this.vel.y += this.acc.y * dt;
+        this.vel.limitMut(speed);
+
+        if (this.vel.x !== 0 || this.vel.y !== 0) {
+            let target = Math.atan2(this.vel.y, this.vel.x);
+            if (this.type === 'tank') {
+                let diff = target - this.angle;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                this.angle += diff * 5 * dt;
+            } else {
+                this.angle = target;
+            }
+        }
+
+        this.pos.x += this.vel.x * dt;
+        this.pos.y += this.vel.y * dt;
+        this.acc.multMut(0);
+
+        if (this.pos.distSq(goal.pos) < (goal.size + this.size) ** 2) {
+            this.dead = true;
+            goal.takeDmg(this.castleDmg);
+        }
+    }
+
+    draw(ctx) {
+        const sprite = G.sprites[this.type];
+        if (sprite) {
+            ctx.save();
+            ctx.translate(this.pos.x, this.pos.y);
+            ctx.rotate(this.angle);
+            const w = sprite.width / G.dpr;
+            const h = sprite.height / G.dpr;
+            ctx.drawImage(sprite, -w / 2, -h / 2, w, h);
+            ctx.restore();
+        }
+    }
+}
+
+class Building extends Obj {
+    constructor(hex, type) {
+        const p = Hex.toPixel(hex, CFG.SYS.hexSize).addMut(new Vec(G.w / 2 + G.offX, G.h / 2 + G.offY));
+        super(p.x, p.y);
+        Object.assign(this, CFG.BUILDINGS[type]);
+        this.type = type;
+        this.hex = hex;
+        this.maxHp = this.hp;
+        this.cdTimer = 0;
+        this.lvl = 1;
+        this.size = 12 * (G.scale || 1);
+        this.range *= (G.scale || 1);
+        if (this.splash) this.splash *= (G.scale || 1);
+    }
+
+    upgrade() {
+        this.lvl++;
+        if (this.type === 'turret') {
+            const increase = CFG.BUILDINGS[this.type].hp * 0.5;
+            this.maxHp += increase;
+            this.hp += increase;
+        } else {
+            this.maxHp *= CFG.UPGRADE.hpMult;
+            this.hp *= CFG.UPGRADE.hpMult;
+        }
+        if (this.hp > this.maxHp) this.hp = this.maxHp;
+
+        this.dmg *= CFG.UPGRADE.dmgMult;
+        this.range *= CFG.UPGRADE.rangeMult;
+        this.cd *= CFG.UPGRADE.cdMult;
+        G.addMoney(-Math.floor(this.cost * CFG.UPGRADE.costMult * this.lvl));
+        for (let i = 0; i < 10; i++) G.fx.push(Pool.getPart(this.pos.x, this.pos.y, '#fff', Rnd(2, 5), 3, 0.5));
+    }
+
+    takeDmg(a) {
+        this.hp -= a;
+        if (this.hp <= 0) {
+            this.dead = true;
+            for (let i = 0; i < 5; i++) G.fx.push(Pool.getPart(this.pos.x, this.pos.y, this.color, Rnd(1, 3), 3, 0.4));
+        }
+    }
+
+    up(dt) {
+        this.cdTimer -= dt;
+
+        if (this.type === 'tech' && this.cdTimer <= 0) {
+            G.addTPoints(this.amt);
+            this.cdTimer = this.cd;
+            G.pops.push({ p: new Vec(this.pos.x, this.pos.y - 20), t: 'T+' + this.amt, l: 1, c: '#fff' });
+            return;
+        }
+
+        if (this.type === 'heal' && this.cdTimer <= 0) {
+            let healed = false;
+            const rangeSq = this.range ** 2;
+            for (let b of G.builds) {
+                if (b === this) continue;
+                if (b.type === 'heal') continue; // Cannot heal other heal buildings
+                if (this.pos.distSq(b.pos) < rangeSq && b.hp < b.maxHp) {
+                    b.hp = Math.min(b.maxHp, b.hp + this.amt);
+                    healed = true;
+                    G.fx.push(Pool.getPart(b.pos.x, b.pos.y, '#00ffaa', 2, 2, 0.5));
+                }
+            }
+            if (healed) this.cdTimer = this.cd;
+            return;
+        }
+
+        if (this.type === 'jam') {
+            const rangeSq = this.range ** 2;
+            for (let e of G.enemies) {
+                if (e.type !== 'tank' && this.pos.distSq(e.pos) < rangeSq) {
+                    e.slowed = 0.1;
+                }
+            }
+            return;
+        }
+
+        if (this.cdTimer > 0) return;
+
+        if (this.type === 'generator') {
+            G.addMoney(this.amt * this.lvl);
+            this.cdTimer = this.cd;
+            G.pops.push({ p: new Vec(this.pos.x, this.pos.y - 20), t: '+' + Math.floor(this.amt * this.lvl), l: 1, c: CFG.COLORS.s });
+            return;
+        }
+
+        let t = null, min = this.range ** 2;
+        for (let e of G.enemies) {
+            let d = this.pos.distSq(e.pos);
+            if (d < min) {
+                if (this.type === 'sniper') { if (!t || e.hp > t.hp) t = e; }
+                else { min = d; t = e; }
+            }
+        }
+
+        if (t) {
+            G.projs.push(Pool.getProj(this.pos.x, this.pos.y, t, this.type, this.lvl));
+            this.cdTimer = this.cd;
+        }
+    }
+
+    draw(ctx) {
+        const s = CFG.SYS.hexSize;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const ang = 2 * Math.PI / 6 * i;
+            const x = this.pos.x + s * Math.cos(ang);
+            const y = this.pos.y + s * Math.sin(ang);
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fill();
+        ctx.strokeStyle = this.color; ctx.lineWidth = 2; ctx.stroke();
+
+        ctx.fillStyle = this.color;
+
+        // Scale size based on level (slightly larger per level)
+        const lvlScale = 1 + (this.lvl - 1) * 0.3;
+
+        if (this.type === 'turret') {
+            const sz = 8 * lvlScale;
+            ctx.fillRect(this.pos.x - sz / 2, this.pos.y - sz / 2, sz, sz);
+        }
+        else if (this.type === 'sniper') {
+            ctx.beginPath(); ctx.arc(this.pos.x, this.pos.y, 4 * lvlScale, 0, 6.28); ctx.fill();
+        }
+        else if (this.type === 'wall') {
+            ctx.beginPath(); ctx.arc(this.pos.x, this.pos.y, 4 * lvlScale, 0, 6.28); ctx.fill();
+        }
+        else if (this.type === 'generator') {
+            ctx.font = `${10 * lvlScale}px Orbitron`;
+            ctx.fillText('$', this.pos.x - 3, this.pos.y + 3);
+            ctx.font = '10px Orbitron'; // Reset font
+        }
+        else if (this.type === 'tech') {
+            ctx.font = `${10 * lvlScale}px Orbitron`;
+            ctx.fillText('T', this.pos.x - 3, this.pos.y + 3);
+            ctx.font = '10px Orbitron';
+        }
+        else if (this.type === 'heal') {
+            ctx.font = `${10 * lvlScale}px Orbitron`;
+            ctx.fillText('+', this.pos.x - 3, this.pos.y + 3);
+            ctx.font = '10px Orbitron';
+        }
+
+        if (this.hp < this.maxHp) {
+            ctx.fillStyle = 'red';
+            const w = 20 * (G.scale || 1);
+            const h = 4 * (G.scale || 1);
+            const hpW = w * (this.hp / this.maxHp);
+            ctx.fillRect(this.pos.x - w / 2, this.pos.y - h / 2, hpW, h);
+        }
+    }
+}
+
+class Proj extends Obj {
+    constructor(x, y, t, type, lvl) {
+        super(x, y);
+        this.reset(x, y, t, type, lvl);
+    }
+    reset(x, y, t, type, lvl) {
+        this.pos.x = x; this.pos.y = y; this.dead = false;
+        this.t = t; this.type = type;
+        let spd = CFG.PROJ.baseSpeed;
+        if (type === 'sniper' || type === 'wall') spd *= CFG.PROJ.sniperMult;
+        this.spd = spd * (G.scale || 1);
+        this.c = CFG.BUILDINGS[type].color;
+        this.dmg = CFG.BUILDINGS[type].dmg * (1 + (lvl - 1) * 0.2) * G.getDmgMult();
+        this.lvl = lvl;
+    }
+    up(dt) {
+        const w = cvs.width / G.dpr, h = cvs.height / G.dpr;
+        if (this.pos.x < -100 || this.pos.x > w + 100 || this.pos.y < -100 || this.pos.y > h + 100) this.dead = true;
+
+        if (this.t && !this.t.dead) {
+            Vec.tmp1.set(this.t.pos).subMut(this.pos).normMut();
+            this.pos.addMut(Vec.tmp1.multMut(this.spd * dt));
+            if (this.pos.distSq(this.t.pos) < 225) {
+                this.dead = true;
+                const d = this.dmg;
+                if (this.type === 'wall') {
+                    const splashSq = (CFG.BUILDINGS.wall.splash * (G.scale || 1)) ** 2;
+                    for (let e of G.enemies) if (e.pos.distSq(this.pos) < splashSq) e.takeDmg(d);
+                } else this.t.takeDmg(d);
+            }
+        } else this.dead = true;
+    }
+    draw(ctx) {
+        ctx.fillStyle = this.c;
+        const s = 3 + this.lvl;
+        ctx.fillRect(this.pos.x - s, this.pos.y - s, s * 2, s * 2);
+    }
+}
+
+// --- GAME ---
+const G = {
+    run: false, money: CFG.SYS.startMoney, lvl: 1, wave: 1, tPoints: 0,
+    selectedStartLvl: 1,
+    castle: null, map: new Map(), flow: {}, spatial: new Map(),
+    enemies: [], builds: [], projs: [], fx: [], pops: [],
+    sel: null, ms: new Vec(0, 0), tmr: 0, st: 0, wTmr: 0,
+    dpr: window.devicePixelRatio || 1,
+    w: 0, h: 0, offX: 0, offY: 0,
+
+    init() {
+        // Build Menu
+        const menu = $('build-menu');
+        menu.innerHTML = '';
+        for (let k in CFG.BUILDINGS) {
+            const b = CFG.BUILDINGS[k];
+            const btn = document.createElement('button');
+            btn.id = `btn-${k}`;
+            btn.className = 'btn';
+            if (b.btnColor) btn.style.setProperty('--prim', b.btnColor);
+            btn.innerHTML = `${b.name.toUpperCase()}<span class="cost">${b.cost}</span>`;
+            btn.addEventListener('click', () => G.setSel(k));
+            menu.appendChild(btn);
+        }
+
+        // Static Listeners
+        const sysBtn = document.getElementById('sys-btn');
+        if (sysBtn) sysBtn.addEventListener('click', () => G.showStartMenu());
+
+        const contBtn = document.getElementById('cont-btn');
+        if (contBtn) contBtn.addEventListener('click', () => G.continueGame());
+
+        const lvlDropdown = document.getElementById('lvl-dropdown');
+        if (lvlDropdown) {
+            lvlDropdown.addEventListener('change', (e) => {
+                G.setStartLvl(parseInt(e.target.value));
+            });
+        }
+
+        const startBtn = document.getElementById('start-game-btn');
+        if (startBtn) startBtn.addEventListener('click', () => G.startGame());
+
+        // Over-scherm: geen knoppen; klik overal gaat terug naar menu
+
+        // Ensure resize happens after DOM is fully ready
+        setTimeout(() => {
+            this.resize();
+        }, 100);
+
+        this.castle = {
+            pos: new Vec(0, 0), // Will be fixed by resize
+            hp: CFG.CASTLE.hp, max: CFG.CASTLE.hp,
+            size: CFG.SYS.hexSize * 2, hit: 0,
+            takeDmg: (a) => {
+                G.castle.hp -= a; G.castle.hit = 0.2; G.ui();
+                for (let i = 0; i < 5; i++) G.fx.push(Pool.getPart(G.castle.pos.x, G.castle.pos.y, CFG.CASTLE.color, Rnd(2, 5), 3, 0.5));
+                if (G.castle.hp <= 0) G.over();
+            }
+        };
+
+        window.addEventListener('resize', () => this.resize());
+
+        const updateMs = e => {
+            const rect = cvs.getBoundingClientRect();
+            let cx, cy;
+            if (e.touches && e.touches.length > 0) {
+                cx = e.touches[0].clientX;
+                cy = e.touches[0].clientY;
+            } else if (e.changedTouches && e.changedTouches.length > 0) {
+                cx = e.changedTouches[0].clientX;
+                cy = e.changedTouches[0].clientY;
+            } else {
+                cx = e.clientX;
+                cy = e.clientY;
+            }
+            G.ms.x = cx - rect.left;
+            G.ms.y = cy - rect.top;
+        };
+
+        cvs.addEventListener('mousemove', e => { updateMs(e); });
+        cvs.addEventListener('touchmove', e => { e.preventDefault(); updateMs(e); }, { passive: false });
+        cvs.addEventListener('touchstart', e => {
+            e.preventDefault();
+            updateMs(e);
+        }, { passive: false });
+        cvs.addEventListener('touchend', e => {
+            e.preventDefault();
+            G.click(e);
+        }, { passive: false });
+        cvs.addEventListener('click', e => G.click(e));
+
+        this.showStartMenu();
+        this.loop();
+    },
+
+    showStartMenu() {
+        this.run = false;
+        $('start-menu').style.display = 'flex';
+        $('over').style.display = 'none';
+        this.setStartLvl(this.selectedStartLvl);
+
+        // Show Continue button if game is in progress (map exists and castle alive)
+        if (this.map.size > 0 && this.castle.hp > 0) {
+            $('cont-btn').style.display = 'block';
+            $('start-game-btn').innerText = 'REBOOT SYSTEM';
+        } else {
+            $('cont-btn').style.display = 'none';
+            $('start-game-btn').innerText = 'INITIATE SYSTEM';
+        }
+    },
+
+    continueGame() {
+        $('start-menu').style.display = 'none';
+        this.run = true;
+        this.loop();
+    },
+
+    setStartLvl(l) {
+        this.selectedStartLvl = l;
+        const dd = document.getElementById('lvl-dropdown');
+        if (dd) dd.value = l;
+    },
+
+    startGame() {
+        this.lvl = this.selectedStartLvl;
+        // Scale start money: base + (lvl) * lvlMoney
+        // Vraag: "lvl 7 wordt dan: startMoney + lvlMoney = 770" -> Betekent 700 + 7 * 10
+        this.money = CFG.SYS.startMoney + (this.lvl * CFG.SYS.lvlMoney);
+        this.restart();
+        $('start-menu').style.display = 'none';
+    },
+
+    resize() {
+        this.w = window.innerWidth; this.h = window.innerHeight;
+        this.dpr = window.devicePixelRatio || 1;
+
+        // Ensure integer canvas size to prevent blurring/skewing
+        cvs.width = Math.floor(this.w * this.dpr);
+        cvs.height = Math.floor(this.h * this.dpr);
+        cvs.style.width = this.w + 'px';
+        cvs.style.height = this.h + 'px';
+
+        ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset before scaling
+        ctx.scale(this.dpr, this.dpr);
+
+        // Cache Canvas
+        if (!this.gridCvs) {
+            this.gridCvs = document.createElement('canvas');
+            this.gridCtx = this.gridCvs.getContext('2d', { alpha: false });
+        }
+        this.gridCvs.width = cvs.width;
+        this.gridCvs.height = cvs.height;
+        this.gridCtx.setTransform(1, 0, 0, 1, 0, 0);
+        this.gridCtx.scale(this.dpr, this.dpr);
+
+        // --- Dynamic Mobile Grid Calculation ---
+        const topUI = 60; // HUD height
+        const botUI = 140; // Build menu height
+        const margin = 10;
+
+        const availW = this.w - (margin * 2);
+        const availH = this.h - topUI - botUI - (margin * 2);
+
+        // Determine orientation and target columns
+        const isPortrait = this.h > this.w;
+        // Mobile Portrait: 16 cols. Desktop/Landscape: ~28+
+        let targetCols = isPortrait ? 16 : 24;
+        if (this.w > 1000) targetCols = 36; // Large screens
+
+        // Calculate Hex Size to fit WIDTH
+        // Width = (cols * 1.5 + 0.5) * size
+        let s = Math.floor(availW / (targetCols * 1.5 + 0.5));
+
+        // Clamp size for usability
+        // On mobile, we want at least ~30px diameter for touch (size ~15-20)
+        // But let's prioritize fitting the grid.
+
+        // Calculate resulting Rows that fit in HEIGHT
+        // Height = rows * sqrt(3) * size
+        let targetRows = Math.floor(availH / (Math.sqrt(3) * s));
+
+        // Ensure odd dimensions for symmetry
+        if (targetCols % 2 === 0) targetCols--;
+        if (targetRows % 2 === 0) targetRows--;
+
+        // Update Config
+        CFG.SYS.mapCols = targetCols;
+        CFG.SYS.mapRows = targetRows;
+        CFG.SYS.hexSize = s;
+        G.scale = s / 22; // Reference size
+
+        this.renderEnemiesToCache();
+
+        // Calculate Offsets to CENTER grid in PLAYABLE area
+        const visualCenterY = topUI + margin + (availH / 2);
+
+        this.offX = 0; // Horizontally centered (relative to w/2)
+        this.offY = visualCenterY - (this.h / 2); // Shift from center
+        this.center = new Vec(this.w / 2 + this.offX, this.h / 2 + this.offY);
+
+        // Update Castle Position
+        if (this.castle) {
+            const targetY = topUI + margin + (availH * 0.75);
+            this.castle.pos = new Vec(this.w / 2 + this.offX, targetY);
+            this.castle.size = CFG.SYS.hexSize * 2;
+            const center = this.center;
+            const localCastle = this.castle.pos.copy().subMut(center);
+            const castleHex = Hex.fromPixel(localCastle, CFG.SYS.hexSize);
+
+            // Snap castle pos to exact hex center to align visual elements
+            const snappedLocal = Hex.toPixel(castleHex, CFG.SYS.hexSize);
+            this.castle.pos = snappedLocal.addMut(center);
+
+            const castleKey = Hex.key(castleHex);
+            G.castleHexKey = castleKey;
+            G.castleZoneKeys = [castleKey];
+            for (let i = 0; i < 6; i++) {
+                const n = Hex.neighbor(castleHex, i);
+                G.castleZoneKeys.push(Hex.key(n));
+            }
+            if (this.map && this.map.size > 0) {
+                // Sync castle tile color (type 3) to the current castle hex
+                this.map.forEach((t, k) => { t.type = (G.castleZoneKeys.includes(k) ? 3 : (t.type === 3 ? 0 : t.type)); });
+            }
+        }
+
+        // Update Entities
+        if (this.map.size > 0) {
+            const center = new Vec(G.w / 2 + G.offX, G.h / 2 + G.offY);
+            this.map.forEach(t => {
+                t.pos = Hex.toPixel(t.h, CFG.SYS.hexSize).addMut(center);
+            });
+
+            this.builds.forEach(b => {
+                const p = Hex.toPixel(b.hex, CFG.SYS.hexSize).addMut(center);
+                b.pos = p;
+                b.size = 12 * G.scale;
+                b.range = CFG.BUILDINGS[b.type].range * G.scale;
+                if (b.splash) b.splash = CFG.BUILDINGS[b.type].splash * G.scale;
+            });
+
+            if (this.run) this.calcFlow();
+            this.renderGridToCache();
+        }
+    },
+
+    // toggleFS removed
+
+    restart() {
+        // Keep money if starting from menu, reset if pure restart
+        if ($('start-menu').style.display !== 'none') {
+            // Coming from menu, money already set
+        } else {
+            // In-game reset
+            this.lvl = 1; this.money = CFG.SYS.startMoney;
+        }
+        this.startLvl();
+        $('over').style.display = 'none';
+        this.run = true;
+    },
+
+    retryLvl() {
+        this.money = CFG.SYS.startMoney;
+        this.startLvl();
+        $('over').style.display = 'none';
+        this.run = true;
+    },
+
+    startLvl() {
+        this.tPoints = 0; // Reset T-Points
+        this.wave = 1; this.wTmr = 0;
+        this.enemies = []; this.builds = [];
+        this.projs.forEach(p => Pool.recycleProj(p)); this.projs = [];
+        this.fx.forEach(p => Pool.recycle(p)); this.fx = [];
+        this.castle.hp = CFG.CASTLE.hp;
+        this.genMap();
+        this.calcFlow();
+        this.msg(`LEVEL ${this.lvl} INITIALIZED`, CFG.COLORS.p);
+        this.updateUnlocked();
+        this.ui();
+        this.setSel('turret');
+    },
+
+    getUnlockedList() {
+        const l = this.lvl;
+        const unlocks = ['turret'];
+        if (l >= 2) unlocks.push('generator', 'fill');
+        if (l >= 3) unlocks.push('sniper');
+        if (l >= 4) unlocks.push('wall');
+        if (l >= 5) unlocks.push('jam');
+        if (l >= 6) unlocks.push('tech');
+        if (l >= 7) unlocks.push('heal');
+        return unlocks;
+    },
+
+    updateUnlocked() {
+        const unlocks = this.getUnlockedList();
+        for (let k in CFG.BUILDINGS) {
+            const btn = document.getElementById(`btn-${k}`);
+            if (btn) {
+                if (unlocks.includes(k)) {
+                    btn.disabled = false;
+                    btn.style.opacity = 1;
+                    btn.style.filter = 'none';
+                    btn.style.pointerEvents = 'auto';
+                } else {
+                    btn.disabled = true;
+                    btn.style.opacity = 0.3;
+                    btn.style.filter = 'grayscale(100%)';
+                    btn.style.pointerEvents = 'none';
+                }
+            }
+        }
+    },
+
+    nextLvl() {
+        this.lvl++; this.money = CFG.SYS.startMoney;
+        this.startLvl();
+    },
+
+    genMap() {
+        this.map = new Map();
+        const cols = CFG.SYS.mapCols;
+        const rows = CFG.SYS.mapRows;
+        const colStart = -Math.floor(cols / 2);
+        const colEnd = Math.floor(cols / 2);
+        const rowStart = -Math.floor(rows / 2);
+        const rowEnd = Math.floor(rows / 2);
+
+        for (let c = colStart; c <= colEnd; c++) {
+            for (let r_off = rowStart; r_off <= rowEnd; r_off++) {
+                const q = c;
+                const r = r_off - Math.floor((c - (c & 1)) / 2);
+                const h = new Hex(q, r);
+                const k = Hex.key(h);
+                const dist = Hex.dist(h, new Hex(0, 0));
+                let type = 0;
+                if (G.castleZoneKeys && G.castleZoneKeys.includes(k)) type = 3;
+                else {
+                    // Water chance: base + inc per level
+                    if (Math.random() < CFG.LEVEL.baseWater + (this.lvl * CFG.LEVEL.inc.water)) type = 1;
+                    else if (Math.random() < CFG.LEVEL.baseNode + (this.lvl * CFG.LEVEL.inc.node)) type = 2;
+                    else if (Math.random() < CFG.LEVEL.baseRuin + (this.lvl * CFG.LEVEL.inc.ruin)) type = 4; // Ruin
+                }
+                const tile = { h, type };
+                if (this.center) tile.pos = Hex.toPixel(h, CFG.SYS.hexSize).addMut(this.center);
+                this.map.set(k, tile);
+            }
+        }
+        this.renderGridToCache();
+    },
+
+    renderGridToCache() {
+        const ctx = this.gridCtx;
+        // Clear and Fill Background
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = CFG.COLORS.bg;
+        ctx.fillRect(0, 0, this.gridCvs.width, this.gridCvs.height);
+        ctx.scale(this.dpr, this.dpr);
+
+        const s = CFG.SYS.hexSize;
+        // Draw slightly smaller to avoid any overlap between tiles
+        const drawS = s * 0.96;
+
+        this.map.forEach((tile, key) => {
+            if (!tile.pos) return;
+            const x = tile.pos.x, y = tile.pos.y;
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const ang = 2 * Math.PI / 6 * i;
+                const vx = x + drawS * Math.cos(ang);
+                const vy = y + drawS * Math.sin(ang);
+                if (i === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
+            }
+            ctx.closePath();
+
+            if (tile.type === 3) {
+                ctx.fillStyle = CFG.COLORS.v;
+                ctx.fill();
+                // Inset castle outline so it doesn't get covered by neighbours
+                const outlineS = s * 0.92;
+                ctx.beginPath();
+                const nMap = [0, 5, 4, 3, 2, 1]; // Maps edge i to neighbor dir
+                for (let i = 0; i < 6; i++) {
+                    // Check neighbor across this edge
+                    const dir = nMap[i];
+                    const nHex = Hex.neighbor(tile.h, dir);
+                    const nKey = Hex.key(nHex);
+
+                    // If neighbor is castle, skip this edge
+                    if (G.castleZoneKeys && G.castleZoneKeys.includes(nKey)) continue;
+
+                    const ang1 = 2 * Math.PI / 6 * i;
+                    const ang2 = 2 * Math.PI / 6 * ((i + 1) % 6);
+
+                    const p1x = x + outlineS * Math.cos(ang1);
+                    const p1y = y + outlineS * Math.sin(ang1);
+                    const p2x = x + outlineS * Math.cos(ang2);
+                    const p2y = y + outlineS * Math.sin(ang2);
+
+                    ctx.moveTo(p1x, p1y);
+                    ctx.lineTo(p2x, p2y);
+                }
+                // No closePath() to avoid closing disjoint segments
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.strokeStyle = CFG.CASTLE.color;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            } else if (tile.type === 1) {
+                ctx.fillStyle = CFG.COLORS.water;
+                ctx.fill();
+            } else if (tile.type === 2) {
+                ctx.fillStyle = CFG.COLORS.node;
+                ctx.fill();
+            } else if (tile.type === 4) { // Ruin
+                ctx.fillStyle = CFG.COLORS.ruin;
+                ctx.fill();
+            } else {
+                ctx.fillStyle = CFG.COLORS.v;
+                ctx.fill();
+            }
+            // Inset outline for all non-castle tiles
+            if (!(G.castleZoneKeys && G.castleZoneKeys.includes(key))) {
+                const outlineS = s * 0.92;
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const ang = 2 * Math.PI / 6 * i;
+                    const vx = x + outlineS * Math.cos(ang);
+                    const vy = y + outlineS * Math.sin(ang);
+                    if (i === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
+                }
+                ctx.closePath();
+                ctx.lineJoin = 'round';
+                ctx.strokeStyle = 'rgba(0, 243, 255, 0.18)';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+        });
+        ctx.restore();
+    },
+
+    renderEnemiesToCache() {
+        this.sprites = {};
+        for (let k in CFG.ENEMIES) {
+            const data = CFG.ENEMIES[k];
+            const s = G.scale || 1;
+            const sz = data.size * s;
+
+            const cvs = document.createElement('canvas');
+            const ctx = cvs.getContext('2d', { alpha: true });
+            const drawSz = (k === 'tank') ? 20 * s : sz;
+            const dim = Math.ceil(drawSz * 2.5);
+
+            cvs.width = dim * this.dpr;
+            cvs.height = dim * this.dpr;
+            ctx.scale(this.dpr, this.dpr);
+            ctx.translate(dim / 2, dim / 2);
+
+            ctx.fillStyle = data.color;
+
+            if (k === 'tank') {
+                const tSz = 10 * s;
+                ctx.fillRect(-tSz, -tSz, tSz * 2, tSz * 2);
+                ctx.fillStyle = '#000';
+                ctx.fillRect(-tSz / 2, -tSz / 2, tSz, tSz);
+            } else {
+                // Triangle
+                ctx.beginPath();
+                ctx.moveTo(sz, 0);
+                ctx.lineTo(-sz * 0.7, -sz * 0.7);
+                ctx.lineTo(-sz * 0.3, 0);
+                ctx.lineTo(-sz * 0.7, sz * 0.7);
+                ctx.fill();
+            }
+            this.sprites[k] = cvs;
+        }
+    },
+
+    calcFlow() {
+        this.flow = {};
+        const q = [];
+        const visited = new Set();
+        const s = CFG.SYS.hexSize;
+        const center = new Vec(this.w / 2 + this.offX, this.h / 2 + this.offY);
+        const localCastle = this.castle.pos.copy().subMut(center);
+        const castleHex = Hex.fromPixel(localCastle, s);
+        const castleKey = Hex.key(castleHex);
+        G.castleHexKey = castleKey;
+        G.castleZoneKeys = [castleKey];
+        for (let i = 0; i < 6; i++) {
+            const n = Hex.neighbor(castleHex, i);
+            const nk = Hex.key(n);
+            G.castleZoneKeys.push(nk);
+        }
+        // Seed BFS from all castle zone tiles
+        for (let k of G.castleZoneKeys) {
+            const qh = k === castleKey ? castleHex : this.map.get(k)?.h;
+            if (qh && !visited.has(k)) { q.push({ h: qh, d: 0 }); visited.add(k); }
+        }
+
+        while (q.length > 0) {
+            const cur = q.shift();
+            for (let i = 0; i < 6; i++) {
+                const n = Hex.neighbor(cur.h, i);
+                const k = Hex.key(n);
+                if (this.map.has(k) && !visited.has(k)) {
+                    const tile = this.map.get(k);
+                    let blocked = tile.type === 1;
+                    if (!blocked) for (let b of this.builds) if (b.hex && Hex.key(b.hex) === k) { blocked = true; break; }
+                    if (!blocked) {
+                        visited.add(k);
+                        const p1 = Hex.toPixel(n, CFG.SYS.hexSize);
+                        const p2 = Hex.toPixel(cur.h, CFG.SYS.hexSize);
+                        const v = p2.sub(p1).norm();
+                        this.flow[k] = v;
+                        q.push({ h: n, d: cur.d + 1 });
+                    }
+                }
+            }
+        }
+    },
+
+    spawn() {
+        const w = this.w, h = this.h;
+        if (this.wave > CFG.SYS.maxWaves) { this.nextLvl(); return; }
+        let t = 'drone', r = Math.random();
+        if (this.wave > CFG.SPAWN.tankStart && r < CFG.SPAWN.tankChance) t = 'tank';
+        else if (this.wave > CFG.SPAWN.kamiStart && r < CFG.SPAWN.kamiChance) t = 'kamikaze';
+        else if (this.wave > CFG.SPAWN.swarmStart && r < CFG.SPAWN.swarmChance) t = 'swarm';
+
+        const c = CFG.ENEMIES[t].count || 1;
+        for (let i = 0; i < c; i++) this.enemies.push(Pool.getUnit(t, this.wave, this.lvl));
+    },
+
+    click(e) {
+        if (!this.run) return;
+        const rect = cvs.getBoundingClientRect();
+        let cx, cy;
+        if (e.touches && e.touches.length > 0) {
+            cx = e.touches[0].clientX;
+            cy = e.touches[0].clientY;
+        } else if (e.changedTouches && e.changedTouches.length > 0) {
+            cx = e.changedTouches[0].clientX;
+            cy = e.changedTouches[0].clientY;
+        } else {
+            cx = e.clientX;
+            cy = e.clientY;
+        }
+        const x = cx - rect.left;
+        const y = cy - rect.top;
+
+        if (G.center) Vec.tmp1.setXY(x, y).subMut(G.center);
+        else Vec.tmp1.setXY(0, 0);
+
+        const h = Hex.fromPixelToTmp(Vec.tmp1, CFG.SYS.hexSize);
+        const k = Hex.key(h);
+
+        if (!this.map.has(k)) return;
+        const tile = this.map.get(k);
+        const existing = this.builds.find(b => Hex.key(b.hex) === k);
+
+        if (existing) {
+            if (this.sel && this.sel === existing.type) {
+                if (existing.type === 'generator' || existing.type === 'tech') {
+                    this.msg("MAX LEVEL REACHED", CFG.COLORS.w);
+                    return;
+                }
+                if (existing.lvl >= 3) {
+                    this.msg("MAX LEVEL REACHED", CFG.COLORS.w);
+                    return;
+                }
+
+                if (this.money >= existing.cost * 0.5 * existing.lvl) {
+                    existing.upgrade();
+                    this.ui();
+                } else this.msg("INSUFFICIENT DATA", CFG.COLORS.w);
+            }
+            return;
+        }
+
+        if (!this.sel) return;
+        const bData = CFG.BUILDINGS[this.sel];
+
+        if (this.money < bData.cost) { this.msg("INSUFFICIENT DATA", CFG.COLORS.w); return; }
+
+        if (this.sel === 'fill') {
+            if (tile.type !== 1 && tile.type !== 2 && tile.type !== 4) { this.msg("MUST PLACE ON WATER, NODE OR RUIN", CFG.COLORS.w); return; }
+            this.money -= bData.cost;
+            tile.type = 0;
+            this.calcFlow();
+            this.renderGridToCache();
+            this.ui();
+            const pixel = Hex.toPixel(h, CFG.SYS.hexSize).addMut(new Vec(this.w / 2 + this.offX, this.h / 2 + this.offY));
+            for (let i = 0; i < 8; i++) G.fx.push(Pool.getPart(pixel.x, pixel.y, '#888888', 1, 3, 0.4));
+            return;
+        }
+
+        if (tile.type === 1) { this.msg("CANNOT BUILD ON WATER", CFG.COLORS.d); return; }
+        if (tile.type === 4) { this.msg("CANNOT BUILD ON RUINS", CFG.COLORS.d); return; }
+        if (G.castleZoneKeys && G.castleZoneKeys.includes(k)) { this.msg("PROTECT THE CASTLE", CFG.COLORS.p); return; }
+        if (this.sel === 'generator' && tile.type !== 2) { this.msg("NEEDS RESOURCE NODE", CFG.COLORS.w); return; }
+        if (this.sel !== 'generator' && this.sel !== 'tech' && tile.type === 2) { this.msg("SAVE NODES FOR MINERS", CFG.COLORS.w); return; }
+
+        this.money -= bData.cost;
+        this.builds.push(new Building(new Hex(h.q, h.r), this.sel));
+        this.calcFlow();
+        this.ui();
+        const pixel = Hex.toPixel(h, CFG.SYS.hexSize).addMut(new Vec(this.w / 2 + this.offX, this.h / 2 + this.offY));
+        for (let i = 0; i < 8; i++) this.fx.push(Pool.getPart(pixel.x, pixel.y, CFG.COLORS.p, 1, 3, 0.4));
+    },
+
+    setSel(t) {
+        const unlocks = this.getUnlockedList();
+        if (!unlocks.includes(t)) {
+            this.msg("LOCKED", CFG.COLORS.w);
+            return;
+        }
+        if (this.sel === t) this.sel = null; else this.sel = t;
+        document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+        if (this.sel) {
+            const idx = Object.keys(CFG.BUILDINGS).indexOf(t);
+            const btns = document.querySelectorAll('.btn');
+            if (btns[idx]) btns[idx].classList.add('active');
+        }
+    },
+
+    addMoney(a) {
+        this.money += a;
+        this.ui();
+    },
+
+    addTPoints(a) {
+        this.tPoints += a;
+        this.ui();
+    },
+
+    getDmgMult() {
+        let mult = 1;
+        this.builds.forEach(b => {
+            if (b.type === 'tech') mult += CFG.BUILDINGS.tech.dmgBoost * b.lvl;
+        });
+        return mult;
+    },
+
+    msg(t, c) {
+        this.pops.push({ p: new Vec(this.w / 2, this.h / 2 - 100), t: t, l: 2, c: c || '#fff' });
+    },
+
+    over() {
+        this.run = false;
+        $('score').innerText = `LVL ${this.lvl} - WAVE ${this.wave}`;
+        const overEl = $('over');
+        overEl.style.display = 'flex';
+        const handler = () => {
+            this.showStartMenu();
+            overEl.removeEventListener('click', handler);
+        };
+        overEl.addEventListener('click', handler, { once: true });
+    },
+    ui() {
+        $('hp').innerText = `HP: ${Math.floor(this.castle.hp)}`;
+        $('wave').innerText = `LVL: ${this.lvl} | WAVE: ${this.wave}/${CFG.SYS.maxWaves}`;
+        $('money').innerText = `$: ${Math.floor(this.money)}`;
+        $('t-points').innerText = `T: ${Math.floor(this.tPoints)}%`;
+    },
+
+    loop() {
+        requestAnimationFrame(() => this.loop());
+        if (!this.run) return;
+
+        let now = Date.now();
+        let dt = (now - this.st) / 1000;
+        this.st = now;
+        if (dt > 0.1) dt = 0.1;
+
+        this.tmr += dt;
+        this.wTmr += dt;
+
+        if (this.wTmr > CFG.WAVE.time) {
+            this.wave++; this.wTmr = 0; this.ui();
+            if (this.wave > CFG.SYS.maxWaves) this.nextLvl();
+            else this.msg(`WAVE ${this.wave}`, CFG.COLORS.a);
+        }
+
+        let rate = Math.max(CFG.SPAWN.minRate, CFG.SPAWN.baseRate - (this.wave * CFG.WAVE.inc.rate) - (this.lvl * CFG.LEVEL.inc.rate));
+        if (this.tmr > rate) { this.spawn(); this.tmr = 0; }
+
+        // Update Spatial Grid
+        this.spatial.clear();
+        if (this.center) {
+            for (let e of this.enemies) {
+                Vec.tmp1.set(e.pos).subMut(this.center);
+                const h = Hex.fromPixelToTmp(Vec.tmp1, CFG.SYS.hexSize);
+                const k = Hex.key(h);
+                if (!this.spatial.has(k)) this.spatial.set(k, []);
+                this.spatial.get(k).push(e);
+                e._hexKey = k;
+            }
+        }
+
+        // Optimized Update & Remove Loop (No new arrays)
+        // Enemies
+        let i = 0;
+        while (i < this.enemies.length) {
+            this.enemies[i].up(dt);
+            if (this.enemies[i].dead) {
+                Pool.recycleUnit(this.enemies[i]);
+                this.enemies[i] = this.enemies[this.enemies.length - 1];
+                this.enemies.pop();
+            } else {
+                i++;
+            }
+        }
+
+        // Projectiles
+        i = 0;
+        while (i < this.projs.length) {
+            this.projs[i].up(dt);
+            if (this.projs[i].dead) {
+                Pool.recycleProj(this.projs[i]);
+                this.projs[i] = this.projs[this.projs.length - 1];
+                this.projs.pop();
+            } else {
+                i++;
+            }
+        }
+
+        // Buildings
+        i = 0;
+        while (i < this.builds.length) {
+            this.builds[i].up(dt);
+            if (this.builds[i].dead) {
+                this.builds[i] = this.builds[this.builds.length - 1];
+                this.builds.pop();
+            } else {
+                i++;
+            }
+        }
+
+        // FX
+        i = 0;
+        while (i < this.fx.length) {
+            this.fx[i].up(dt);
+            if (this.fx[i].l <= 0) {
+                Pool.recycle(this.fx[i]);
+                this.fx[i] = this.fx[this.fx.length - 1];
+                this.fx.pop();
+            } else {
+                i++;
+            }
+        }
+
+        this.pops.forEach(p => { p.l -= dt; p.p.y -= 10 * dt; });
+        this.pops = this.pops.filter(p => p.l > 0);
+
+        if (this.gridCvs) {
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.drawImage(this.gridCvs, 0, 0);
+            ctx.restore();
+        }
+
+        const cPos = this.castle.pos;
+        const cSize = CFG.SYS.hexSize * 1.8;
+
+        // Castle Core
+        ctx.beginPath(); ctx.arc(cPos.x, cPos.y, cSize * 0.4, 0, 6.28);
+        ctx.fillStyle = (this.castle.hit > 0) ? '#ff0000' : CFG.CASTLE.color;
+        ctx.fill();
+        if (this.castle.hit > 0) this.castle.hit -= dt;
+
+        // Castle HP Ring
+        ctx.beginPath(); ctx.arc(cPos.x, cPos.y, cSize * 0.5, 0, 6.28 * (this.castle.hp / this.castle.max));
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+
+        // Optimized Draw Loop (No array creation)
+        for (let e of this.builds) e.draw(ctx);
+        for (let e of this.enemies) e.draw(ctx);
+        for (let e of this.projs) e.draw(ctx);
+        for (let e of this.fx) e.draw(ctx);
+
+        for (let p of this.pops) { ctx.globalAlpha = p.l; ctx.fillStyle = p.c; ctx.font = '12px Orbitron'; ctx.fillText(p.t, p.p.x, p.p.y); }
+        ctx.globalAlpha = 1;
+
+        if (this.sel) {
+            if (G.center) Vec.tmp1.set(this.ms).subMut(G.center);
+            else Vec.tmp1.setXY(0, 0);
+
+            const h = Hex.fromPixelToTmp(Vec.tmp1, CFG.SYS.hexSize);
+            const k = Hex.key(h);
+
+            if (this.map.has(k)) {
+                const tile = this.map.get(k);
+                const bData = CFG.BUILDINGS[this.sel];
+                let ok = this.money >= bData.cost && tile.type !== 1 && tile.type !== 4 && !(G.castleZoneKeys && G.castleZoneKeys.includes(k));
+
+                const needsNode = (this.sel === 'generator' || this.sel === 'tech');
+                if (needsNode && tile.type !== 2) ok = false;
+                if (!needsNode && tile.type === 2) ok = false;
+
+                const existing = this.builds.find(b => Hex.key(b.hex) === k);
+                if (existing) {
+                    if (this.sel === existing.type) ok = true;
+                    else ok = false;
+                }
+
+                const center = Hex.toPixel(h, CFG.SYS.hexSize).addMut(new Vec(this.w / 2 + this.offX, this.h / 2 + this.offY));
+                const s = CFG.SYS.hexSize;
+
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const ang = 2 * Math.PI / 6 * i;
+                    const vx = center.x + s * Math.cos(ang);
+                    const vy = center.y + s * Math.sin(ang);
+                    if (i === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
+                }
+                ctx.closePath();
+
+                if (existing && ok) {
+                    ctx.fillStyle = 'rgba(255,255,0,0.3)'; ctx.strokeStyle = '#ffff00';
+                } else {
+                    ctx.fillStyle = ok ? 'rgba(0,255,0,0.15)' : 'rgba(255,0,0,0.15)';
+                    ctx.strokeStyle = ok ? '#03ff03' : '#ff0303';
+                }
+                ctx.fill(); ctx.lineWidth = 2; ctx.stroke();
+
+                if (ok && bData.range > 0) {
+                    ctx.beginPath(); ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                    ctx.arc(center.x, center.y, bData.range * (G.scale || 1), 0, 6.28); ctx.stroke();
+                }
+            }
+        }
+    }
+};
+
+G.init();
+window.G = G;
+</script>
+</body>
+
+</html>
