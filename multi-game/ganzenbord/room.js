@@ -236,7 +236,14 @@ export class Room {
       return { ok: true };
     }
 
-    this.session.send(Msg.ROLL, { playerId: this.localId });
+    const sent = this.session.send(Msg.ROLL, { playerId: this.localId });
+    if (!sent) {
+      return {
+        ok: false,
+        reason: "Geen verbinding met de host — opnieuw verbinden…",
+        reconnect: true,
+      };
+    }
     return { ok: true };
   }
 
@@ -269,7 +276,14 @@ export class Room {
     }
 
     // Guest: always ask host to advance — covers own turn and host-clock lag.
-    this.session.send(Msg.TIMEOUT, { playerId: current.id });
+    const sent = this.session.send(Msg.TIMEOUT, { playerId: current.id });
+    if (!sent) {
+      return {
+        ok: false,
+        reason: "Geen verbinding met de host — opnieuw verbinden…",
+        reconnect: true,
+      };
+    }
     return { ok: true };
   }
 

@@ -248,10 +248,19 @@ export class Session {
     this.#pingTimer = setInterval(() => {
       if (this.role === "host" && this.maxGuests > 1) {
         this.broadcast(TransportType.PING, { t: Date.now() });
-      } else if (this.net.isConnected()) {
-        this.send(TransportType.PING, { t: Date.now() });
+        return;
       }
-    }, 8000);
+      if (!this.net.isConnected()) {
+        if (this.role === "guest") {
+          this.net.markDisconnected("Verbinding verbroken");
+        }
+        return;
+      }
+      const ok = this.send(TransportType.PING, { t: Date.now() });
+      if (!ok && this.role === "guest") {
+        this.net.markDisconnected("Verbinding verbroken");
+      }
+    }, 5000);
   }
 
   #stopPing() {

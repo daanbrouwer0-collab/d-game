@@ -34,6 +34,9 @@ let room = null;
 /** @type {string | null} */
 let shareUrl = null;
 let lastStatus = "idle";
+/** @type {ReturnType<typeof setTimeout> | null} */
+let autoReconnectTimer = null;
+let autoReconnectAttempts = 0;
 
 const savedName = getDisplayName();
 if (savedName && ui.nameInput) ui.nameInput.value = savedName;
@@ -144,6 +147,14 @@ function bindSession(s) {
       !isLocal() && (status === "disconnected" || status === "error"),
     );
 
+    if (status === "connected") {
+      autoReconnectAttempts = 0;
+      if (autoReconnectTimer) {
+        clearTimeout(autoReconnectTimer);
+        autoReconnectTimer = null;
+      }
+    }
+
     if (status === "connected" && s.role === "guest" && room) {
       if (room.joined && wasDisconnected) {
         room.onReconnected();
@@ -152,12 +163,14 @@ function bindSession(s) {
         ui.showLobby();
         room.beginAsGuest();
       }
+      ui.setError("");
       syncView();
       refreshRecent();
     }
 
     if (status === "connected" && s.role === "host" && room && !isLocal()) {
       if (wasDisconnected) room.onReconnected();
+      ui.setError("");
       syncView();
     }
 
@@ -173,6 +186,7 @@ function bindSession(s) {
     ) {
       ui.setError(detail || "Verbinding verbroken.");
       syncView();
+      if (s.role === "guest") scheduleGuestAutoReconnect();
     }
   };
 
@@ -180,6 +194,27 @@ function bindSession(s) {
   s.onGameMismatch = (reason) => ui.setError(reason);
   s.onRoomFull = () =>
     ui.setError(`Lobby is vol (max ${MAX_PLAYERS} spelers).`);
+}
+
+function scheduleGuestAutoReconnect() {
+  if (!session || session.role !== "guest" || isLocal()) return;
+  if (autoReconnectTimer) return;
+  if (autoReconnectAttempts >= 6) {
+    ui.setError("Verbinding blijft weg. Tik op Opnieuw verbinden.");
+    return;
+  }
+  const delay = 700 + autoReconnectAttempts * 600;
+  autoReconnectTimer = setTimeout(async () => {
+    autoReconnectTimer = null;
+    autoReconnectAttempts += 1;
+    ui.setError(`Opnieuw verbinden… (${autoReconnectAttempts}/6)`);
+    try {
+      await session?.reconnect();
+    } catch (err) {
+      ui.setError(humanizePeerError(err));
+      scheduleGuestAutoReconnect();
+    }
+  }, delay);
 }
 
 function bindRoom(r) {
@@ -279,7 +314,14 @@ ui.btnStart.addEventListener("click", () => {
 });
 
 ui.btnRoll.addEventListener("click", () => {
-  room?.tryRoll();
+  if (!room) return;
+  const result = room.tryRoll();
+  if (!result.ok) {
+    ui.setError(result.reason || "Kon niet gooien");
+    if (/** @type {{ reconnect?: boolean }} */ (result).reconnect) {
+      scheduleGuestAutoReconnect();
+    }
+  }
 });
 
 ui.btnRematch?.addEventListener("click", () => {
@@ -318,10 +360,12 @@ ui.btnReconnectGame?.addEventListener("click", () => reconnectNow());
 async function reconnectNow() {
   if (!session || session.transport === "local") return;
   ui.setError("");
+  autoReconnectAttempts = 0;
   try {
     await session.reconnect();
   } catch (err) {
     ui.setError(humanizePeerError(err));
+    if (session.role === "guest") scheduleGuestAutoReconnect();
   }
 }
 

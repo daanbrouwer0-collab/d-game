@@ -374,7 +374,16 @@ export class Net {
       if (this.conn && this.conn !== conn) return;
       this.conn = null;
       if (this.#hasOpenDataConnection()) return;
-      this.#setStatus("disconnected", "Verbinding verbroken");
+      // Brief delay: mobile WebRTC sometimes flaps before a reconnect lands.
+      const code = this.roomCode;
+      setTimeout(() => {
+        if (this.status === "idle") return;
+        if (this.roomCode !== code) return;
+        if (this.#hasOpenDataConnection()) return;
+        // Skip only while an explicit reconnect/join is in flight.
+        if (this.status === "connecting") return;
+        this.#setStatus("disconnected", "Verbinding verbroken");
+      }, 1200);
     });
 
     conn.on("error", (err) => {
@@ -442,6 +451,15 @@ export class Net {
     }
     // multi: host is "in session" while hosting (lobby open)
     return this.status === "hosting" || this.status === "connected";
+  }
+
+  /**
+   * Force UI/session into disconnected (e.g. failed keepalive send).
+   * @param {string} [detail]
+   */
+  markDisconnected(detail = "Verbinding verbroken") {
+    if (this.status === "idle" || this.status === "connecting") return;
+    this.#setStatus("disconnected", detail);
   }
 
   async destroy() {
