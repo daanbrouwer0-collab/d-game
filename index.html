@@ -2,7 +2,7 @@
 <html lang="nl">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>D-Game</title>
     <meta
       name="description"
@@ -13,18 +13,22 @@
       body {
         margin: 0;
         height: 100%;
-        background: #fff;
+        height: 100dvh;
+        overflow: hidden;
+        overscroll-behavior: none;
+        background: #1a1f2e;
       }
       #site-frame {
         display: block;
         width: 100%;
         height: 100%;
+        height: 100dvh;
         border: 0;
       }
       #site-error {
         font-family: system-ui, sans-serif;
         padding: 2rem;
-        color: #333;
+        color: #e8ecf4;
       }
     </style>
   </head>
@@ -45,19 +49,21 @@
             if (data.sha) version = data.sha;
           }
         } catch (_) {
-          // blijf op main als de API niet bereikbaar is
+          /* blijf op main als de API niet bereikbaar is */
         }
 
         const base = `https://cdn.jsdelivr.net/gh/${repo}@${version}/${subpath}`;
         const frame = document.getElementById("site-frame");
+        let showGen = 0;
 
         function normalizePath(path) {
-          let p = (path || "index.html").replace(/^\/+/, "");
+          let p = String(path || "index.html").replace(/^\/+/, "");
+          const qi = p.indexOf("?");
+          if (qi >= 0) p = p.slice(0, qi);
           if (!p || p.endsWith("/")) p += "index.html";
           return p;
         }
 
-        /** @param {string} hash */
         function parseHash(hash) {
           const raw = (hash || "#index.html").replace(/^#/, "");
           const qi = raw.indexOf("?");
@@ -71,7 +77,6 @@
             ? pagePath.slice(0, pagePath.lastIndexOf("/") + 1)
             : "";
           const pageBase = `${base}/${pageDir}`;
-
           if (!/<base\s/i.test(html)) {
             html = html.replace(
               /<head([^>]*)>/i,
@@ -81,62 +86,97 @@
           return html;
         }
 
-        function wireNavigation(doc) {
-          doc.addEventListener("click", (event) => {
-            const anchor = event.target.closest("a");
-            if (!anchor) return;
-
-            const href = anchor.getAttribute("href");
-            if (!href || href.startsWith("#")) return;
-            if (/^(mailto:|tel:|javascript:)/i.test(href)) return;
-
-            const absolute = /^(https?:)?\/\//i.test(href);
-            if (absolute) return;
-
-            event.preventDefault();
-            const current = parseHash(location.hash).path;
-            const currentDir = current.includes("/")
-              ? current.slice(0, current.lastIndexOf("/") + 1)
+        function pathFromHref(href, currentPath) {
+          if (!href || /^(mailto:|tel:|javascript:)/i.test(href)) return null;
+          if (href.startsWith("#")) {
+            return parseHash(href);
+          }
+          try {
+            if (/^(https?:)?\/\//i.test(href)) {
+              const url = new URL(href);
+              const marker = `/${subpath}/`;
+              const idx = url.pathname.indexOf(marker);
+              if (idx < 0) return null;
+              const rest = url.pathname.slice(idx + marker.length);
+              return {
+                path: normalizePath(rest),
+                search: url.search || "",
+              };
+            }
+            const currentDir = currentPath.includes("/")
+              ? currentPath.slice(0, currentPath.lastIndexOf("/") + 1)
               : "";
-            const resolved = new URL(
-              href,
-              `https://local.invalid/${currentDir}`,
-            );
-            const nextPath = normalizePath(
-              resolved.pathname.replace(/^\//, ""),
-            );
-            const nextHash = `#${nextPath}${resolved.search || ""}`;
-            history.pushState(
-              { path: nextPath, search: resolved.search || "" },
-              "",
-              nextHash,
-            );
-            show(nextPath);
-          });
+            const resolved = new URL(href, `https://local.invalid/${currentDir}`);
+            return {
+              path: normalizePath(resolved.pathname.replace(/^\//, "")),
+              search: resolved.search || "",
+            };
+          } catch {
+            return null;
+          }
+        }
+
+        function wireNavigation(doc) {
+          doc.addEventListener(
+            "click",
+            (event) => {
+              const anchor = event.target.closest("a");
+              if (!anchor || anchor.target === "_blank") return;
+              const href = anchor.getAttribute("href");
+              const next = pathFromHref(href, parseHash(location.hash).path);
+              if (!next) return;
+              event.preventDefault();
+              event.stopPropagation();
+              const nextHash = `#${next.path}${next.search}`;
+              history.pushState(
+                { path: next.path, search: next.search },
+                "",
+                nextHash,
+              );
+              show(next.path);
+            },
+            true,
+          );
         }
 
         async function show(path) {
+          const gen = ++showGen;
           const pagePath = normalizePath(path);
           const res = await fetch(`${base}/${pagePath}`);
+          if (gen !== showGen) return;
           if (!res.ok) {
             throw new Error(`Pagina niet gevonden: ${pagePath}`);
           }
+          const html =
+            rewriteAssetUrls(await res.text(), pagePath) + `<!-- r${gen} -->`;
 
-          const html = rewriteAssetUrls(await res.text(), pagePath);
-          frame.onload = () => {
-            try {
-              const doc = frame.contentDocument;
-              if (!doc) return;
-              wireNavigation(doc);
-              const title = doc.querySelector("title");
-              if (title && title.textContent) {
-                document.title = title.textContent;
+          await new Promise((resolve) => {
+            const done = () => {
+              frame.removeEventListener("load", done);
+              resolve();
+            };
+            frame.addEventListener("load", done);
+            frame.removeAttribute("srcdoc");
+            frame.src = "about:blank";
+          });
+          if (gen !== showGen) return;
+
+          await new Promise((resolve) => {
+            frame.onload = () => {
+              try {
+                const doc = frame.contentDocument;
+                if (doc) {
+                  wireNavigation(doc);
+                  const title = doc.querySelector("title");
+                  if (title && title.textContent) document.title = title.textContent;
+                }
+              } catch (_) {
+                /* ignore */
               }
-            } catch (_) {
-              // negeer als iframe niet bereikbaar is
-            }
-          };
-          frame.srcdoc = html;
+              resolve();
+            };
+            frame.srcdoc = html;
+          });
         }
 
         const initial = parseHash(location.hash || "#index.html");
@@ -149,8 +189,7 @@
 
         window.addEventListener("popstate", (event) => {
           const parsed = parseHash(location.hash || "#index.html");
-          const path =
-            (event.state && event.state.path) || parsed.path;
+          const path = (event.state && event.state.path) || parsed.path;
           show(path).catch(() => {
             document.body.innerHTML =
               '<p id="site-error">Kon de D-Game-site niet laden vanaf GitHub.</p>';

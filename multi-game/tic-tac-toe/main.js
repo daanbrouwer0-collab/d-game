@@ -7,6 +7,7 @@ import { showHostInviteCard } from "../js/shell/p2p-invite-ui.js";
 import {
   readHostIntentFromUrl,
   readRoomFromUrl,
+  watchShellRoute,
 } from "../js/shell/site-url.js";
 import { GAME_ID } from "./game.js";
 import { GameEngine } from "./engine.js";
@@ -399,6 +400,7 @@ async function resumeAsHost(code) {
 }
 
 const roomParam = readRoomFromUrl();
+let lastShellKey = `${roomParam || ""}:${readHostIntentFromUrl() ? "host" : "join"}`;
 if (roomParam && transportFromUrl() !== "qr") {
   ui.joinCode.value = roomParam;
   if (readHostIntentFromUrl()) {
@@ -409,3 +411,20 @@ if (roomParam && transportFromUrl() !== "qr") {
     joinRoom(roomParam);
   }
 }
+
+watchShellRoute(() => {
+  const room = readRoomFromUrl();
+  const asHost = readHostIntentFromUrl();
+  const key = `${room || ""}:${asHost ? "host" : "join"}`;
+  if (key === lastShellKey) return;
+  lastShellKey = key;
+  if (!room || transportFromUrl() === "qr") return;
+  ui.joinCode.value = room;
+  if (asHost) {
+    ui.lobbyHint.textContent = "Bezig deze room opnieuw te hosten…";
+    resumeAsHost(room);
+  } else {
+    ui.lobbyHint.textContent = "Bezig met joinen via deellink…";
+    joinRoom(room);
+  }
+});

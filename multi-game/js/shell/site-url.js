@@ -148,6 +148,11 @@ export function navigateInShell(gamePath, params = {}) {
       win.dispatchEvent(
         new PopStateEvent("popstate", { state: { path, search } }),
       );
+      try {
+        win.dispatchEvent(new HashChangeEvent("hashchange"));
+      } catch {
+        /* older browsers */
+      }
       return;
     } catch {
       /* fall through */
@@ -310,4 +315,98 @@ export function parseInviteFromText(raw) {
     return { code, url: text, via: null };
   }
   return null;
+}
+
+/**
+ * @returns {string} directory of current hash path, e.g. "lobby/"
+ */
+function currentHashDir() {
+  try {
+    const raw = (shellWindow().location.hash || "#index.html").replace(/^#/, "");
+    const path = raw.split("?")[0];
+    if (!path.includes("/")) return "";
+    return path.slice(0, path.lastIndexOf("/") + 1);
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Map a clicked href (relative or jsDelivr) to a hash-shell path + params.
+ * @param {string} href
+ * @returns {{ path: string, params: Record<string, string> } | null}
+ */
+export function parseShellHref(href) {
+  const raw = String(href || "").trim();
+  if (!raw || /^(mailto:|tel:|javascript:)/i.test(raw)) return null;
+  if (raw.startsWith("#")) {
+    const inner = raw.slice(1);
+    const qi = inner.indexOf("?");
+    const pathPart = qi >= 0 ? inner.slice(0, qi) : inner;
+    const search = qi >= 0 ? inner.slice(qi + 1) : "";
+    const params = Object.fromEntries(new URLSearchParams(search));
+    return { path: toHashPath(pathPart), params };
+  }
+
+  try {
+    if (/^(https?:)?\/\//i.test(raw)) {
+      const url = new URL(raw);
+      const marker = "/multi-game/";
+      const idx = url.pathname.indexOf(marker);
+      if (idx < 0) return null;
+      const rest = url.pathname.slice(idx + marker.length);
+      return {
+        path: toHashPath(rest),
+        params: Object.fromEntries(url.searchParams),
+      };
+    }
+    const resolved = new URL(raw, `https://local.invalid/${currentHashDir()}`);
+    return {
+      path: toHashPath(resolved.pathname.replace(/^\//, "")),
+      params: Object.fromEntries(resolved.searchParams),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Capture in-iframe clicks so <base href="jsdelivr"> never leaves the shell.
+ * Call once per page (e.g. from mountShellNav).
+ * @param {ParentNode} [root]
+ */
+export function bindShellClicks(root = document) {
+  if (!isHashShell()) return;
+  const el = /** @type {HTMLElement} */ (root instanceof Document ? root.documentElement : root);
+  if (el.dataset.shellClicks === "1") return;
+  el.dataset.shellClicks = "1";
+  root.addEventListener(
+    "click",
+    (event) => {
+      const anchor = event.target.closest?.("a");
+      if (!anchor || anchor.target === "_blank") return;
+      const href = anchor.getAttribute("href");
+      const parsed = parseShellHref(href);
+      if (!parsed) return;
+      event.preventDefault();
+      event.stopPropagation();
+      navigateInShell(parsed.path, parsed.params);
+    },
+    true,
+  );
+}
+
+/**
+ * @param {() => void} handler
+ * @returns {() => void}
+ */
+export function watchShellRoute(handler) {
+  const win = isHashShell() ? shellWindow() : window;
+  const run = () => handler();
+  win.addEventListener("popstate", run);
+  win.addEventListener("hashchange", run);
+  return () => {
+    win.removeEventListener("popstate", run);
+    win.removeEventListener("hashchange", run);
+  };
 }

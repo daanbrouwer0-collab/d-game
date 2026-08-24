@@ -1,5 +1,18 @@
 import { listDeskCards, navigateDeskCard } from "../core/desk.js";
-import { readRoomFromUrl } from "./site-url.js";
+import {
+  bindShellClicks,
+  isHashShell,
+  navigateInShell,
+  readRoomFromUrl,
+} from "./site-url.js";
+
+const TAB_PATHS = {
+  games: "index.html",
+  lobby: "lobby/index.html",
+  friends: "friends/index.html",
+  netwerk: "netwerk/index.html",
+  geheugen: "geheugen/index.html",
+};
 
 /**
  * Inject shared bottom tab navigation for the D-Game sandbox shell.
@@ -7,6 +20,7 @@ import { readRoomFromUrl } from "./site-url.js";
  */
 export function mountShellNav({ active, base = "" }) {
   const root = base.endsWith("/") || base === "" ? base : `${base}/`;
+  const hash = isHashShell();
 
   const tabs = [
     { id: "games", label: "Games", href: `${root}index.html` },
@@ -33,15 +47,30 @@ export function mountShellNav({ active, base = "" }) {
   }
 
   nav.innerHTML = normalized
-    .map(
-      (t) => `
-    <a class="shell-tab${t.id === active ? " is-active" : ""}" href="${t.href}" data-tab="${t.id}">
-      <span>${t.label}</span>
-    </a>`,
-    )
+    .map((t) => {
+      const on = t.id === active ? " is-active" : "";
+      if (hash) {
+        return `<button type="button" class="shell-tab${on}" data-tab="${t.id}">
+        <span>${t.label}</span>
+      </button>`;
+      }
+      return `<a class="shell-tab${on}" href="${t.href}" data-tab="${t.id}">
+        <span>${t.label}</span>
+      </a>`;
+    })
     .join("");
 
+  if (hash) {
+    nav.querySelectorAll("[data-tab]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-tab");
+        navigateInShell(TAB_PATHS[id] || "index.html");
+      });
+    });
+  }
+
   document.documentElement.classList.add("has-shell-nav");
+  bindShellClicks(document);
 }
 
 /**
