@@ -16,6 +16,7 @@ import {
   MAX_PLAYERS,
   addPlayer,
   applyRoll,
+  applyTimeout,
   canStart,
   cloneState,
   createEmptyLobby,
@@ -240,6 +241,42 @@ export class Room {
   }
 
   /**
+   * Turn timer expired for the current player (host-authoritative).
+   * Guests may request; host applies.
+   */
+  tryTimeout() {
+    if (this.state.phase !== "playing") {
+      return { ok: false, reason: "Spel loopt niet" };
+    }
+    const current = this.state.players[this.state.turnIndex];
+    if (!current) {
+      return { ok: false, reason: "Geen beurt" };
+    }
+
+    if (this.isLocal && this.session.role === "host") {
+      const result = applyTimeout(this.state, current.id);
+      if (!result.ok) return result;
+      this.state = result.state;
+      this.#emit();
+      return { ok: true };
+    }
+
+    if (this.session.role === "host") {
+      const result = applyTimeout(this.state, current.id);
+      if (!result.ok) return result;
+      this.#appendAndBroadcast("timeout", { playerId: current.id });
+      return { ok: true };
+    }
+
+    // Guest: ask host (e.g. if their local display timer fired first)
+    if (current.id === this.localId) {
+      this.session.send(Msg.TIMEOUT, { playerId: this.localId });
+      return { ok: true };
+    }
+    return { ok: false, reason: "Alleen de host kan een timeout toepassen" };
+  }
+
+  /**
    * @param {string} playerId
    */
   isPlayerOnline(playerId) {
@@ -459,6 +496,18 @@ export class Room {
           playerId: payload.playerId,
           value: roll,
         });
+        break;
+      }
+
+      case Msg.TIMEOUT: {
+        if (this.session.role !== "host") break;
+        const payload = /** @type {{ playerId?: string }} */ (msg.payload || {});
+        if (!payload.playerId) break;
+        const current = this.state.players[this.state.turnIndex];
+        if (!current || current.id !== payload.playerId) break;
+        const result = applyTimeout(this.state, payload.playerId);
+        if (!result.ok) break;
+        this.#appendAndBroadcast("timeout", { playerId: payload.playerId });
         break;
       }
 

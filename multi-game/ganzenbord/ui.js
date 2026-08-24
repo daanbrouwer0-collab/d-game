@@ -71,7 +71,16 @@ export class UI {
     this.winActions = document.getElementById("win-actions");
     this.boardTrack = document.getElementById("board-track");
     this.legendEl = document.getElementById("goose-legend");
+    this.timerEl = document.getElementById("turn-timer");
+    this.timerFill = document.getElementById("turn-timer-fill");
+    this.timerLabel = document.getElementById("turn-timer-label");
     this.recentSetup = document.getElementById("recent-setup");
+    /** @type {ReturnType<typeof setInterval> | null} */
+    this._timerInterval = null;
+    /** @type {string} */
+    this._timerKey = "";
+    /** @type {(() => void) | null} */
+    this._onTimerExpire = null;
     this.recentSetupList = document.getElementById("recent-setup-list");
     this.recentLobbyList = document.getElementById("recent-lobby-list");
     this.switchCode = document.getElementById("switch-code");
@@ -86,12 +95,14 @@ export class UI {
   }
 
   showSetup() {
+    this.clearTurnTimer();
     this.setup.classList.remove("hidden");
     this.lobby.classList.add("hidden");
     this.game.classList.add("hidden");
   }
 
   showLobby() {
+    this.clearTurnTimer();
     this.setup.classList.add("hidden");
     this.lobby.classList.remove("hidden");
     this.game.classList.add("hidden");
@@ -136,6 +147,71 @@ export class UI {
   setReconnectVisible(visible) {
     this.btnReconnect?.classList.toggle("hidden", !visible);
     this.btnReconnectGame?.classList.toggle("hidden", !visible);
+  }
+
+  clearTurnTimer() {
+    if (this._timerInterval) {
+      clearInterval(this._timerInterval);
+      this._timerInterval = null;
+    }
+    this._timerKey = "";
+    this._onTimerExpire = null;
+    this.timerEl?.classList.add("hidden");
+    if (this.timerFill) this.timerFill.style.width = "100%";
+    if (this.timerLabel) this.timerLabel.textContent = "";
+  }
+
+  /**
+   * Visual + optional expire callback for the roll deadline.
+   * Restarts only when `key` changes (new turn).
+   * @param {{
+   *   key: string,
+   *   seconds: number,
+   *   active: boolean,
+   *   canExpire: boolean,
+   *   onExpire?: () => void,
+   * }} opts
+   */
+  syncTurnTimer(opts) {
+    if (!opts.active) {
+      this.clearTurnTimer();
+      return;
+    }
+    this.timerEl?.classList.remove("hidden");
+    this._onTimerExpire = opts.canExpire ? opts.onExpire || null : null;
+
+    if (opts.key === this._timerKey && this._timerInterval) return;
+    this._timerKey = opts.key;
+
+    if (this._timerInterval) {
+      clearInterval(this._timerInterval);
+      this._timerInterval = null;
+    }
+
+    const total = Math.max(1, opts.seconds);
+    let left = total;
+    const paint = () => {
+      if (this.timerFill) {
+        this.timerFill.style.width = `${(left / total) * 100}%`;
+      }
+      if (this.timerLabel) {
+        this.timerLabel.textContent = `${left}s`;
+      }
+      this.timerEl?.classList.toggle("is-urgent", left <= 5);
+    };
+    paint();
+
+    this._timerInterval = setInterval(() => {
+      left -= 1;
+      if (left <= 0) {
+        paint();
+        const expire = this._onTimerExpire;
+        this.clearTurnTimer();
+        expire?.();
+        return;
+      }
+      paint();
+    }, 1000);
   }
 
   /**

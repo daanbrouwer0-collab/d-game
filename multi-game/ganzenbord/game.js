@@ -60,11 +60,15 @@ export const Msg = Object.freeze({
   JOIN: "join",
   START: "start",
   ROLL: "roll",
+  TIMEOUT: "timeout",
   STATE: "state",
   LOG: "log",
   REJECT: "reject",
   TO_LOBBY: "to_lobby",
 });
+
+/** Seconds to roll before the turn is forfeited. */
+export const TURN_SECONDS = 20;
 
 /**
  * @typedef {{
@@ -427,6 +431,32 @@ export function applyRoll(state, playerId, roll) {
   advanceTurn(next, turnNotes);
   if (turnNotes.length) log += `. ${turnNotes.join("; ")}`;
   const nextPlayer = next.players[next.turnIndex];
+  next.lastLog = `${log}. Beurt: ${nextPlayer?.name || "…"}`;
+  return { ok: true, state: next };
+}
+
+/**
+ * Current player ran out of time — skip without moving.
+ * @param {GameState} state
+ * @param {string} playerId
+ */
+export function applyTimeout(state, playerId) {
+  if (state.phase !== "playing") {
+    return { ok: false, reason: "Spel loopt niet" };
+  }
+  const current = state.players[state.turnIndex];
+  if (!current || current.id !== playerId) {
+    return { ok: false, reason: "Niet jouw beurt" };
+  }
+
+  const next = cloneState(state);
+  /** @type {string[]} */
+  const turnNotes = [];
+  advanceTurn(next, turnNotes);
+  let log = `${current.name} te laat (${TURN_SECONDS}s) — beurt voorbij`;
+  if (turnNotes.length) log += `. ${turnNotes.join("; ")}`;
+  const nextPlayer = next.players[next.turnIndex];
+  next.lastRoll = null;
   next.lastLog = `${log}. Beurt: ${nextPlayer?.name || "…"}`;
   return { ok: true, state: next };
 }

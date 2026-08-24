@@ -1,6 +1,7 @@
 import {
   addPlayer,
   applyRoll,
+  applyTimeout,
   cloneState,
   createEmptyLobby,
   normalizeColors,
@@ -102,6 +103,13 @@ export function replayGanzenbord(log) {
     if (ev.type === "to_lobby") {
       const back = returnToLobby(state);
       if (back.ok) state = back.state;
+      continue;
+    }
+    if (ev.type === "timeout") {
+      const payload = /** @type {{ playerId?: string }} */ (ev.payload || {});
+      if (typeof payload.playerId !== "string") continue;
+      const timed = applyTimeout(state, payload.playerId);
+      if (timed.ok) state = timed.state;
       continue;
     }
     if (ev.type !== "roll") continue;

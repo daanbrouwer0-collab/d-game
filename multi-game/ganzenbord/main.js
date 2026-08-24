@@ -17,7 +17,7 @@ import {
   readRoomFromUrl,
   watchShellRoute,
 } from "../js/shell/site-url.js";
-import { GAME_ID, MAX_PLAYERS } from "./game.js";
+import { GAME_ID, MAX_PLAYERS, TURN_SECONDS } from "./game.js";
 import { Room } from "./room.js";
 import { UI } from "./ui.js";
 
@@ -76,6 +76,7 @@ function syncView() {
       online,
       youName: room.localName,
     });
+    ui.clearTurnTimer();
   } else {
     ui.showGame();
     ui.renderGame(room.state, room.localId, {
@@ -85,8 +86,36 @@ function syncView() {
       connected: Boolean(session?.isConnected?.() || local),
       isHost: session?.role === "host",
     });
+    syncTurnTimer();
   }
   refreshRecent();
+}
+
+function syncTurnTimer() {
+  if (!room || room.state.phase !== "playing") {
+    ui.clearTurnTimer();
+    return;
+  }
+  const current = room.state.players[room.state.turnIndex];
+  if (!current) {
+    ui.clearTurnTimer();
+    return;
+  }
+  const posKey = room.state.players
+    .map((p) => `${p.id}:${room.state.positions[p.id] ?? 0}`)
+    .join("|");
+  const key = `${room.state.turnIndex}:${current.id}:${posKey}:${room.state.lastLog}`;
+  const isHost = session?.role === "host";
+  ui.syncTurnTimer({
+    key,
+    seconds: TURN_SECONDS,
+    active: true,
+    // Host (incl. local hotseat) enforces timeout for every turn.
+    canExpire: Boolean(isHost),
+    onExpire: () => {
+      room?.tryTimeout();
+    },
+  });
 }
 
 function bindSession(s) {
