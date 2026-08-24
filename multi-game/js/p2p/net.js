@@ -63,6 +63,31 @@ export class Net {
     return this.conns.size;
   }
 
+  #hasOpenDataConnection() {
+    if (this.role === "guest") return Boolean(this.conn?.open);
+    return [...this.conns.values()].some((c) => c.open);
+  }
+
+  /**
+   * PeerJS "disconnected" = lost the cloud signaling server, not the WebRTC
+   * data channel. After join that often fires while the game still works.
+   * @param {import('peerjs').Peer} peer
+   */
+  #watchSignaling(peer) {
+    peer.on("disconnected", () => {
+      if (this.status === "idle" || this.peer !== peer) return;
+      if (this.#hasOpenDataConnection()) {
+        try {
+          if (!peer.destroyed) peer.reconnect();
+        } catch {
+          /* keep playing over the existing data channel */
+        }
+        return;
+      }
+      this.#setStatus("disconnected", "Verbinding verbroken");
+    });
+  }
+
   /**
    * @param {string} [preferredId]
    */
@@ -136,10 +161,7 @@ export class Net {
       peer.on("open", onOpen);
       peer.on("error", onError);
       peer.on("connection", (conn) => this.#onIncoming(conn));
-      peer.on("disconnected", () => {
-        if (this.status === "idle") return;
-        this.#setStatus("disconnected", "Signaling verbroken");
-      });
+      this.#watchSignaling(peer);
     });
   }
 
@@ -205,10 +227,7 @@ export class Net {
 
       peer.on("open", onOpen);
       peer.on("error", onPeerError);
-      peer.on("disconnected", () => {
-        if (this.status === "idle") return;
-        this.#setStatus("disconnected", "Signaling verbroken");
-      });
+      this.#watchSignaling(peer);
     });
   }
 
@@ -267,6 +286,7 @@ export class Net {
       peer.on("open", onOpen);
       peer.on("error", onError);
       peer.on("connection", (conn) => this.#onIncoming(conn));
+      this.#watchSignaling(peer);
     });
   }
 
@@ -328,12 +348,12 @@ export class Net {
     });
 
     conn.on("close", () => {
+      if (this.status === "idle") return;
       if (this.role === "host") {
-        if (this.conns.has(peerId)) {
-          this.conns.delete(peerId);
-          this.onPeerLeave?.(peerId);
-        }
-        if (this.status === "idle") return;
+        if (this.conns.get(peerId) !== conn) return;
+        this.conns.delete(peerId);
+        this.onPeerLeave?.(peerId);
+        if (this.#hasOpenDataConnection()) return;
         if (this.maxGuests === 1) {
           this.#setStatus("disconnected", "Verbinding verbroken");
         } else {
@@ -342,11 +362,12 @@ export class Net {
             `${this.conns.size + 1}/${this.maxGuests + 1} in lobby`,
           );
         }
-      } else {
-        this.conn = null;
-        if (this.status === "idle") return;
-        this.#setStatus("disconnected", "Verbinding verbroken");
+        return;
       }
+      if (this.conn && this.conn !== conn) return;
+      this.conn = null;
+      if (this.#hasOpenDataConnection()) return;
+      this.#setStatus("disconnected", "Verbinding verbroken");
     });
 
     conn.on("error", (err) => {
