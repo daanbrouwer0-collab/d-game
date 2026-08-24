@@ -451,12 +451,14 @@ function bindSession(s) {
     setStatus(
       detail ? `${labels[status] || status}: ${detail}` : labels[status] || status,
     );
-    sessionConnected = status === "hosting" || status === "connected";
+    sessionConnected =
+      status === "hosting" || status === "connected" || status === "connecting";
     if (status === "hosting" || status === "connected") {
       showPanel(activeSession ? "playing" : "lobby");
     }
-    if (status === "idle" || status === "disconnected") {
-      if (!activeSession) showPanel("idle");
+    // Alleen naar idle als sessie echt weg is — niet bij kortstondige disconnect.
+    if (status === "idle" && !session) {
+      showPanel("idle");
     }
   };
 
@@ -843,6 +845,7 @@ async function startHost() {
     setError(err instanceof Error ? err.message : String(err));
     await s.destroy();
     session = null;
+    showPanel("idle");
   }
 }
 
@@ -880,6 +883,7 @@ async function joinRoom(code) {
     setError(err instanceof Error ? err.message : String(err));
     await s.destroy();
     session = null;
+    showPanel("idle");
   }
 }
 

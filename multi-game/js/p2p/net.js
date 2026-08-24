@@ -84,6 +84,15 @@ export class Net {
         }
         return;
       }
+      // Host zonder gasten: PeerJS verliest soms alleen de cloud — lobby/QR open houden.
+      if (this.role === "host" && !peer.destroyed) {
+        try {
+          peer.reconnect();
+        } catch {
+          this.#setStatus("disconnected", "Verbinding verbroken");
+        }
+        return;
+      }
       this.#setStatus("disconnected", "Verbinding verbroken");
     });
   }
