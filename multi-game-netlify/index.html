@@ -329,12 +329,13 @@
         window.addEventListener("popstate", (event) => {
           const parsed = parseHash(location.hash || "#index.html");
           const path = (event.state && event.state.path) || parsed.path;
-          navigate(path, { force: true });
+          // Alleen echte pagina-wissel herladen — ?room= in hash is geen nieuwe pagina.
+          navigate(path);
         });
 
         window.addEventListener("hashchange", () => {
           const parsed = parseHash(location.hash || "#index.html");
-          navigate(parsed.path, { force: true });
+          navigate(parsed.path);
         });
 
         (async function boot() {

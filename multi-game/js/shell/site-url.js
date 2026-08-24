@@ -238,7 +238,7 @@ export function buildRoomShareUrl(code, opts = {}) {
 
 /**
  * @param {string} code
- * @param {{ via?: string }} [opts]
+ * @param {{ via?: string, asHost?: boolean }} [opts]
  */
 export function writeRoomCodeToUrl(code, opts = {}) {
   writeRoomToUrl(`/${ROOM_PATH}`, code, opts);
@@ -271,6 +271,7 @@ export function writeRoomToUrl(gamePath, code, opts = {}) {
   const params = new URLSearchParams();
   params.set("room", String(code || "").trim().toUpperCase());
   if (opts.via) params.set("via", opts.via);
+  if (opts.asHost) params.set("as", "host");
 
   try {
     if (isHashShell()) {
@@ -312,6 +313,7 @@ export function clearRoomFromUrl(gamePath) {
     const url = new URL(window.location.href);
     url.searchParams.delete("room");
     url.searchParams.delete("via");
+    url.searchParams.delete("as");
     history.replaceState(null, "", url);
   } catch {
     /* ignore */

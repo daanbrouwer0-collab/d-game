@@ -23,7 +23,6 @@ export async function showHostInviteCard(opts) {
     urlEl.href = url;
   }
   card?.classList.remove("hidden");
-  card?.scrollIntoView({ behavior: "smooth", block: "center" });
   await nextFrame();
   await nextFrame();
   if (canvas && url) {

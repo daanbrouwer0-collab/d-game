@@ -9,7 +9,7 @@ import {
   touchDeskRoom,
 } from "../js/core/desk.js";
 import { getPlayerId, playerLabel } from "../js/core/storage.js";
-import { saveRoom, clearRoom } from "../js/p2p/room-memory.js";
+import { saveRoom, clearRoom, loadActiveRoom } from "../js/p2p/room-memory.js";
 import { mountRoomStrip, mountShellNav, guardRoomNavigation } from "../js/shell/nav.js";
 import { showHostInviteCard } from "../js/shell/p2p-invite-ui.js";
 import { mountRoomChat } from "../js/shell/room-chat.js";
@@ -23,6 +23,7 @@ import {
   readRoomFromUrl,
   buildGameEmbeddedUrl,
   buildRoomShareUrl,
+  writeRoomCodeToUrl,
 } from "../js/shell/site-url.js";
 import { TransportType } from "../js/p2p/protocol.js";
 import {
@@ -86,6 +87,7 @@ const peerToPlayer = new Map();
 /** @type {ReturnType<typeof mountRoomChat> | null} */
 let roomChat = null;
 let sessionConnected = false;
+let hostStartInFlight = false;
 
 const playerId = getPlayerId();
 const roomCommit = createRoomHostCommit();
@@ -127,6 +129,14 @@ function getGameTitle(gameId) {
   return getGame(gameId)?.title || gameId;
 }
 
+function syncHostInvite() {
+  const card = document.getElementById("invite-card");
+  if (!card) return;
+  const show =
+    session?.role === "host" && Boolean(shareUrl || session?.roomCode);
+  card.classList.toggle("hidden", !show);
+}
+
 function renderRoster() {
   const state = roomState();
   renderRoomRoster(rosterList, rosterCount, {
@@ -140,6 +150,7 @@ function renderRoster() {
   renderGamePicker();
   renderChat();
   syncChatMode();
+  syncHostInvite();
 }
 
 function initRoomChat() {
@@ -775,13 +786,24 @@ function endGame(reason = "back_to_lobby") {
 }
 
 async function startHost() {
+  if (hostStartInFlight) return;
+  hostStartInFlight = true;
   setError("");
+  showPanel("lobby");
+  document.getElementById("invite-card")?.classList.remove("hidden");
+
   const s = createRoomSession({ maxGuests: 5 });
   bindSession(s);
 
   try {
     const urlCode = readRoomFromUrl();
-    const resumeHost = readHostIntentFromUrl();
+    const mem = loadActiveRoom();
+    const resumeHost =
+      readHostIntentFromUrl() ||
+      (mem?.isRoomShell &&
+        mem.role === "host" &&
+        urlCode &&
+        mem.code === urlCode);
     let code;
     if (urlCode && resumeHost) {
       code = await s.hostWithCode(urlCode);
@@ -804,7 +826,6 @@ async function startHost() {
     if (joined.ok) roomLog = joined.log;
     saveRoomLogByCode(code, roomLog);
 
-    s.writeRoomToUrl(code);
     shareUrl = buildRoomShareUrl(code);
     saveRoom({
       code,
@@ -812,6 +833,7 @@ async function startHost() {
       name: playerLabel(),
       isRoomShell: true,
     });
+    writeRoomCodeToUrl(code, { asHost: true });
 
     await showHostInviteCard({
       card: document.getElementById("invite-card"),
@@ -822,7 +844,6 @@ async function startHost() {
       url: shareUrl,
     });
 
-    showPanel("lobby");
     initRoomChat();
     renderRoster();
     persistRoomDesk();
@@ -843,9 +864,12 @@ async function startHost() {
     }
   } catch (err) {
     setError(err instanceof Error ? err.message : String(err));
+    shareUrl = null;
     await s.destroy();
     session = null;
     showPanel("idle");
+  } finally {
+    hostStartInFlight = false;
   }
 }
 
@@ -896,6 +920,7 @@ async function leaveRoom() {
   if (session) await session.destroy();
   session = null;
   roomLog = null;
+  shareUrl = null;
   clearRoom();
   showPanel("idle");
   setStatus("Niet verbonden");
@@ -918,6 +943,10 @@ guardRoomNavigation({
 
 const urlRoom = readRoomFromUrl();
 if (urlRoom) {
-  if (readHostIntentFromUrl()) startHost();
+  const mem = loadActiveRoom();
+  const resumeHost =
+    readHostIntentFromUrl() ||
+    (mem?.isRoomShell && mem.role === "host" && mem.code === urlRoom);
+  if (resumeHost) startHost();
   else joinRoom(urlRoom);
 }
