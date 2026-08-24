@@ -74,6 +74,8 @@ export class UI {
     this.btnRematch = document.getElementById("btn-rematch");
     this.btnToLobby = document.getElementById("btn-to-lobby");
     this.winActions = document.getElementById("win-actions");
+    this.winBanner = document.getElementById("win-banner");
+    this.winBannerBody = document.getElementById("win-banner-body");
     this.boardTrack = document.getElementById("board-track");
     this.legendEl = document.getElementById("goose-legend");
     this.timerEl = document.getElementById("turn-timer");
@@ -304,7 +306,12 @@ export class UI {
       const host = p.isHost ? " · host" : "";
       const online = onlineMap.has(p.id) ? onlineMap.get(p.id) : true;
       const status = local ? "" : online ? "" : " · offline";
-      li.innerHTML = `${goosePawnHtml(p.colors, i, p.name)}<span>${p.name}${you}${host}${status}</span>`;
+      li.innerHTML = `${goosePawnHtml(p.colors, i, p.name)}<span>${p.name}${you}${host}${status}${
+        state.championId === p.id
+          ? ` <span class="pos-crown" title="Vorige winnaar">👑</span>`
+          : ""
+      }</span>`;
+      if (state.championId === p.id) li.classList.add("is-champion");
       if (!online && !local) li.classList.add("is-offline");
       this.playerList.appendChild(li);
     });
@@ -359,14 +366,33 @@ export class UI {
     }
 
     const finished = state.phase === "finished";
-    if (finished) {
-      const winner = state.players.find((p) => p.id === state.winnerId);
-      this.turnLabel.textContent = winner
-        ? `${winner.name} heeft gewonnen!`
-        : "Afgelopen";
+    const winner = finished
+      ? state.players.find((p) => p.id === state.winnerId)
+      : null;
+
+    if (finished && winner) {
+      const wIdx = state.players.findIndex((p) => p.id === winner.id);
+      this.turnLabel.textContent = "";
+      this.winBanner?.classList.remove("hidden");
+      if (this.winBannerBody) {
+        this.winBannerBody.innerHTML = `${goosePawnHtml(winner.colors, wIdx, winner.name)}
+          <div class="win-banner-text">
+            <strong>${winner.name}</strong>
+            <span>heeft gewonnen!</span>
+          </div>`;
+      }
       this.btnRoll.disabled = true;
       this.btnRoll.classList.remove("is-pulse");
+      this.clearTurnTimer();
+    } else if (finished) {
+      this.winBanner?.classList.add("hidden");
+      this.turnLabel.textContent = "Afgelopen";
+      this.btnRoll.disabled = true;
+      this.btnRoll.classList.remove("is-pulse");
+      this.clearTurnTimer();
     } else {
+      this.winBanner?.classList.add("hidden");
+      if (this.winBannerBody) this.winBannerBody.innerHTML = "";
       const inSloot = state.trapped?.[current?.id] === "sloot";
       this.turnLabel.textContent = myTurn
         ? local
@@ -377,8 +403,6 @@ export class UI {
             ? "Jouw beurt — sloot: gooi 4 of 5 om eruit te komen"
             : "Jouw beurt — gooi de dobbelsteen"
         : `Beurt: ${current?.name || "…"}`;
-      // Allow roll whenever it's your turn — PeerJS "connected" flickers on mobile
-      // and was leaving the button stuck disabled after timeouts.
       this.btnRoll.disabled = !myTurn;
       this.btnRoll.classList.toggle("is-pulse", Boolean(myTurn));
       if (myTurn && !local && !connected) {
@@ -401,9 +425,12 @@ export class UI {
     state.players.forEach((p, i) => {
       const row = document.createElement("div");
       row.className = "pos-row";
-      if (current && p.id === current.id && state.phase === "playing") {
-        row.classList.add("is-turn");
-      }
+      const isTurn =
+        !finished && current && p.id === current.id && state.phase === "playing";
+      const isWinner = Boolean(finished && winner && p.id === winner.id);
+      if (isTurn) row.classList.add("is-turn");
+      if (isWinner) row.classList.add("is-winner");
+
       const pos = state.positions[p.id] ?? 0;
       const online = onlineMap.has(p.id) ? onlineMap.get(p.id) : true;
       const off = !local && !online ? " · offline" : "";
@@ -413,7 +440,20 @@ export class UI {
       const skipLabel = skips > 0 ? ` · overslaan (${skips})` : "";
       const onBankje = BANKJE_SQUARES.includes(pos);
       const bankLabel = onBankje && !trap ? " · bankje" : "";
-      row.innerHTML = `<span class="pos-name">${goosePawnHtml(p.colors, i, p.name)}<strong>${p.name}</strong></span> <span>vak ${pos} / ${BOARD_SIZE}${trapLabel}${skipLabel}${bankLabel}${off}</span>`;
+      const isChamp =
+        Boolean(state.championId && p.id === state.championId) && !isWinner;
+      const crown = isChamp
+        ? `<span class="pos-crown" title="Vorige winnaar" aria-label="Vorige winnaar">👑</span>`
+        : "";
+      const badge = isWinner
+        ? `<span class="pos-badge is-winner-badge">Winnaar</span>`
+        : isTurn
+          ? `<span class="pos-badge is-turn-badge">Aan de beurt</span>`
+          : "";
+
+      if (isChamp) row.classList.add("is-champion");
+
+      row.innerHTML = `<span class="pos-name">${goosePawnHtml(p.colors, i, p.name)}<strong>${p.name}</strong>${crown}${badge}</span> <span class="pos-meta">vak ${pos} / ${BOARD_SIZE}${trapLabel}${skipLabel}${bankLabel}${off}</span>`;
       this.positionsEl.appendChild(row);
     });
 

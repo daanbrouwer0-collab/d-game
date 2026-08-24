@@ -10,7 +10,16 @@ import {
   parseSyncPacket,
   tipSeq,
 } from "../js/sync/event-log.js";
-import { GAME_ID, GameMsg, applyMove, cloneState, createInitialState } from "./game.js";
+import {
+  GAME_ID,
+  GameMsg,
+  applyMove,
+  applyTimeoutMove,
+  cloneState,
+  createInitialState,
+  freeCells,
+  pickBlocked,
+} from "./game.js";
 import { markForPlayer, replayTtt, seatsFromLog, tttSummary } from "./log.js";
 
 /**
@@ -51,6 +60,7 @@ export class GameEngine {
     this.hotseat = false;
     this.playerName = playerLabel();
     this.localMark = this.#claimSeat(this.playerId, this.playerName);
+    this.#ensureBoardSetup();
     this.#replay();
     this.#persist();
     this.onReady?.(this.localMark);
@@ -61,7 +71,7 @@ export class GameEngine {
     this.hotseat = true;
     this.localMark = "X";
     this.log = createEventLog(GAME_ID);
-    this.state = createInitialState();
+    this.state = createInitialState(pickBlocked());
     this.onReady?.(this.localMark);
     this.onState?.(cloneState(this.state));
   }
@@ -86,6 +96,7 @@ export class GameEngine {
     if (this.session.role !== "host" || this.hotseat) return;
     this.playerName = playerLabel();
     this.localMark = this.#claimSeat(this.playerId, this.playerName);
+    this.#ensureBoardSetup();
     this.#replay();
     this.#persist();
     this.onReady?.(this.localMark);
@@ -136,6 +147,9 @@ export class GameEngine {
     if (this.state.turn !== this.localMark || this.state.status !== "playing") {
       return { ok: false, reason: "Niet jouw beurt" };
     }
+    if (this.state.blocked?.includes(index)) {
+      return { ok: false, reason: "Vakje is geblokkeerd" };
+    }
     if (this.state.board[index] !== null) {
       return { ok: false, reason: "Vakje is bezet" };
     }
@@ -151,16 +165,55 @@ export class GameEngine {
   requestRestart() {
     if (this.hotseat || this.session.role === "host") {
       if (this.hotseat) {
-        this.state = createInitialState();
+        this.state = createInitialState(pickBlocked());
         this.localMark = "X";
       } else {
-        this.#appendAndBroadcast("restart", null);
+        this.#appendAndBroadcast("restart", { blocked: pickBlocked() });
       }
       this.onReady?.(this.localMark);
       this.onState?.(cloneState(this.state));
       return;
     }
     this.session.send(GameMsg.RESTART);
+  }
+
+  /**
+   * Turn timer expired: place a random free cell for the current turn (P2P).
+   * Guests request; host chooses the index and appends a timeout event.
+   */
+  tryTimeout() {
+    if (this.hotseat) return { ok: false, reason: "Geen timer in hotseat" };
+    if (this.state.status !== "playing") {
+      return { ok: false, reason: "Spel is al afgelopen" };
+    }
+    const mark = this.state.turn;
+    const free = freeCells(this.state);
+    if (!free.length) return { ok: false, reason: "Geen vrije vakjes" };
+
+    if (this.session.role === "host") {
+      const index = free[Math.floor(Math.random() * free.length)];
+      const result = applyTimeoutMove(this.state, mark, index);
+      if (!result.ok) return result;
+      this.#appendAndBroadcast("timeout", { index, mark });
+      this.onState?.(cloneState(this.state));
+      return { ok: true };
+    }
+
+    const sent = this.session.send(GameMsg.TIMEOUT, { mark });
+    if (!sent) return { ok: false, reason: "Niet verbonden" };
+    return { ok: true };
+  }
+
+  /** Host: first board of a room gets blocked cells via restart event. */
+  #ensureBoardSetup() {
+    if (this.hotseat) return;
+    if (this.session.role !== "host") return;
+    const events = this.log.events || [];
+    if (events.some((e) => e.type === "restart")) return;
+    // Don't wipe an in-progress legacy game (moves without restart).
+    if (events.some((e) => e.type === "move" || e.type === "timeout")) return;
+    const added = appendEvent(this.log, "restart", { blocked: pickBlocked() });
+    if (added.ok) this.log = added.log;
   }
 
   stop() {
@@ -415,10 +468,24 @@ export class GameEngine {
 
       case GameMsg.RESTART:
         if (this.session.role === "host") {
-          this.#appendAndBroadcast("restart", null);
+          this.#appendAndBroadcast("restart", { blocked: pickBlocked() });
           this.onState?.(cloneState(this.state));
         }
         break;
+
+      case GameMsg.TIMEOUT: {
+        if (this.session.role !== "host") break;
+        if (this.state.status !== "playing") break;
+        const mark = this.state.turn;
+        const free = freeCells(this.state);
+        if (!free.length) break;
+        const index = free[Math.floor(Math.random() * free.length)];
+        const result = applyTimeoutMove(this.state, mark, index);
+        if (!result.ok) break;
+        this.#appendAndBroadcast("timeout", { index, mark });
+        this.onState?.(cloneState(this.state));
+        break;
+      }
 
       default:
         break;

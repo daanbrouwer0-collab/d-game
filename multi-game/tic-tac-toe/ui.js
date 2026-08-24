@@ -1,3 +1,5 @@
+import { BOARD_SIZE, isBlocked } from "./game.js";
+
 /**
  * DOM helpers for lobby + board + share.
  */
@@ -15,6 +17,9 @@ export class UI {
     this.turnLabel = document.getElementById("turn-label");
     this.resultLabel = document.getElementById("result-label");
     this.boardEl = document.getElementById("board");
+    this.timerEl = document.getElementById("turn-timer");
+    this.timerFill = document.getElementById("turn-timer-fill");
+    this.timerLabel = document.getElementById("turn-timer-label");
     this.btnLocal = document.getElementById("btn-local");
     this.btnHost = document.getElementById("btn-host");
     this.btnJoin = document.getElementById("btn-join");
@@ -31,13 +36,20 @@ export class UI {
 
     /** @type {HTMLButtonElement[]} */
     this.cells = [];
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    this._timerInterval = null;
+    this._timerKey = "";
+    this._timerDeadline = 0;
+    /** @type {(() => void) | null} */
+    this._onTimerExpire = null;
     this.#buildBoard();
   }
 
   #buildBoard() {
     this.boardEl.innerHTML = "";
+    this.boardEl.classList.add("board-4");
     this.cells = [];
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < BOARD_SIZE; i++) {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "cell";
@@ -49,6 +61,7 @@ export class UI {
   }
 
   showLobby() {
+    this.clearTurnTimer();
     this.lobby.classList.remove("hidden");
     this.game.classList.add("hidden");
     this.btnReconnect.classList.add("hidden");
@@ -124,6 +137,99 @@ export class UI {
       : `Jij speelt: ${mark}`;
   }
 
+  clearTurnTimer() {
+    if (this._timerInterval != null) {
+      clearTimeout(this._timerInterval);
+      this._timerInterval = null;
+    }
+    this._timerKey = "";
+    this._timerDeadline = 0;
+    this._onTimerExpire = null;
+    this.timerEl?.classList.add("hidden");
+    if (this.timerFill) this.timerFill.style.width = "100%";
+    if (this.timerLabel) this.timerLabel.textContent = "";
+  }
+
+  nudgeTurnTimer() {
+    if (!this._timerDeadline || !this._onTimerExpire) return;
+    if (Date.now() < this._timerDeadline) return;
+    if (this._timerInterval != null) {
+      clearTimeout(this._timerInterval);
+      this._timerInterval = null;
+    }
+    const expire = this._onTimerExpire;
+    this._onTimerExpire = null;
+    this._timerDeadline = 0;
+    expire?.();
+  }
+
+  /**
+   * @param {{
+   *   key: string,
+   *   seconds: number,
+   *   active: boolean,
+   *   canExpire: boolean,
+   *   onExpire?: () => void,
+   * }} opts
+   */
+  syncTurnTimer(opts) {
+    if (!opts.active) {
+      this.clearTurnTimer();
+      return;
+    }
+    this.timerEl?.classList.remove("hidden");
+    this._onTimerExpire = opts.canExpire ? opts.onExpire || null : null;
+
+    if (opts.key === this._timerKey && this._timerInterval != null) {
+      return;
+    }
+
+    if (this._timerInterval != null) {
+      clearTimeout(this._timerInterval);
+      this._timerInterval = null;
+    }
+
+    this._timerKey = opts.key;
+    const totalMs = Math.max(1, opts.seconds) * 1000;
+    const deadline = Date.now() + totalMs;
+    this._timerDeadline = deadline;
+
+    const paint = (leftSec) => {
+      const total = Math.max(1, opts.seconds);
+      if (this.timerFill) {
+        this.timerFill.style.width = `${(leftSec / total) * 100}%`;
+      }
+      if (this.timerLabel) {
+        this.timerLabel.textContent = `${leftSec}s`;
+      }
+      this.timerEl?.classList.toggle("is-urgent", leftSec <= 5);
+    };
+
+    const finish = () => {
+      if (this._timerInterval != null) {
+        clearTimeout(this._timerInterval);
+        this._timerInterval = null;
+      }
+      this._timerDeadline = 0;
+      paint(0);
+      const expire = this._onTimerExpire;
+      this._onTimerExpire = null;
+      expire?.();
+    };
+    const tick = () => {
+      const leftMs = deadline - Date.now();
+      const leftSec = Math.max(0, Math.ceil(leftMs / 1000));
+      paint(leftSec);
+      if (leftMs <= 0) {
+        finish();
+        return;
+      }
+      this._timerInterval = setTimeout(tick, Math.min(250, leftMs));
+    };
+
+    tick();
+  }
+
   /**
    * @param {ReturnType<import('./game.js').createInitialState>} state
    * @param {'X'|'O'|null} localMark
@@ -132,13 +238,30 @@ export class UI {
    */
   renderState(state, localMark, connected, opts = {}) {
     const hotseat = Boolean(opts.hotseat);
+    const winSet = new Set(state.winningLine || []);
 
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < BOARD_SIZE; i++) {
       const mark = state.board[i];
       const cell = this.cells[i];
+      const blocked = isBlocked(state, i);
+
+      cell.classList.toggle("is-blocked", blocked);
+      cell.classList.toggle("is-win", winSet.has(i));
+
+      if (blocked) {
+        cell.textContent = "";
+        cell.dataset.blocked = "1";
+        delete cell.dataset.mark;
+        cell.disabled = true;
+        cell.setAttribute("aria-label", `Vakje ${i + 1}, geblokkeerd`);
+        continue;
+      }
+
+      delete cell.dataset.blocked;
       cell.textContent = mark || "";
       if (mark) cell.dataset.mark = mark;
       else delete cell.dataset.mark;
+      cell.setAttribute("aria-label", `Vakje ${i + 1}`);
 
       const canPlay =
         connected &&

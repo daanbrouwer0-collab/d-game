@@ -19,7 +19,7 @@ export const GAMES = [
     path: "tic-tac-toe/",
     minPlayers: 2,
     maxPlayers: 2,
-    blurb: "Klassiek 3×3 — P2P-deellink of QR-scan.",
+    blurb: "4×4 met geblokkeerde vakjes — 3 op rij/kolom. P2P of dit apparaat.",
     tags: ["snel", "2 spelers"],
   },
   {

@@ -24,8 +24,9 @@
         <section id="lobby" class="panel">
           <h2>Lobby</h2>
           <p class="lede">
-            Start een P2P-room: er verschijnt een QR. Laat de ander die scannen om te joinen.
-            X en O blijven aan jouw naam, ook als de ander later host.
+            4×4-bord met 3 geblokkeerde vakjes; 3 op een rij of kolom wint (geen diagonaal).
+            Start een P2P-room: er verschijnt een QR. Bij P2P heb je 20s per beurt —
+            te laat = random zet. X en O blijven aan jouw naam.
           </p>
 
           <label class="field-label" for="player-name">Jouw naam</label>
@@ -89,7 +90,14 @@
             <p id="turn-label" class="meta"></p>
           </div>
 
-          <div id="board" class="board" aria-label="Tic tac toe bord"></div>
+          <div id="turn-timer" class="turn-timer hidden" aria-live="polite">
+            <div class="turn-timer-track">
+              <div id="turn-timer-fill" class="turn-timer-fill"></div>
+            </div>
+            <span id="turn-timer-label" class="turn-timer-label">20s</span>
+          </div>
+
+          <div id="board" class="board board-4" aria-label="Tic tac toe bord"></div>
 
           <p id="result-label" class="result"></p>
 

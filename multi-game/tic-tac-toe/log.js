@@ -1,15 +1,32 @@
-import { applyMove, createInitialState } from "./game.js";
+import {
+  applyMove,
+  applyTimeoutMove,
+  createInitialState,
+  normalizeBlocked,
+} from "./game.js";
 
 /**
- * Replay tic-tac-toe from a light event chain (move / restart).
+ * Replay tic-tac-toe from a light event chain (move / restart / timeout).
+ * Blocked cells come only from restart payloads (host-authored) — never RNG here.
  * @param {import('../js/sync/event-log.js').EventLog} log
  * @returns {ReturnType<typeof createInitialState>}
  */
 export function replayTtt(log) {
-  let state = createInitialState();
+  let state = createInitialState([]);
   for (const ev of log.events || []) {
     if (ev.type === "restart") {
-      state = createInitialState();
+      const payload = /** @type {{ blocked?: unknown }} */ (ev.payload || {});
+      state = createInitialState(normalizeBlocked(payload.blocked));
+      continue;
+    }
+    if (ev.type === "timeout") {
+      const payload = /** @type {{ index?: number, mark?: string }} */ (
+        ev.payload || {}
+      );
+      if (payload.mark !== "X" && payload.mark !== "O") continue;
+      if (typeof payload.index !== "number") continue;
+      const timed = applyTimeoutMove(state, payload.mark, payload.index);
+      if (timed.ok) state = timed.state;
       continue;
     }
     if (ev.type !== "move") continue;

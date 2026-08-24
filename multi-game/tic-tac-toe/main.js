@@ -9,7 +9,7 @@ import {
   readRoomFromUrl,
   watchShellRoute,
 } from "../js/shell/site-url.js";
-import { GAME_ID } from "./game.js";
+import { GAME_ID, TURN_SECONDS } from "./game.js";
 import { GameEngine } from "./engine.js";
 import { UI } from "./ui.js";
 
@@ -46,6 +46,44 @@ function syncBoard() {
   if (!engine || !session) return;
   ui.renderState(engine.state, engine.localMark, session.isConnected(), {
     hotseat: engine.hotseat,
+  });
+  syncTurnTimer();
+}
+
+function syncTurnTimer() {
+  // Timer only for P2P (not hotseat / local).
+  if (!engine || !session || engine.hotseat || session.transport === "local") {
+    ui.clearTurnTimer();
+    return;
+  }
+  if (engine.state.status !== "playing") {
+    ui.clearTurnTimer();
+    return;
+  }
+  const boardKey = engine.state.board
+    .map((c, i) => (engine.state.blocked.includes(i) ? "#" : c || "."))
+    .join("");
+  const key = `${engine.state.turn}:${boardKey}`;
+  const isHost = session.role === "host";
+  const myTurn = engine.localMark && engine.state.turn === engine.localMark;
+  ui.syncTurnTimer({
+    key,
+    seconds: TURN_SECONDS,
+    active: true,
+    canExpire: Boolean(isHost || myTurn),
+    onExpire: () => {
+      engine?.tryTimeout();
+      queueMicrotask(() => syncTurnTimer());
+    },
+  });
+}
+
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    if (!engine || engine.hotseat || engine.state.status !== "playing") return;
+    ui.nudgeTurnTimer();
+    queueMicrotask(() => syncTurnTimer());
   });
 }
 
@@ -290,6 +328,7 @@ async function joinRoom(code) {
  * @param {{ clearUrl?: boolean }} [opts]
  */
 async function teardown({ clearUrl = false } = {}) {
+  ui.clearTurnTimer();
   if (engine) engine.stop();
   if (session) {
     if (clearUrl) session.clearRoomFromUrl();

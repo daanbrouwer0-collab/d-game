@@ -127,6 +127,7 @@ export const TURN_SECONDS = 20;
  *   lastRoll: number|null,
  *   lastLog: string,
  *   winnerId: string|null,
+ *   championId: string|null,
  * }} GameState
  */
 
@@ -144,12 +145,14 @@ export function createEmptyLobby() {
     lastRoll: null,
     lastLog: "Lobby: wacht op spelers…",
     winnerId: null,
+    championId: null,
   };
 }
 
 /**
  * @param {string} playerId
  * @param {string} playerName
+ * @param {CharacterColors | null | undefined} [colors]
  * @returns {GameState}
  */
 export function createLobbyState(playerId, playerName, colors) {
@@ -171,6 +174,7 @@ export function createLobbyState(playerId, playerName, colors) {
     lastRoll: null,
     lastLog: "Lobby: wacht op spelers…",
     winnerId: null,
+    championId: null,
   };
 }
 
@@ -191,6 +195,7 @@ export function cloneState(state) {
     lastRoll: state.lastRoll,
     lastLog: state.lastLog,
     winnerId: state.winnerId,
+    championId: state.championId ?? null,
   };
 }
 
@@ -259,6 +264,12 @@ export function startGame(state) {
     };
   }
   const next = cloneState(state);
+  // Reigning crown: previous game's winner wears it for this whole match.
+  if (state.phase === "finished" && state.winnerId) {
+    next.championId = state.winnerId;
+  } else {
+    next.championId = state.championId ?? null;
+  }
   next.phase = "playing";
   next.turnIndex = 0;
   next.winnerId = null;
@@ -287,6 +298,8 @@ export function returnToLobby(state) {
   next.skipTurns = {};
   next.trapped = {};
   next.turnIndex = 0;
+  // Keep crown for the next match (winner of the finished game, or existing champ).
+  next.championId = state.winnerId || state.championId || null;
   next.winnerId = null;
   next.lastRoll = null;
   next.lastLog = "Terug in lobby. Host kan opnieuw starten.";
