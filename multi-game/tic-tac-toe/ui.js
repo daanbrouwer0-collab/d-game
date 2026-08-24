@@ -234,11 +234,19 @@ export class UI {
    * @param {ReturnType<import('./game.js').createInitialState>} state
    * @param {'X'|'O'|null} localMark
    * @param {boolean} connected
-   * @param {{ hotseat?: boolean }} [opts]
+   * @param {{
+   *   hotseat?: boolean,
+   *   isHost?: boolean,
+   *   seats?: { X?: { name?: string } | null, O?: { name?: string } | null },
+   * }} [opts]
    */
   renderState(state, localMark, connected, opts = {}) {
     const hotseat = Boolean(opts.hotseat);
+    const isHost = Boolean(opts.isHost);
+    const seats = opts.seats || {};
     const winSet = new Set(state.winningLine || []);
+    // Host may keep playing / restarting if the guest flaps offline.
+    const linkOk = hotseat || connected || isHost;
 
     for (let i = 0; i < BOARD_SIZE; i++) {
       const mark = state.board[i];
@@ -264,7 +272,7 @@ export class UI {
       cell.setAttribute("aria-label", `Vakje ${i + 1}`);
 
       const canPlay =
-        connected &&
+        linkOk &&
         state.status === "playing" &&
         mark === null &&
         (hotseat || (localMark && state.turn === localMark));
@@ -272,32 +280,56 @@ export class UI {
       cell.disabled = !canPlay;
     }
 
+    const nameOf = (m) => {
+      const n = seats[m]?.name?.trim();
+      return n || m;
+    };
+
+    this.game?.classList.toggle(
+      "is-my-turn",
+      state.status === "playing" &&
+        !hotseat &&
+        Boolean(localMark && state.turn === localMark),
+    );
+    this.game?.classList.toggle("is-waiting-turn", 
+      state.status === "playing" &&
+        !hotseat &&
+        Boolean(localMark && state.turn !== localMark),
+    );
+
     if (state.status === "playing") {
       if (hotseat) {
         this.turnLabel.textContent = `Beurt: ${state.turn} (zelfde apparaat)`;
       } else {
         const yours = localMark && state.turn === localMark;
+        const who = nameOf(state.turn);
         this.turnLabel.textContent = yours
-          ? "Jouw beurt"
-          : `Beurt: ${state.turn}`;
+          ? `Jouw beurt · ${who} (${state.turn})`
+          : `Wacht op ${who} (${state.turn})`;
       }
-      this.resultLabel.textContent = "";
+      if (!connected && !hotseat) {
+        this.resultLabel.textContent = isHost
+          ? "Gast offline — jij kunt blijven spelen; zij synct bij reconnect."
+          : "Verbinding weg — opnieuw verbinden…";
+      } else {
+        this.resultLabel.textContent = "";
+      }
       this.btnRestart.disabled = true;
     } else if (state.status === "won") {
       this.turnLabel.textContent = "";
+      const winnerName = nameOf(/** @type {'X'|'O'} */ (state.winner));
       if (hotseat) {
-        this.resultLabel.textContent = `${state.winner} wint`;
+        this.resultLabel.textContent = `${winnerName} (${state.winner}) wint`;
+      } else if (state.winner === localMark) {
+        this.resultLabel.textContent = `Je hebt gewonnen! (${winnerName})`;
       } else {
-        this.resultLabel.textContent =
-          state.winner === localMark
-            ? "Je hebt gewonnen!"
-            : `${state.winner} wint`;
+        this.resultLabel.textContent = `${winnerName} (${state.winner}) wint`;
       }
-      this.btnRestart.disabled = !connected;
+      this.btnRestart.disabled = !(hotseat || isHost || connected);
     } else if (state.status === "draw") {
       this.turnLabel.textContent = "";
       this.resultLabel.textContent = "Gelijkspel";
-      this.btnRestart.disabled = !connected;
+      this.btnRestart.disabled = !(hotseat || isHost || connected);
     }
   }
 

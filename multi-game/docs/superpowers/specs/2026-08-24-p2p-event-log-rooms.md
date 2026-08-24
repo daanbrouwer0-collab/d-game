@@ -2,9 +2,14 @@
 
 Datum: 2026-08-24  
 Context: D-Game (static site, geen database, PeerJS / WebRTC)  
-Status: verkenning / ontwerpnotitie — nog niet geïmplementeerd
+**Status: historisch / verkenning — niet de beschrijving van productie**
 
-## Doel
+> **Lees eerst:** de actuele werking staat in  
+> [`docs/p2p-multiplayer.md`](../p2p-multiplayer.md)  
+> (ster-topologie, host-authority, LOG+STATE, beurten, situatiecatalogus).  
+> Dit bestand verkent een **ander** model (eigen room per speler + gossip) dat zo **niet** is gebouwd.
+
+## Doel (toenmalige verkenning)
 
 Spelers willen:
 

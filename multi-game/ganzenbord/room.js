@@ -3,13 +3,15 @@ import { loadRoomLog, saveRoomLog, touchDeskRoom } from "../js/core/desk.js";
 import { getPlayerId } from "../js/core/storage.js";
 import {
   appendEvent,
-  coerceEventLog,
   createEventLog,
   encodeSyncPacket,
-  mergeLogs,
   parseSyncPacket,
+  adoptHostPacket,
+  replaceFromHostPacket,
+  tipEventId,
   tipSeq,
 } from "../js/sync/event-log.js";
+import { createHostCommit } from "../js/sync/host-commit.js";
 import {
   Msg,
   MIN_PLAYERS,
@@ -53,6 +55,7 @@ export class Room {
     /** @type {import('./game.js').GameState} */
     this.state = createEmptyLobby();
     this.log = createEventLog(GAME_ID);
+    this.hostCommit = createHostCommit({ gameId: GAME_ID });
     /** @type {Map<string, string>} peerId → playerId */
     this.peerToPlayer = new Map();
     /** @type {Set<string>} playerIds currently connected (excl. local host self) */
@@ -112,7 +115,6 @@ export class Room {
       name: this.localName,
       playerId: this.playerId,
       colors: getCharacter() || normalizeColors(null, 0),
-      log: encodeSyncPacket(this.log),
     });
   }
 
@@ -163,6 +165,7 @@ export class Room {
       const result = startGame(this.state);
       if (!result.ok) return result;
       this.state = result.state;
+      this.hostCommit.clearTurnKeys();
       this.#emit();
       return { ok: true };
     }
@@ -172,6 +175,7 @@ export class Room {
         reason: `Minimaal ${MIN_PLAYERS} spelers nodig (nu ${this.state.players.length})`,
       };
     }
+    this.hostCommit.clearTurnKeys();
     this.#appendAndBroadcast("start", null);
     return { ok: true };
   }
@@ -248,8 +252,7 @@ export class Room {
   }
 
   /**
-   * Turn timer expired for the current player (host-authoritative).
-   * Guests may request; host applies.
+   * Turn timer expired — host-only clock (idempotent per turnKey).
    */
   tryTimeout() {
     if (this.state.phase !== "playing") {
@@ -260,30 +263,28 @@ export class Room {
       return { ok: false, reason: "Geen beurt" };
     }
 
+    if (this.session.role !== "host" && !this.isLocal) {
+      return { ok: false, reason: "Alleen host-timer" };
+    }
+
+    const turnKey = `timeout:${current.id}:${tipSeq(this.log)}`;
+    if (this.hostCommit.isTurnKeyDone(turnKey)) {
+      return { ok: false, reason: "already" };
+    }
+
     if (this.isLocal && this.session.role === "host") {
       const result = applyTimeout(this.state, current.id);
       if (!result.ok) return result;
       this.state = result.state;
+      this.hostCommit.markTurnKeyDone(turnKey);
       this.#emit();
       return { ok: true };
     }
 
-    if (this.session.role === "host") {
-      const result = applyTimeout(this.state, current.id);
-      if (!result.ok) return result;
-      this.#appendAndBroadcast("timeout", { playerId: current.id });
-      return { ok: true };
-    }
-
-    // Guest: always ask host to advance — covers own turn and host-clock lag.
-    const sent = this.session.send(Msg.TIMEOUT, { playerId: current.id });
-    if (!sent) {
-      return {
-        ok: false,
-        reason: "Geen verbinding met de host — opnieuw verbinden…",
-        reconnect: true,
-      };
-    }
+    const result = applyTimeout(this.state, current.id);
+    if (!result.ok) return result;
+    this.hostCommit.markTurnKeyDone(turnKey);
+    this.#appendAndBroadcast("timeout", { playerId: current.id });
     return { ok: true };
   }
 
@@ -332,15 +333,15 @@ export class Room {
    * @param {unknown} payload
    */
   #appendAndBroadcast(type, payload) {
-    const added = appendEvent(this.log, type, payload);
-    if (!added.ok) return;
-    this.log = added.log;
+    const committed = this.hostCommit.commit(this.log, type, payload);
+    if (!committed.ok) return;
+    this.log = committed.log;
     this.#replay();
     this.#persist();
     if (!this.isLocal) {
-      this.session.broadcast(Msg.LOG, encodeSyncPacket(this.log));
-      // Snapshot backup — guests sometimes miss/fail log-merge after timeout.
-      this.session.broadcast(Msg.STATE, cloneState(this.state));
+      const packet = this.hostCommit.encodeSince(this.log, 0);
+      const n = this.session.broadcast(Msg.LOG, packet);
+      if (!n) this.session.send(Msg.LOG, packet);
     }
     this.#emit();
   }
@@ -350,11 +351,16 @@ export class Room {
    * @param {string|null} [youAre]
    */
   #sendLogWelcome(peerId, youAre = null) {
+    const tip = tipSeq(this.log);
     this.session.sendWelcome(
       {
         youAre,
-        log: encodeSyncPacket(this.log),
-        state: this.state,
+        log: encodeSyncPacket(this.log, 0),
+        checkpoint: {
+          tipSeq: tip,
+          tipEventId: tipEventId(this.log),
+          state: cloneState(this.state),
+        },
         minPlayers: MIN_PLAYERS,
         maxPlayers: MAX_PLAYERS,
       },
@@ -392,18 +398,31 @@ export class Room {
   }
 
   /**
+   * Guest adopts host LOG only.
    * @param {unknown} raw
+   * @param {{ replace?: boolean }} [opts]
    */
-  #adoptRemoteLog(raw) {
+  #adoptHostLog(raw, opts = {}) {
     const packet = parseSyncPacket(raw);
-    if (!packet) return;
-    const remote = coerceEventLog(
-      { gameId: packet.gameId, events: packet.events },
-      GAME_ID,
-    );
-    this.log = mergeLogs(this.log, remote);
+    if (!packet) return false;
+    if (opts.replace || !this.log.events.length) {
+      const replaced = replaceFromHostPacket(GAME_ID, packet);
+      if (!replaced.ok) return false;
+      this.log = replaced.log;
+    } else {
+      const adopted = adoptHostPacket(this.log, packet);
+      if (!adopted.ok) {
+        this.session.send(Msg.RESYNC, {
+          haveTipSeq: tipSeq(this.log),
+          haveTipEventId: tipEventId(this.log),
+        });
+        return false;
+      }
+      this.log = adopted.log;
+    }
     this.#replay();
     this.#persist();
+    return true;
   }
 
   /**
@@ -415,10 +434,10 @@ export class Room {
     switch (msg.type) {
       case TransportType.HELLO: {
         if (this.session.role !== "host" || !from) break;
-        const payload = /** @type {{ name?: string, playerId?: string, colors?: unknown, log?: unknown }} */ (
+        const payload = /** @type {{ name?: string, playerId?: string, colors?: unknown }} */ (
           msg.payload || {}
         );
-        this.#adoptRemoteLog(payload.log);
+        // Do not adopt guest log — host is sole writer.
         this.#claimSeat(this.playerId, this.localName, getCharacter());
 
         const guestId = String(payload.playerId || "");
@@ -446,7 +465,6 @@ export class Room {
             guestColors,
           );
         } else {
-          // Refresh colors for returning seat
           this.#claimSeat(youAre, guestName, guestColors);
         }
 
@@ -456,6 +474,7 @@ export class Room {
         }
 
         this.peerToPlayer.set(from, youAre);
+        this.hostCommit.bindPeer(from, youAre);
         this.onlineIds.add(youAre);
         this.#replay();
         this.#persist();
@@ -466,12 +485,20 @@ export class Room {
 
       case TransportType.WELCOME: {
         if (this.session.role === "host") break;
-        const payload = /** @type {{ youAre?: string, log?: unknown, state?: import('./game.js').GameState }} */ (
-          msg.payload || {}
-        );
-        if (payload.log) this.#adoptRemoteLog(payload.log);
-        else if (payload.state) {
-          this.state = cloneState(payload.state);
+        const payload = /** @type {{
+          youAre?: string,
+          log?: unknown,
+          checkpoint?: { tipSeq?: number, tipEventId?: string|null, state?: import('./game.js').GameState },
+        }} */ (msg.payload || {});
+        if (payload.log) this.#adoptHostLog(payload.log, { replace: true });
+        const cp = payload.checkpoint;
+        if (
+          cp &&
+          cp.tipSeq === tipSeq(this.log) &&
+          cp.tipEventId === tipEventId(this.log) &&
+          cp.state?.players
+        ) {
+          this.state = cloneState(cp.state);
         }
         if (payload.youAre) this.localId = payload.youAre;
         this.onlineIds = new Set(this.state.players.map((p) => p.id));
@@ -481,24 +508,27 @@ export class Room {
 
       case Msg.LOG: {
         if (this.session.role === "host") break;
-        this.#adoptRemoteLog(msg.payload);
+        this.#adoptHostLog(msg.payload);
         this.#emit();
         break;
       }
 
-      case Msg.STATE: {
-        if (this.session.role === "host") break;
-        const state = /** @type {import('./game.js').GameState} */ (msg.payload);
-        if (!state?.players) break;
-        this.state = cloneState(state);
-        this.#emit();
+      case Msg.STATE:
+      case Msg.CHECKPOINT:
+        break;
+
+      case Msg.RESYNC: {
+        if (this.session.role !== "host") break;
+        this.#sendLogWelcome(from || undefined, this.peerToPlayer.get(from || "") || null);
         break;
       }
 
       case Msg.ROLL: {
         if (this.session.role !== "host") break;
         const payload = /** @type {{ playerId?: string }} */ (msg.payload || {});
-        if (!payload.playerId) break;
+        if (!payload.playerId || !from) break;
+        const bound = this.hostCommit.playerForPeer(from);
+        if (!bound || bound !== payload.playerId) break;
         const current = this.state.players[this.state.turnIndex];
         if (!current || current.id !== payload.playerId) break;
         if (payload.playerId === this.localId) break;
@@ -512,18 +542,9 @@ export class Room {
         break;
       }
 
-      case Msg.TIMEOUT: {
-        if (this.session.role !== "host") break;
-        const payload = /** @type {{ playerId?: string }} */ (msg.payload || {});
-        if (!payload.playerId) break;
-        const current = this.state.players[this.state.turnIndex];
-        // Only accept timeout for the player who is actually to move.
-        if (!current || current.id !== payload.playerId) break;
-        const result = applyTimeout(this.state, payload.playerId);
-        if (!result.ok) break;
-        this.#appendAndBroadcast("timeout", { playerId: payload.playerId });
+      case Msg.TIMEOUT:
+        // Host clock only — ignore guest timeout nudges in v1.
         break;
-      }
 
       case Msg.REJECT: {
         const reason =
@@ -545,6 +566,7 @@ export class Room {
     if (this.session.role !== "host") return;
     const playerId = this.peerToPlayer.get(peerId);
     this.peerToPlayer.delete(peerId);
+    this.hostCommit.unbindPeer(peerId);
     if (playerId) this.onlineIds.delete(playerId);
 
     if (this.isLocal && playerId) {

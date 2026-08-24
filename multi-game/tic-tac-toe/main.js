@@ -11,6 +11,7 @@ import {
 } from "../js/shell/site-url.js";
 import { GAME_ID, TURN_SECONDS } from "./game.js";
 import { GameEngine } from "./engine.js";
+import { seatsFromLog } from "./log.js";
 import { UI } from "./ui.js";
 
 mountShellNav({ active: "games", base: "../" });
@@ -41,11 +42,16 @@ let engine = null;
 let lastStatus = "idle";
 /** @type {string | null} */
 let shareUrl = null;
+/** @type {ReturnType<typeof setTimeout> | null} */
+let autoReconnectTimer = null;
+let autoReconnectAttempts = 0;
 
 function syncBoard() {
   if (!engine || !session) return;
   ui.renderState(engine.state, engine.localMark, session.isConnected(), {
     hotseat: engine.hotseat,
+    isHost: session.role === "host" && !engine.hotseat,
+    seats: seatsFromLog(engine.log),
   });
   syncTurnTimer();
 }
@@ -65,17 +71,51 @@ function syncTurnTimer() {
     .join("");
   const key = `${engine.state.turn}:${boardKey}`;
   const isHost = session.role === "host";
-  const myTurn = engine.localMark && engine.state.turn === engine.localMark;
   ui.syncTurnTimer({
     key,
     seconds: TURN_SECONDS,
     active: true,
-    canExpire: Boolean(isHost || myTurn),
+    canExpire: Boolean(isHost),
     onExpire: () => {
       engine?.tryTimeout();
       queueMicrotask(() => syncTurnTimer());
     },
   });
+}
+
+function scheduleGuestAutoReconnect() {
+  if (!session || session.role !== "guest" || session.transport === "local") {
+    return;
+  }
+  if (autoReconnectTimer) return;
+  if (autoReconnectAttempts >= 6) {
+    const msg = "Verbinding blijft weg. Tik op Opnieuw verbinden.";
+    ui.setLobbyError(msg);
+    if (ui.resultLabel) ui.resultLabel.textContent = msg;
+    return;
+  }
+  const delay = 700 + autoReconnectAttempts * 600;
+  autoReconnectTimer = setTimeout(async () => {
+    autoReconnectTimer = null;
+    autoReconnectAttempts += 1;
+    const msg = `Opnieuw verbinden… (${autoReconnectAttempts}/6)`;
+    ui.setLobbyError(msg);
+    if (ui.resultLabel) ui.resultLabel.textContent = msg;
+    try {
+      await session?.reconnect();
+    } catch (err) {
+      ui.setLobbyError(humanizePeerError(err));
+      scheduleGuestAutoReconnect();
+    }
+  }, delay);
+}
+
+function clearAutoReconnect() {
+  autoReconnectAttempts = 0;
+  if (autoReconnectTimer) {
+    clearTimeout(autoReconnectTimer);
+    autoReconnectTimer = null;
+  }
 }
 
 if (typeof document !== "undefined") {
@@ -121,6 +161,7 @@ function wireSession() {
     if (session.transport === "local") return;
 
     if (status === "connected") {
+      clearAutoReconnect();
       ui.setLobbyError("");
       ui.showGame();
       if (session.role === "host") {
@@ -145,6 +186,7 @@ function wireSession() {
 
     if (status === "disconnected" || status === "error") {
       syncBoard();
+      if (session.role === "guest") scheduleGuestAutoReconnect();
     }
   };
 
@@ -169,6 +211,9 @@ function wireEngine() {
     syncBoard();
   };
   engine.onState = () => syncBoard();
+  engine.onReject = (reason) => {
+    if (ui.resultLabel) ui.resultLabel.textContent = reason;
+  };
 }
 
 ui.onCellClick((index) => {
@@ -176,6 +221,9 @@ ui.onCellClick((index) => {
   const result = engine.tryMove(index);
   if (!result.ok && result.reason) {
     ui.resultLabel.textContent = result.reason;
+    if (result.reason === "Niet verbonden" && session?.role === "guest") {
+      scheduleGuestAutoReconnect();
+    }
   }
 });
 
@@ -282,10 +330,12 @@ ui.btnLeave.addEventListener("click", async () => {
 ui.btnReconnect.addEventListener("click", async () => {
   if (!session || session.transport === "local") return;
   ui.setLobbyError("");
+  clearAutoReconnect();
   try {
     await session.reconnect();
   } catch (err) {
     ui.setLobbyError(humanizePeerError(err));
+    if (session.role === "guest") scheduleGuestAutoReconnect();
   }
 });
 
@@ -329,6 +379,7 @@ async function joinRoom(code) {
  */
 async function teardown({ clearUrl = false } = {}) {
   ui.clearTurnTimer();
+  clearAutoReconnect();
   if (engine) engine.stop();
   if (session) {
     if (clearUrl) session.clearRoomFromUrl();

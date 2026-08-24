@@ -56,6 +56,12 @@ Config in de shell (niet lichtzinnig wijzigen): `repo`, `branch`, `subpath: "mul
 
 Spellen praten niet rechtstreeks met PeerJS in de UI. Ze gebruiken een gemeenschappelijke **Room API** en optioneel een **event-log** (host-authoritative state).
 
+**Volledige documentatie:**
+
+- [`multi-game/docs/p2p-multiplayer.md`](multi-game/docs/p2p-multiplayer.md) — hoe het werkt  
+- [`multi-game/docs/multiplayer-bouwregels.md`](multi-game/docs/multiplayer-bouwregels.md) — regels voor nieuwe spellen  
+- [`multi-game/docs/p2p-kritisch-rapport.md`](multi-game/docs/p2p-kritisch-rapport.md) — kritisch audit / wat nog niet waterdicht is  
+
 ### Transporten
 
 `createRoom({ gameId, transport, maxGuests })` in `multi-game/js/core/room.js`:
@@ -75,22 +81,21 @@ Voorkeur-transport voor “echte” multiplayer: **P2P**.
 2. Host krijgt een PeerJS-id; de **kamercode** en share-URL (`#<game>/index.html?room=…`) worden getoond.
 3. Gast opent die URL (of typt de code). De shell laadt het spel; het spel leest `room` uit de hash-query.
 4. Handshake: `hello` / `welcome` met **`gameId`** (bijv. `"ganzenbord"`). Verkeerd spel → duidelijke fout, geen gemengde state.
-5. Verdere berichten zijn game-specifiek (`roll`, `start`, …) of log-sync (`LOG` / event-log packet).
+5. Verdere berichten: game-intents (`move`, `roll`, …) en sync (`LOG` + vaak `STATE`-snapshot).
 
-### Host + event-log (ganzenbord e.d.)
+### Host + event-log (ganzenbord, tic-tac-toe, …)
 
-Voor lobby-spellen met meerdere zetten:
-
-- De **host** is authoritative: rolls/starts worden op de host toegepast en als events in een **append-only log** gezet.
-- Die log wordt naar peers gebroadcast / gemerged (`js/sync/event-log.js`).
-- State = **replay van de log** (niet “laatste snapshot wint”). Zo blijven stoelen en voortgang stabiel bij reconnect / late join.
-- Desk / “recente rooms” op het apparaat onthouden code + rol; openen gaat weer via de hash-shell (`navigateInShell`), niet via jsDelivr-`<base>` links.
+- De **host** is authoritative: zetten/worpen worden op de host toegepast en als events in een **append-only log** gezet.
+- Die log wordt naar peers gebroadcast / gemerged (`js/sync/event-log.js`); vaak volgt een **STATE**-snapshot als backup.
+- State = **replay van de log** (deterministisch: RNG-uitkomsten zitten in het event-payload).
+- Stoelen hangen aan **`playerId`**, niet aan “wie nu de PeerJS-host is”.
+- Desk / recente rooms onthouden code + rol; openen via hash-shell (`?as=host` voor host-wissel).
 
 ### Wat P2P wél en niet is
 
-- **Wel:** browser-to-browser via PeerJS-broker + WebRTC data channels; deellink/QR; host mag tabblad open houden.
-- **Niet:** centrale gameserver die zetten bewaart; geen account-database in deze sandbox.
-- Offline host → gasten kunnen niet doorzetten tot er weer een host is (of iemand host overneemt, waar het spel dat ondersteunt).
+- **Wel:** browser-to-browser via PeerJS-broker + WebRTC data channels; deellink/QR; host-tab moet bereikbaar blijven (of iemand neemt host over).
+- **Niet:** centrale gameserver; geen account-database in deze sandbox.
+- Offline host → gasten kunnen niet doorzetten tot er weer een host is met dezelfde roomcode + log.
 
 ### Belangrijke bestanden
 
@@ -119,4 +124,7 @@ Meer detail over tabs en spellen: [multi-game/README.md](multi-game/README.md).
 
 ## Design-docs
 
-Onder `multi-game/docs/superpowers/specs/` (frame, sandbox shell, P2P event-log, enz.).
+- **Huidige P2P-werking:** [`multi-game/docs/p2p-multiplayer.md`](multi-game/docs/p2p-multiplayer.md)
+- **Bouwregels:** [`multi-game/docs/multiplayer-bouwregels.md`](multi-game/docs/multiplayer-bouwregels.md)
+- **Kritisch rapport:** [`multi-game/docs/p2p-kritisch-rapport.md`](multi-game/docs/p2p-kritisch-rapport.md)
+- Historische / ontwerpnotities: `multi-game/docs/superpowers/specs/`

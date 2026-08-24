@@ -1006,6 +1006,26 @@ html.page-ganzenbord body {
   font-size: 0.9rem;
 }
 
+#game .turn-banner {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  text-align: right;
+}
+
+#game.is-my-turn .turn-banner {
+  color: #3d9a7a;
+}
+
+#game.is-waiting-turn .turn-banner {
+  color: var(--muted);
+}
+
+#game.is-my-turn .board.board-4 {
+  box-shadow: 0 0 0 2px rgba(61, 154, 122, 0.55);
+  border-radius: 10px;
+}
+
 .board {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

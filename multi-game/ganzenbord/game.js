@@ -104,6 +104,8 @@ export const Msg = Object.freeze({
   LOG: "log",
   REJECT: "reject",
   TO_LOBBY: "to_lobby",
+  RESYNC: "resync",
+  CHECKPOINT: "checkpoint",
 });
 
 /** Seconds to roll before the turn is forfeited. */

@@ -2,6 +2,7 @@
 
 Datum: 2026-08-24  
 Context: D-Game (static, PeerJS, event-log zoals tic-tac-toe)  
+**Status: ontwerp (deels geïmplementeerd)** — zie ook [`../p2p-multiplayer.md`](../p2p-multiplayer.md) voor de actuele situatiecatalogus.
 Status: goedgekeurd ontwerp — klaar voor implementatieplan
 
 ## Doel

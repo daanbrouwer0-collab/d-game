@@ -110,16 +110,13 @@ function syncTurnTimer() {
   // Don't include lastLog — timeout updates it and caused timer/key races.
   const key = `${room.state.turnIndex}:${current.id}:${posKey}`;
   const isHost = session?.role === "host";
-  const myClock = current.id === room.localId;
   ui.syncTurnTimer({
     key,
     seconds: TURN_SECONDS,
     active: true,
-    // Host enforces every turn; current player can also fire (mobile/guest).
-    canExpire: Boolean(isHost || myClock || isLocal()),
+    canExpire: Boolean(isHost || isLocal()),
     onExpire: () => {
       room?.tryTimeout();
-      // Always re-arm from live state (covers failed/raced timeout).
       queueMicrotask(() => syncTurnTimer());
     },
   });

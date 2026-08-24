@@ -52,10 +52,13 @@ js/shell/qr-scanner.js camera QR-scan (P2P invite)
 
 1. Host: `createRoom({ gameId, transport: "p2p" })` → kamercode + QR + `#…?room=CODE`.
 2. Gast opent deellink of joint met code; `hello`/`welcome` checken `gameId`.
-3. Lobby-spellen (ganzenbord): host schrijft events in de log; peers **replayen** de log voor state.
+3. Lobby-spellen (ganzenbord): host schrijft events in de log; peers **replayen** de log voor state. Na elke actie ook een **STATE**-snapshot als backup.
 4. Hotseat: `transport: "local"` — zelfde UI, geen PeerJS.
 
-Uitgebreider: [../README.md](../README.md#p2p-in-games).
+**Uitgebreid (situaties, beurten, data per spel):**  
+[docs/p2p-multiplayer.md](docs/p2p-multiplayer.md)
+
+Kort in de repo-root: [../README.md](../README.md#p2p-in-games).
 
 ## Netwerk-lab
 
@@ -76,6 +79,10 @@ Hotseat (“Op dit apparaat”) staat alleen in spellen, niet op Netwerk.
 
 ## Design
 
+- **[P2P fundamenten](docs/p2p-fundamenten.md)** — canon, rangschikking, keuzes A/B/C
+- **[P2P multiplayer — hoe het werkt](docs/p2p-multiplayer.md)**
+- **[Bouwregels multiplayer](docs/multiplayer-bouwregels.md)** — verplicht bij nieuwe spellen
+- **[Kritisch P2P-rapport](docs/p2p-kritisch-rapport.md)** — gaten, hotspots, pad naar waterdicht
 - [Sandbox shell](docs/superpowers/specs/2026-08-24-d-game-sandbox-shell-design.md)
 - [Frame Room API](docs/superpowers/specs/2026-08-24-d-game-frame-design.md)
-- [P2P event-log rooms](docs/superpowers/specs/2026-08-24-p2p-event-log-rooms.md)
+- [P2P event-log rooms (verkenning / niet = productie)](docs/superpowers/specs/2026-08-24-p2p-event-log-rooms.md)

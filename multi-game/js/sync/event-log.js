@@ -175,6 +175,15 @@ export function tipSeq(log) {
 }
 
 /**
+ * @param {EventLog} log
+ * @returns {string | null}
+ */
+export function tipEventId(log) {
+  const last = log.events[log.events.length - 1];
+  return last ? last.id : null;
+}
+
+/**
  * @param {unknown} raw
  * @returns {EventLog | null}
  */
@@ -187,6 +196,52 @@ export function coerceEventLog(raw, gameId) {
 }
 
 /**
+ * Guest adopts host truth. Never "preferred local" on fork.
+ * @param {EventLog} localLog
+ * @param {SyncPacket} packet
+ * @returns {{ ok: true, log: EventLog } | { ok: false, reason: string, log: EventLog }}
+ */
+export function adoptHostPacket(localLog, packet) {
+  if (!packet || packet.gameId !== localLog.gameId) {
+    return { ok: false, reason: "gameId", log: localLog };
+  }
+  if (!localLog.events.length) {
+    const applied = applySyncPacket(createEventLog(localLog.gameId), {
+      v: 1,
+      gameId: packet.gameId,
+      fromSeq: 0,
+      events: packet.events,
+    });
+    return applied.ok
+      ? { ok: true, log: applied.log }
+      : { ok: false, reason: applied.reason, log: localLog };
+  }
+  const applied = applySyncPacket(localLog, packet);
+  if (applied.ok) return { ok: true, log: applied.log };
+  return { ok: false, reason: applied.reason || "gap", log: localLog };
+}
+
+/**
+ * Full replace from host welcome / resync response.
+ * @param {string} gameId
+ * @param {SyncPacket} packet
+ * @returns {{ ok: true, log: EventLog, applied: number } | { ok: false, reason: string }}
+ */
+export function replaceFromHostPacket(gameId, packet) {
+  if (!packet || packet.gameId !== gameId) {
+    return { ok: false, reason: "gameId", log: createEventLog(gameId) };
+  }
+  return applySyncPacket(createEventLog(gameId), {
+    v: 1,
+    gameId,
+    fromSeq: 0,
+    events: packet.events,
+  });
+}
+
+/**
+ * @deprecated Prefer adoptHostPacket / replaceFromHostPacket for P2P guests.
+ * Bidirectional merge can prefer local on fork — unsafe for log-only canon.
  * Longest valid chain wins. Forks: keep `preferred`.
  * @param {EventLog} preferred
  * @param {EventLog | null | undefined} other

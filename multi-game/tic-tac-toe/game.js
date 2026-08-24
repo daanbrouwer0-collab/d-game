@@ -12,6 +12,11 @@ export const GameMsg = Object.freeze({
   RESTART: "restart",
   LOG: "log",
   TIMEOUT: "timeout",
+  INTENT: "intent",
+  ACK: "ack",
+  REJECT: "reject",
+  RESYNC: "resync",
+  CHECKPOINT: "checkpoint",
 });
 
 /** All 3-in-a-row lines on a 4×4 board (rows + columns only — no diagonals). */
