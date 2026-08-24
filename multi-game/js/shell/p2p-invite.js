@@ -1,30 +1,16 @@
+import { buildShareUrl, parseInviteFromText } from "./site-url.js";
+
 /**
  * Parse P2P invite from scanned QR text (URL or room code).
+ * Supports classic path URLs and d-game.nl hash URLs:
+ *   https://www.d-game.nl/#tic-tac-toe/index.html?room=AB7K2M
  * @param {string} raw
  * @returns {{ code: string, url: string | null } | null}
  */
 export function parseP2pInvite(raw) {
-  const text = String(raw || "").trim();
-  if (!text) return null;
-
-  try {
-    const url = new URL(text);
-    const room = url.searchParams.get("room");
-    if (room && room.trim()) {
-      return {
-        code: room.trim().toUpperCase(),
-        url: url.toString(),
-      };
-    }
-  } catch {
-    /* not a URL */
-  }
-
-  const code = text.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  if (code.length >= 4 && code.length <= 12) {
-    return { code, url: null };
-  }
-  return null;
+  const invite = parseInviteFromText(raw);
+  if (!invite) return null;
+  return { code: invite.code, url: invite.url || null };
 }
 
 /**
@@ -32,8 +18,5 @@ export function parseP2pInvite(raw) {
  * @param {string} code
  */
 export function buildP2pInviteUrl(gamePath, code) {
-  const path = gamePath.endsWith("/") ? gamePath : `${gamePath}/`;
-  const url = new URL(path, window.location.origin);
-  url.searchParams.set("room", code);
-  return url.toString();
+  return buildShareUrl(gamePath, code);
 }

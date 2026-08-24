@@ -59,18 +59,24 @@ const SessionMenu = {
   },
 
   async handleIncomingP2pLink() {
-    const params = new URLSearchParams(window.location.search);
-    const room = params.get('room');
+    const room =
+      window.RobotRunP2P?.readRoomFromUrl?.() ||
+      new URLSearchParams(window.location.search).get("room");
     if (!room?.trim()) return;
     try {
       await P2pSessionController.joinRoom(room.trim());
-      params.delete('room');
-      const qs = params.toString();
-      window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : ''));
-      this.showModal('p2p-lobby');
-      Toast.show('Lobby gejoined via link');
+      if (window.RobotRunP2P?.clearRoomFromUrl) {
+        window.RobotRunP2P.clearRoomFromUrl("/robotrun/");
+      } else {
+        const params = new URLSearchParams(window.location.search);
+        params.delete("room");
+        const qs = params.toString();
+        window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
+      }
+      this.showModal("p2p-lobby");
+      Toast.show("Lobby gejoined via link");
     } catch (err) {
-      Toast.show(err.message || 'Joinen via link mislukt');
+      Toast.show(err.message || "Joinen via link mislukt");
       this.openP2pLobbyView();
     }
   },

@@ -1,3 +1,9 @@
+import {
+  buildShareUrl as buildSiteShareUrl,
+  clearRoomFromUrl as clearSiteRoomFromUrl,
+  readRoomFromUrl as readSiteRoomFromUrl,
+  writeRoomToUrl as writeSiteRoomToUrl,
+} from "../shell/site-url.js";
 import { Net } from "./net.js";
 import {
   TransportType,
@@ -214,37 +220,27 @@ export class Session {
    * @param {string} code
    * @param {string} [origin]
    */
-  buildShareUrl(gamePath, code, origin = window.location.origin) {
-    const path = gamePath.endsWith("/") ? gamePath : `${gamePath}/`;
-    const url = new URL(path, origin.endsWith("/") ? origin : `${origin}/`);
-    url.searchParams.set("room", code);
-    return url.toString();
+  buildShareUrl(gamePath, code, origin) {
+    return buildSiteShareUrl(gamePath, code, origin ? { origin } : {});
   }
 
   /**
    * @param {string} [search]
    * @returns {string | null}
    */
-  readRoomFromUrl(search = window.location.search) {
-    const room = new URLSearchParams(search).get("room");
-    if (!room) return null;
-    const code = room.trim().toUpperCase();
-    return code || null;
+  readRoomFromUrl(search) {
+    return readSiteRoomFromUrl(search);
   }
 
   /**
    * @param {string} code
    */
   writeRoomToUrl(code) {
-    const url = new URL(window.location.href);
-    url.searchParams.set("room", code);
-    history.replaceState(null, "", url);
+    writeSiteRoomToUrl(`/${this.gameId}/`, code);
   }
 
   clearRoomFromUrl() {
-    const url = new URL(window.location.href);
-    url.searchParams.delete("room");
-    history.replaceState(null, "", url);
+    clearSiteRoomFromUrl(`/${this.gameId}/`);
   }
 
   #startPing() {

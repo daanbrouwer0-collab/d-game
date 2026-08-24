@@ -2,24 +2,32 @@
 
 Static HTML/JS/CSS. Geen database. **Sandbox** om simpele games te koppelen aan multiplayer-communicatie: P2P (PeerJS), hotseat op één apparaat in spellen, Matrix later.
 
-## Starten
+## Live
+
+Productie: [https://www.d-game.nl/#index.html](https://www.d-game.nl/#index.html)
+
+Uitnodigingen gebruiken hash-routes, bijvoorbeeld:
+
+`https://www.d-game.nl/#tic-tac-toe/index.html?room=AB7K2M`
+
+## Starten (lokaal)
 
 ```bash
 cd multi-game
 python3 -m http.server 8080
 ```
 
-Open [http://localhost:8080](http://localhost:8080).
+Open [http://localhost:8080](http://localhost:8080). Lokaal blijven path-URL’s (`/tic-tac-toe/?room=…`) werken.
 
 ## Tabs
 
-| Tab | Pad | Inhoud |
-|-----|-----|--------|
-| Games | `/` | Spelcatalogus |
-| Lobby | `/lobby/` | Recente rooms |
-| Friends | `/friends/` | Lokale vrienden |
-| Netwerk | `/netwerk/` | P2P-lab (host, QR-scan, echo) |
-| Geheugen | `/geheugen/` | Profiel + wissen |
+| Tab | Pad (lokaal) | Hash (d-game.nl) | Inhoud |
+|-----|--------------|------------------|--------|
+| Games | `/` | `#index.html` | Spelcatalogus |
+| Lobby | `/lobby/` | `#lobby/index.html` | Recente rooms |
+| Friends | `/friends/` | `#friends/index.html` | Lokale vrienden |
+| Netwerk | `/netwerk/` | `#netwerk/index.html` | P2P-lab (host, QR-scan, echo) |
+| Geheugen | `/geheugen/` | `#geheugen/index.html` | Profiel + wissen |
 
 ## Frame
 

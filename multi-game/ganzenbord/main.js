@@ -11,6 +11,7 @@ import {
 import { parseP2pInvite } from "../js/shell/p2p-invite.js";
 import { showHostInviteCard } from "../js/shell/p2p-invite-ui.js";
 import { openQrScanner } from "../js/shell/qr-scanner.js";
+import { readRoomFromUrl } from "../js/shell/site-url.js";
 import { GAME_ID, MAX_PLAYERS } from "./game.js";
 import { Room } from "./room.js";
 import { UI } from "./ui.js";
@@ -446,10 +447,7 @@ function humanizePeerError(err) {
 
 async function resumeIfPossible() {
   const saved = loadRoom(GAME_ID);
-  const roomFromUrl = new URLSearchParams(window.location.search)
-    .get("room")
-    ?.trim()
-    .toUpperCase();
+  const roomFromUrl = readRoomFromUrl();
 
   if (saved?.role === "host") {
     ui.nameInput.value = saved.name || "";

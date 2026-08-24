@@ -5,6 +5,7 @@ import { parseP2pInvite } from "../js/shell/p2p-invite.js";
 import { openQrScanner } from "../js/shell/qr-scanner.js";
 import { drawQr } from "../js/shell/qr-ui.js";
 import { showHostInviteCard } from "../js/shell/p2p-invite-ui.js";
+import { readRoomFromUrl } from "../js/shell/site-url.js";
 import { GAME_ID } from "./game.js";
 import { GameEngine } from "./engine.js";
 import { UI } from "./ui.js";
@@ -351,10 +352,7 @@ function humanizePeerError(err) {
   return message || "Onbekende fout";
 }
 
-const roomParam = new URLSearchParams(window.location.search)
-  .get("room")
-  ?.trim()
-  .toUpperCase();
+const roomParam = readRoomFromUrl();
 if (roomParam && transportFromUrl() !== "qr") {
   ui.joinCode.value = roomParam;
   ui.lobbyHint.textContent = "Bezig met joinen via deellink…";

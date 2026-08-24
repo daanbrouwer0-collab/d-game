@@ -1,0 +1,35 @@
+# www.d-game.nl — shell + multi-game via GitHub (jsDelivr).
+# Routes: https://www.d-game.nl/#index.html
+# Invites: https://www.d-game.nl/#tic-tac-toe/index.html?room=CODE
+
+[build]
+  publish = "."
+  # Geen build-stap (pure HTML/JS/CSS)
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=60, must-revalidate"
+
+# Alleen de shell staat op Netlify; multi-game komt uit GitHub.
+# Fallback: onbekende paden → shell (hash-routing).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

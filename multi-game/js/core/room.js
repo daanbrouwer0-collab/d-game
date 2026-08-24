@@ -3,6 +3,7 @@ import { P2PTransport } from "../transport/p2p.js";
 import { MatrixTransport } from "../transport/matrix.js";
 import { QrTransport } from "../transport/qr.js";
 import { TransportType } from "../p2p/protocol.js";
+import { getUrlParams, getUrlSearch } from "../shell/site-url.js";
 
 /**
  * @typedef {'local'|'p2p'|'matrix'|'qr'} TransportKind
@@ -40,8 +41,8 @@ export function createRoom({ gameId, transport = "p2p", maxGuests = 1 }) {
  * @param {string} [search]
  * @returns {'p2p'|'qr'|null}
  */
-export function transportFromUrl(search = window.location.search) {
-  const params = new URLSearchParams(search);
+export function transportFromUrl(search = getUrlSearch()) {
+  const params = getUrlParams(search);
   const room = params.get("room");
   if (!room || !room.trim()) return null;
   if (params.get("via") === "qr") return "qr";

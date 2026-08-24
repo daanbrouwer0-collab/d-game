@@ -249,6 +249,7 @@ const P2pSessionController = {
     this.localSessionId = session.id;
     this.persistActiveRoom();
     this.setStatus("online");
+    window.RobotRunP2P?.writeRoomToUrl?.(this.GAME_PATH, code);
     this.renderLobbyUi();
     return { roomCode: code, session, lobby: this.lobby };
   },

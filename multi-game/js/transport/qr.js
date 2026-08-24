@@ -13,6 +13,14 @@ import {
   packetToQrText,
 } from "../sync/event-log.js";
 import { saveEventLog } from "../core/storage.js";
+import {
+  buildShareUrl as buildSiteShareUrl,
+  clearRoomFromUrl as clearSiteRoomFromUrl,
+  getUrlParams,
+  getUrlSearch,
+  readRoomFromUrl as readSiteRoomFromUrl,
+  writeRoomToUrl as writeSiteRoomToUrl,
+} from "../shell/site-url.js";
 
 /**
  * QR transport: Room-compatible API. Sync via show/scan event-log packets.
@@ -237,39 +245,31 @@ export class QrTransport {
    * @param {string} code
    * @param {string} [origin]
    */
-  buildShareUrl(gamePath, code, origin = window.location.origin) {
-    const path = gamePath.endsWith("/") ? gamePath : `${gamePath}/`;
-    const url = new URL(path, origin.endsWith("/") ? origin : `${origin}/`);
-    url.searchParams.set("room", code);
-    url.searchParams.set("via", "qr");
-    return url.toString();
+  buildShareUrl(gamePath, code, origin) {
+    return buildSiteShareUrl(gamePath, code, {
+      origin,
+      via: "qr",
+    });
   }
 
   /**
    * @param {string} [search]
    */
-  readRoomFromUrl(search = window.location.search) {
-    const params = new URLSearchParams(search);
+  readRoomFromUrl(search) {
+    const params = getUrlParams(search ?? getUrlSearch());
     if (params.get("via") !== "qr") return null;
-    const room = params.get("room");
-    return room ? room.trim().toUpperCase() : null;
+    return readSiteRoomFromUrl(search);
   }
 
   /**
    * @param {string} code
    */
   writeRoomToUrl(code) {
-    const url = new URL(window.location.href);
-    url.searchParams.set("room", code);
-    url.searchParams.set("via", "qr");
-    history.replaceState(null, "", url);
+    writeSiteRoomToUrl(`/${this.gameId}/`, code, { via: "qr" });
   }
 
   clearRoomFromUrl() {
-    const url = new URL(window.location.href);
-    url.searchParams.delete("room");
-    url.searchParams.delete("via");
-    history.replaceState(null, "", url);
+    clearSiteRoomFromUrl(`/${this.gameId}/`);
   }
 
   /**

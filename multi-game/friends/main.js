@@ -5,6 +5,7 @@ import {
   updateFriend,
 } from "../js/core/storage.js";
 import { mountShellNav } from "../js/shell/nav.js";
+import { buildSiteHomeUrl } from "../js/shell/site-url.js";
 
 mountShellNav({ active: "friends", base: "../" });
 
@@ -53,7 +54,7 @@ function render() {
   });
   listEl.querySelectorAll("[data-invite]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      const url = new URL("../", window.location.href).href;
+      const url = buildSiteHomeUrl();
       try {
         await navigator.clipboard.writeText(`Speel mee op D-Game: ${url}`);
         errEl.textContent = "Uitnodigingstekst gekopieerd.";
