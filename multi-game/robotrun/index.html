@@ -15,8 +15,6 @@
   <link rel="stylesheet" href="css/menu.css">
   <link rel="stylesheet" href="css/hud.css">
   <link rel="stylesheet" href="css/board.css">
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script type="module" src="p2p-bridge.js"></script>
 </head>
   <body>
@@ -297,17 +295,12 @@
   <div id="menu-overlay" class="hidden">
     <div class="menu-card glass-card">
       <h1>RobotRun</h1>
-      <p class="subtitle">Tactische robotrace — hotseat of P2P multiplayer</p>
+      <p class="subtitle">Tactische robotrace — hotseat op dit apparaat of multiplayer via room</p>
 
       <div id="menu-view-new" class="menu-view">
         <h2 class="menu-view-title">Nieuwe Sessie</h2>
         <div class="menu-field-stack">
-          <label class="menu-label">Speelwijze</label>
-          <div class="transport-toggle" role="group" aria-label="Speelwijze">
-            <button type="button" class="transport-btn active" data-transport="local" id="transport-local">1 toestel</button>
-            <button type="button" class="transport-btn" data-transport="p2p" id="transport-p2p">P2P</button>
-          </div>
-          <p id="session-transport-help" class="menu-helper">Op één toestel: om de beurt programmeren. Via P2P: iedereen tegelijk op eigen device.</p>
+          <p id="session-transport-help" class="menu-helper">Op één toestel: om de beurt programmeren (of 1vAI). Multiplayer met vrienden: start een room op de home-pagina.</p>
 
           <div id="local-session-fields">
             <label class="menu-label" for="session-player-count">Aantal spelers</label>
@@ -350,52 +343,7 @@
         </div>
         <div class="menu-actions">
           <button id="btn-session-new-go" class="btn success" type="button">Start Game</button>
-          <button id="btn-session-p2p-lobby" class="btn alt" type="button">P2P lobby / join</button>
-        </div>
-      </div>
-
-      <div id="menu-view-p2p-lobby" class="menu-view hidden">
-        <h2 class="menu-view-title">P2P lobby</h2>
-
-        <div id="p2p-join-panel" class="menu-field-stack">
-          <p class="menu-helper">Join een bestaande lobby met code of QR-scan.</p>
-          <label class="menu-label" for="p2p-join-input">Kamercode</label>
-          <div class="share-actions">
-            <input id="p2p-join-input" class="input" maxlength="12" placeholder="CODE">
-            <button type="button" class="btn success" id="btn-p2p-join-code">Join</button>
-            <button type="button" class="btn alt" id="btn-p2p-scan-join">Scan QR</button>
-          </div>
-        </div>
-
-        <div id="p2p-lobby-panel" class="hidden">
-          <p id="p2p-conn-status" class="matrix-conn-status" aria-live="polite"></p>
-          <p id="p2p-lobby-you" class="menu-helper"></p>
-          <p id="p2p-lobby-status" class="menu-helper"></p>
-          <p id="p2p-lobby-counts" class="menu-helper"></p>
-          <ul id="p2p-seat-list" class="matrix-lobby-list"></ul>
-
-          <div id="p2p-host-controls" class="menu-field-stack">
-            <p class="invite-kicker">Jouw room</p>
-            <p class="invite-title">Laat anderen deze QR scannen</p>
-            <div class="invite-qr-wrap qr-canvas-wrap">
-              <div id="p2p-invite-qr" class="invite-qr-host" role="img" aria-label="QR-code"></div>
-            </div>
-            <p>Kamercode: <strong id="p2p-room-code"></strong></p>
-            <p class="invite-wait">Wachten tot spelers joinen… houd dit tabblad open.</p>
-            <div class="share-actions">
-              <button type="button" class="btn success" id="btn-p2p-share-copy">Kopieer link</button>
-              <button type="button" class="btn alt" id="btn-p2p-share-whatsapp">WhatsApp</button>
-              <button type="button" class="btn alt" id="btn-p2p-share">Andere apps…</button>
-            </div>
-            <input id="p2p-share-link" class="input" readonly aria-label="Uitnodigingslink">
-            <button type="button" class="btn success" id="btn-p2p-start">Start race</button>
-          </div>
-
-          <div class="menu-actions">
-            <button type="button" class="btn success" id="btn-p2p-ready">Ready</button>
-            <button type="button" class="btn alt" id="btn-p2p-rejoin">Opnieuw verbinden</button>
-            <button type="button" class="btn alt" id="btn-p2p-leave-lobby">Lobby verlaten</button>
-          </div>
+          <a href="../room/" class="btn alt" style="text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">Naar room (multiplayer)</a>
         </div>
       </div>
 
@@ -439,7 +387,6 @@
   <script src="js/robot-draw.js"></script>
   <script src="js/nav.js"></script>
   <script src="js/p2p-session.js"></script>
-  <script src="js/p2p-lobby.js"></script>
   <script src="js/menu.js"></script>
   <script src="js/app-menu.js"></script>
   <script src="js/character.js"></script>

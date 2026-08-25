@@ -958,7 +958,7 @@ const P2pSessionController = {
   },
 
   renderLobbyUi() {
-    P2pLobbyUi?.render?.(this);
+    /* Standalone P2P lobby removed — multiplayer via room shell. */
   },
 
   wireHostAutosnapshots() {

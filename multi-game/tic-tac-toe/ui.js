@@ -64,7 +64,7 @@ export class UI {
     this.clearTurnTimer();
     this.lobby.classList.remove("hidden");
     this.game.classList.add("hidden");
-    this.btnReconnect.classList.add("hidden");
+    this.btnReconnect?.classList.add("hidden");
   }
 
   showGame() {
@@ -77,20 +77,27 @@ export class UI {
    * @param {string} shareUrl
    */
   showHostInvite(code, shareUrl) {
+    if (!this.hostInfo) return;
     this.hostInfo.classList.remove("hidden");
-    this.roomCodeEl.textContent = code;
-    this.shareUrlEl.textContent = shareUrl;
-    this.shareUrlEl.href = shareUrl;
-    this.lobbyHint.textContent =
-      "Houd dit tabblad open. De ander scant jouw QR of opent de link.";
+    if (this.roomCodeEl) this.roomCodeEl.textContent = code;
+    if (this.shareUrlEl) {
+      this.shareUrlEl.textContent = shareUrl;
+      this.shareUrlEl.href = shareUrl;
+    }
+    if (this.lobbyHint) {
+      this.lobbyHint.textContent =
+        "Houd dit tabblad open. De ander scant jouw QR of opent de link.";
+    }
   }
 
   hideHostInvite() {
-    this.hostInfo.classList.add("hidden");
-    this.roomCodeEl.textContent = "";
-    this.shareUrlEl.textContent = "";
-    this.shareUrlEl.removeAttribute("href");
-    this.lobbyHint.textContent = "";
+    this.hostInfo?.classList.add("hidden");
+    if (this.roomCodeEl) this.roomCodeEl.textContent = "";
+    if (this.shareUrlEl) {
+      this.shareUrlEl.textContent = "";
+      this.shareUrlEl.removeAttribute("href");
+    }
+    if (this.lobbyHint) this.lobbyHint.textContent = "";
   }
 
   setLobbyError(message) {
@@ -116,9 +123,9 @@ export class UI {
       : labels[status] || status;
 
     if (status === "disconnected" || status === "error") {
-      this.btnReconnect.classList.remove("hidden");
+      this.btnReconnect?.classList.remove("hidden");
     } else if (status === "connected") {
-      this.btnReconnect.classList.add("hidden");
+      this.btnReconnect?.classList.add("hidden");
     }
   }
 

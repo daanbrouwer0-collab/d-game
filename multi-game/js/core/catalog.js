@@ -49,8 +49,8 @@ export const GAMES = [
     path: "robotrun/",
     minPlayers: 2,
     maxPlayers: 5,
-    blurb: "RoboRally — hotseat of room (2–5 spelers, room-modus volgt).",
-    tags: ["bordspel", "tactisch", "p2p"],
+    blurb: "RoboRally — hotseat op dit apparaat of multiplayer via room (2–5).",
+    tags: ["bordspel", "tactisch"],
     embedded: {
       entry: "js/embedded.js",
       syncProfile: "snapshot",

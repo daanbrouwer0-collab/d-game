@@ -6,11 +6,9 @@
     <title>Tic Tac Toe — D-Game</title>
     <meta
       name="description"
-      content="Speel tic-tac-toe op één apparaat of via P2P (deellink of QR-scan)."
+      content="Speel tic-tac-toe hotseat op dit apparaat, of multiplayer via een D-Game room."
     />
     <link rel="stylesheet" href="../css/site.css" />
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   </head>
   <body>
     <div class="app">
@@ -22,11 +20,11 @@
 
       <main>
         <section id="lobby" class="panel">
-          <h2>Lobby</h2>
+          <h2>Op dit apparaat</h2>
           <p class="lede">
             4×4-bord met 3 geblokkeerde vakjes; 3 op een rij of kolom wint (geen diagonaal).
-            Start een P2P-room: er verschijnt een QR. Bij P2P heb je 20s per beurt —
-            te laat = random zet. X en O blijven aan jouw naam.
+            Hotseat: wissel om de beurt op dit toestel. Multiplayer met vrienden: start een room op
+            de home-pagina.
           </p>
 
           <label class="field-label" for="player-name">Jouw naam</label>
@@ -40,44 +38,8 @@
           />
 
           <div class="actions">
-            <button type="button" id="btn-local" class="btn btn-ghost">Op dit apparaat</button>
-            <button type="button" id="btn-host" class="btn btn-primary">Maak room + toon QR</button>
-          </div>
-
-          <div id="host-info" class="host-info invite-card hidden">
-            <p class="invite-kicker">Jouw room</p>
-            <p class="invite-title">Laat de ander deze QR scannen</p>
-            <div class="invite-qr-wrap qr-canvas-wrap">
-              <div id="invite-qr-canvas" class="invite-qr-host" role="img" aria-label="QR-code"></div>
-            </div>
-            <p>Kamercode</p>
-            <p id="room-code" class="room-code"></p>
-            <p class="invite-wait">Wachten tot iemand scant of de link opent…</p>
-            <p class="share-label">Of deel de link</p>
-            <a id="share-url" class="share-url" href="#"></a>
-            <div class="actions share-actions">
-              <button type="button" id="btn-copy-link" class="btn btn-primary">Kopieer link</button>
-              <button type="button" id="btn-share-whatsapp" class="btn btn-ghost">
-                WhatsApp
-              </button>
-              <button type="button" id="btn-share" class="btn btn-ghost">Andere apps…</button>
-            </div>
-          </div>
-
-          <div class="join-row">
-            <label for="join-code">Of join: scan de QR van de host</label>
-            <div class="join-controls">
-              <input
-                id="join-code"
-                type="text"
-                maxlength="12"
-                autocomplete="off"
-                spellcheck="false"
-                placeholder="bijv. AB7K2M"
-              />
-              <button type="button" id="btn-join" class="btn btn-primary">Join</button>
-              <button type="button" id="btn-scan-qr" class="btn btn-primary">Scan QR</button>
-            </div>
+            <button type="button" id="btn-local" class="btn btn-primary">Opnieuw starten</button>
+            <a href="../room/" class="btn btn-ghost">Naar room (multiplayer)</a>
           </div>
 
           <p id="lobby-hint" class="hint"></p>
@@ -105,10 +67,7 @@
             <button type="button" id="btn-restart" class="btn btn-primary" disabled>
               Opnieuw spelen
             </button>
-            <button type="button" id="btn-leave" class="btn btn-ghost">Terug naar lobby</button>
-            <button type="button" id="btn-reconnect" class="btn btn-ghost hidden">
-              Opnieuw verbinden
-            </button>
+            <button type="button" id="btn-leave" class="btn btn-ghost">Terug</button>
           </div>
         </section>
       </main>

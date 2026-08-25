@@ -1,24 +1,18 @@
-import { createRoom, transportFromUrl } from "../js/core/room.js";
-import { getDisplayName, playerLabel, saveRoom, setDisplayName } from "../js/core/storage.js";
+/**
+ * Standalone tic-tac-toe: local hotseat only.
+ * Multiplayer runs via room/ + embedded.js — not this file.
+ */
+import { createRoom } from "../js/core/room.js";
+import { getDisplayName, playerLabel, setDisplayName } from "../js/core/storage.js";
 import { mountShellNav } from "../js/shell/nav.js";
 import { setupStandaloneLocalGame } from "../js/shell/room-only-multiplayer.js";
-import { parseP2pInvite } from "../js/shell/p2p-invite.js";
-import { openQrScanner } from "../js/shell/qr-scanner.js";
-import { showHostInviteCard } from "../js/shell/p2p-invite-ui.js";
-import {
-  readHostIntentFromUrl,
-  readRoomFromUrl,
-  watchShellRoute,
-} from "../js/shell/site-url.js";
-import { GAME_ID, TURN_SECONDS } from "./game.js";
+import { GAME_ID } from "./game.js";
 import { GameEngine } from "./engine.js";
 import { seatsFromLog } from "./log.js";
 import { UI } from "./ui.js";
 
 mountShellNav({ active: "games", base: "../" });
 setupStandaloneLocalGame();
-
-const GAME_PATH = "/tic-tac-toe/";
 
 const ui = new UI();
 
@@ -40,168 +34,19 @@ let session = null;
 /** @type {GameEngine | null} */
 let engine = null;
 
-let lastStatus = "idle";
-/** @type {string | null} */
-let shareUrl = null;
-/** @type {ReturnType<typeof setTimeout> | null} */
-let autoReconnectTimer = null;
-let autoReconnectAttempts = 0;
-
 function syncBoard() {
   if (!engine || !session) return;
   ui.renderState(engine.state, engine.localMark, session.isConnected(), {
     hotseat: engine.hotseat,
-    isHost: session.role === "host" && !engine.hotseat,
+    isHost: false,
     seats: seatsFromLog(engine.log),
   });
-  syncTurnTimer();
+  ui.clearTurnTimer();
 }
 
-function syncTurnTimer() {
-  // Timer only for P2P (not hotseat / local).
-  if (!engine || !session || engine.hotseat || session.transport === "local") {
-    ui.clearTurnTimer();
-    return;
-  }
-  if (engine.state.status !== "playing") {
-    ui.clearTurnTimer();
-    return;
-  }
-  const boardKey = engine.state.board
-    .map((c, i) => (engine.state.blocked.includes(i) ? "#" : c || "."))
-    .join("");
-  const key = `${engine.state.turn}:${boardKey}`;
-  const isHost = session.role === "host";
-  ui.syncTurnTimer({
-    key,
-    seconds: TURN_SECONDS,
-    active: true,
-    canExpire: Boolean(isHost),
-    onExpire: () => {
-      engine?.tryTimeout();
-      queueMicrotask(() => syncTurnTimer());
-    },
-  });
-}
-
-function scheduleGuestAutoReconnect() {
-  if (!session || session.role !== "guest" || session.transport === "local") {
-    return;
-  }
-  if (autoReconnectTimer) return;
-  if (autoReconnectAttempts >= 6) {
-    const msg = "Verbinding blijft weg. Tik op Opnieuw verbinden.";
-    ui.setLobbyError(msg);
-    if (ui.resultLabel) ui.resultLabel.textContent = msg;
-    return;
-  }
-  const delay = 700 + autoReconnectAttempts * 600;
-  autoReconnectTimer = setTimeout(async () => {
-    autoReconnectTimer = null;
-    autoReconnectAttempts += 1;
-    const msg = `Opnieuw verbinden… (${autoReconnectAttempts}/6)`;
-    ui.setLobbyError(msg);
-    if (ui.resultLabel) ui.resultLabel.textContent = msg;
-    try {
-      await session?.reconnect();
-    } catch (err) {
-      ui.setLobbyError(humanizePeerError(err));
-      scheduleGuestAutoReconnect();
-    }
-  }, delay);
-}
-
-function clearAutoReconnect() {
-  autoReconnectAttempts = 0;
-  if (autoReconnectTimer) {
-    clearTimeout(autoReconnectTimer);
-    autoReconnectTimer = null;
-  }
-}
-
-if (typeof document !== "undefined") {
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState !== "visible") return;
-    if (!engine || engine.hotseat || engine.state.status !== "playing") return;
-    ui.nudgeTurnTimer();
-    queueMicrotask(() => syncTurnTimer());
-  });
-}
-
-/**
- * @param {'local'|'p2p'} transport
- */
-function ensureSession(transport) {
-  session = createRoom({ gameId: GAME_ID, transport, maxGuests: 1 });
+function ensureLocalSession() {
+  session = createRoom({ gameId: GAME_ID, transport: "local", maxGuests: 1 });
   engine = new GameEngine(session);
-  wireSession();
-  wireEngine();
-  return session;
-}
-
-async function showInviteQr(url, code) {
-  await showHostInviteCard({
-    card: ui.hostInfo,
-    canvas: ui.inviteQrCanvas,
-    codeEl: ui.roomCodeEl,
-    urlEl: ui.shareUrlEl,
-    code: code || "",
-    url,
-  });
-}
-
-function wireSession() {
-  if (!session || !engine) return;
-
-  session.onStatus = (status, detail) => {
-    const wasDisconnected =
-      lastStatus === "disconnected" || lastStatus === "error";
-    lastStatus = status;
-    ui.setConnectionStatus(status, detail);
-
-    if (session.transport === "local") return;
-
-    if (status === "connected") {
-      clearAutoReconnect();
-      ui.setLobbyError("");
-      ui.showGame();
-      if (session.role === "host") {
-        if (engine.localMark && wasDisconnected) engine.onReconnected();
-        else engine.onPeerConnected();
-      } else if (wasDisconnected && engine.localMark) {
-        engine.onReconnected();
-      } else {
-        engine.startAsGuest();
-      }
-      syncBoard();
-    }
-
-    if (status === "hosting") {
-      if (engine.log.events.length) {
-        ui.showGame();
-        syncBoard();
-      } else {
-        ui.showLobby();
-      }
-    }
-
-    if (status === "disconnected" || status === "error") {
-      syncBoard();
-      if (session.role === "guest") scheduleGuestAutoReconnect();
-    }
-  };
-
-  session.onError = (err) => {
-    ui.setLobbyError(humanizePeerError(err));
-  };
-
-  session.onGameMismatch = (reason) => {
-    ui.setLobbyError(reason);
-  };
-}
-
-function wireEngine() {
-  if (!engine) return;
   engine.onReady = (mark) => {
     if (engine?.hotseat) {
       ui.setRole(null);
@@ -215,346 +60,56 @@ function wireEngine() {
   engine.onReject = (reason) => {
     if (ui.resultLabel) ui.resultLabel.textContent = reason;
   };
+  return session;
+}
+
+async function teardown() {
+  ui.clearTurnTimer();
+  if (engine) engine.stop();
+  if (session) await session.destroy();
+  session = null;
+  engine = null;
+}
+
+async function startLocalHotseat() {
+  rememberName();
+  ui.setLobbyError("");
+  try {
+    await teardown();
+    ensureLocalSession();
+    await session.host();
+    ui.hideHostInvite?.();
+    engine.startLocalHotseat();
+    ui.showGame();
+    ui.setConnectionStatus("connected", "Op dit apparaat");
+    syncBoard();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    ui.setLobbyError(message || "Kon niet starten");
+  }
 }
 
 ui.onCellClick((index) => {
   if (!engine) return;
   const result = engine.tryMove(index);
-  if (!result.ok && result.reason) {
+  if (!result.ok && result.reason && ui.resultLabel) {
     ui.resultLabel.textContent = result.reason;
-    if (result.reason === "Niet verbonden" && session?.role === "guest") {
-      scheduleGuestAutoReconnect();
-    }
   }
 });
 
-ui.btnLocal.addEventListener("click", async () => {
-  ui.setLobbyError("");
-  rememberName();
-  ui.btnLocal.disabled = true;
-  try {
-    await teardown({ clearUrl: true });
-    ensureSession("local");
-    await session.host();
-    shareUrl = null;
-    ui.hideHostInvite();
-    engine.startLocalHotseat();
-    ui.showGame();
-    ui.setConnectionStatus("connected", "Op dit apparaat");
-    syncBoard();
-  } catch (err) {
-    ui.setLobbyError(humanizePeerError(err));
-  } finally {
-    ui.btnLocal.disabled = false;
-  }
+ui.btnLocal?.addEventListener("click", () => {
+  void startLocalHotseat();
 });
 
-ui.btnHost.addEventListener("click", async () => {
-  ui.setLobbyError("");
-  rememberName();
-  ui.btnHost.disabled = true;
-  ui.showHostInvite("…", "");
-  ui.lobbyHint.textContent = "Kamer wordt aangemaakt… even wachten.";
-  try {
-    await teardown({ clearUrl: true });
-    ensureSession("p2p");
-    const code = await session.host();
-    engine.loadPersisted(code);
-    shareUrl = session.buildShareUrl(GAME_PATH, code);
-    session.writeRoomToUrl(code);
-    saveRoom({
-      gameId: GAME_ID,
-      code,
-      name: "host",
-      role: "host",
-    });
-    ui.showHostInvite(code, shareUrl);
-    await showInviteQr(shareUrl, code);
-    engine.startAsHost();
-  } catch (err) {
-    ui.setLobbyError(humanizePeerError(err));
-  } finally {
-    ui.btnHost.disabled = false;
-  }
-});
+ui.btnRestart?.addEventListener("click", () => engine?.requestRestart());
 
-ui.btnJoin.addEventListener("click", () => joinFromInput());
-
-ui.btnScanQr?.addEventListener("click", () => {
-  ui.setLobbyError("");
-  openQrScanner({
-    hint: "Richt op de P2P-QR van de host",
-    onScan: async (raw) => {
-      const invite = parseP2pInvite(raw);
-      if (!invite) {
-        ui.setLobbyError("Geen geldige P2P-uitnodiging in deze QR.");
-        return;
-      }
-      ui.joinCode.value = invite.code;
-      await joinRoom(invite.code);
-    },
-    onError: () => {
-      ui.setLobbyError("Camera kon niet starten.");
-    },
-  });
-});
-
-ui.joinCode.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    joinFromInput();
-  }
-});
-
-ui.btnShareWhatsapp.addEventListener("click", () => openWhatsAppShare());
-ui.btnShare.addEventListener("click", async () => {
-  await shareInvite({ preferWhatsApp: false });
-});
-ui.btnCopyLink.addEventListener("click", async () => {
-  if (!shareUrl) return;
-  const ok = await copyText(shareUrl);
-  flashButton(ui.btnCopyLink, ok ? "Gekopieerd" : "Mislukt", "Kopieer link");
-});
-
-ui.btnRestart.addEventListener("click", () => engine?.requestRestart());
-
-ui.btnLeave.addEventListener("click", async () => {
-  await teardown({ clearUrl: true });
+ui.btnLeave?.addEventListener("click", async () => {
+  await teardown();
   ui.setRole(null);
-  ui.hideHostInvite();
+  ui.hideHostInvite?.();
   ui.setLobbyError("");
   ui.showLobby();
   ui.setConnectionStatus("idle");
-  lastStatus = "idle";
 });
 
-ui.btnReconnect.addEventListener("click", async () => {
-  if (!session || session.transport === "local") return;
-  ui.setLobbyError("");
-  clearAutoReconnect();
-  try {
-    await session.reconnect();
-  } catch (err) {
-    ui.setLobbyError(humanizePeerError(err));
-    if (session.role === "guest") scheduleGuestAutoReconnect();
-  }
-});
-
-async function joinFromInput() {
-  await joinRoom(ui.joinCode.value);
-}
-
-/**
- * @param {string} code
- */
-async function joinRoom(code) {
-  ui.setLobbyError("");
-  rememberName();
-  ui.btnJoin.disabled = true;
-  try {
-    await teardown({ clearUrl: false });
-    ensureSession("p2p");
-    ui.hideHostInvite();
-    const normalized = code.trim().toUpperCase();
-    engine.loadPersisted(normalized);
-    await session.join(normalized);
-    session.writeRoomToUrl(normalized);
-    shareUrl = session.buildShareUrl(GAME_PATH, normalized);
-    saveRoom({
-      gameId: GAME_ID,
-      code: normalized,
-      name: "guest",
-      role: "guest",
-    });
-  } catch (err) {
-    ui.setLobbyError(
-      `${humanizePeerError(err)} De host moet het spel open hebben.`,
-    );
-  } finally {
-    ui.btnJoin.disabled = false;
-  }
-}
-
-/**
- * @param {{ clearUrl?: boolean }} [opts]
- */
-async function teardown({ clearUrl = false } = {}) {
-  ui.clearTurnTimer();
-  clearAutoReconnect();
-  if (engine) engine.stop();
-  if (session) {
-    if (clearUrl) session.clearRoomFromUrl();
-    await session.destroy();
-  }
-  session = null;
-  engine = null;
-  shareUrl = null;
-}
-
-function inviteText() {
-  return `Speel tic-tac-toe met me: ${shareUrl}`;
-}
-
-function openWhatsAppShare() {
-  if (!shareUrl) return;
-  window.open(
-    `https://wa.me/?text=${encodeURIComponent(inviteText())}`,
-    "_blank",
-    "noopener,noreferrer",
-  );
-}
-
-/**
- * @param {{ preferWhatsApp?: boolean }} [opts]
- */
-async function shareInvite({ preferWhatsApp = false } = {}) {
-  if (!shareUrl) return;
-  if (!preferWhatsApp && typeof navigator.share === "function") {
-    try {
-      await navigator.share({
-        title: "Tic Tac Toe",
-        text: inviteText(),
-        url: shareUrl,
-      });
-      return;
-    } catch (err) {
-      if (err && /** @type {{ name?: string }} */ (err).name === "AbortError") {
-        return;
-      }
-    }
-  }
-  openWhatsAppShare();
-}
-
-/**
- * @param {string} text
- */
-async function copyText(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * @param {HTMLButtonElement} btn
- * @param {string} temp
- * @param {string} restore
- */
-function flashButton(btn, temp, restore) {
-  btn.textContent = temp;
-  setTimeout(() => {
-    btn.textContent = restore;
-  }, 1500);
-}
-
-/**
- * @param {unknown} err
- */
-function humanizePeerError(err) {
-  const message = err instanceof Error ? err.message : String(err);
-  const type =
-    err && typeof err === "object" && "type" in err
-      ? /** @type {{ type?: string }} */ (err).type
-      : null;
-
-  if (type === "peer-unavailable" || /Could not connect to peer/i.test(message)) {
-    return "Peer niet gevonden. Controleer de code of of de host online is.";
-  }
-  if (type === "unavailable-id") {
-    return "Die kamercode is al in gebruik. Iemand host deze room nog — kies Join, of wacht tot de host weg is.";
-  }
-  if (type === "network" || /Lost connection to server/i.test(message)) {
-    return "Geen verbinding met de PeerJS-server.";
-  }
-  return message || "Onbekende fout";
-}
-
-/**
- * Re-open a saved room as host (host-wissel).
- * @param {string} code
- */
-async function resumeAsHost(code) {
-  const normalized = code.trim().toUpperCase();
-  ui.setLobbyError("");
-  rememberName();
-  ui.btnHost.disabled = true;
-  ui.showHostInvite(normalized, "");
-  ui.lobbyHint.textContent = "Room opnieuw hosten…";
-  try {
-    await teardown({ clearUrl: false });
-    ensureSession("p2p");
-    engine.loadPersisted(normalized);
-    await session.hostWithCode(normalized);
-    engine.startAsHost();
-    syncBoard();
-    shareUrl = session.buildShareUrl(GAME_PATH, normalized);
-    session.writeRoomToUrl(normalized);
-    saveRoom({
-      gameId: GAME_ID,
-      code: normalized,
-      name: "host",
-      role: "host",
-    });
-    ui.showHostInvite(normalized, shareUrl);
-    await showInviteQr(shareUrl, normalized);
-  } catch (err) {
-    ui.setLobbyError(humanizePeerError(err));
-  } finally {
-    ui.btnHost.disabled = false;
-  }
-}
-
-const roomParam = readRoomFromUrl();
-let lastShellKey = `${roomParam || ""}:${readHostIntentFromUrl() ? "host" : "join"}`;
-if (roomParam && transportFromUrl() !== "qr") {
-  ui.joinCode.value = roomParam;
-  if (readHostIntentFromUrl()) {
-    ui.lobbyHint.textContent = "Bezig deze room opnieuw te hosten…";
-    resumeAsHost(roomParam);
-  } else {
-    ui.lobbyHint.textContent = "Bezig met joinen via deellink…";
-    joinRoom(roomParam);
-  }
-}
-
-watchShellRoute(() => {
-  const room = readRoomFromUrl();
-  const asHost = readHostIntentFromUrl();
-  const key = `${room || ""}:${asHost ? "host" : "join"}`;
-  if (key === lastShellKey) return;
-  lastShellKey = key;
-  if (!room || transportFromUrl() === "qr") return;
-  ui.joinCode.value = room;
-  if (asHost) {
-    ui.lobbyHint.textContent = "Bezig deze room opnieuw te hosten…";
-    resumeAsHost(room);
-  } else {
-    ui.lobbyHint.textContent = "Bezig met joinen via deellink…";
-    joinRoom(room);
-  }
-});
-
-async function bootLocalDefault() {
-  if (readRoomFromUrl()) return;
-  if (session?.isConnected?.()) return;
-  rememberName();
-  ui.setLobbyError("");
-  try {
-    await teardown({ clearUrl: true });
-    ensureSession("local");
-    await session.host();
-    shareUrl = null;
-    ui.hideHostInvite();
-    engine.startLocalHotseat();
-    ui.showGame();
-    ui.setConnectionStatus("connected", "Op dit apparaat");
-    syncBoard();
-  } catch (err) {
-    ui.setLobbyError(humanizePeerError(err));
-  }
-}
-
-bootLocalDefault();
+void startLocalHotseat();

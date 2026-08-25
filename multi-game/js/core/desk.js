@@ -16,7 +16,7 @@ import {
   removeRecent,
   removeRecentByCode,
 } from "../p2p/room-memory.js";
-import { navigateInShell, toHashPath, ROOM_PATH } from "../shell/site-url.js";
+import { navigateInShell, ROOM_PATH } from "../shell/site-url.js";
 
 /**
  * @param {string} gameId
@@ -157,19 +157,6 @@ export function listDeskCards(base = "") {
       joinHref: roomHref,
     };
   });
-}
-
-/**
- * @param {DeskCard} card
- * @param {'open'|'host'|'join'} [intent]
- */
-export function deskHashHref(card, intent = "open") {
-  const game = getGame(card.gameId);
-  const path = toHashPath(game?.path || `${card.gameId}/`);
-  const params = new URLSearchParams();
-  params.set("room", card.code);
-  if (intent === "host") params.set("as", "host");
-  return `#${path}?${params.toString()}`;
 }
 
 /**

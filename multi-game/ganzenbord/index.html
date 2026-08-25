@@ -6,11 +6,9 @@
     <title>Ganzenbord — D-Game</title>
     <meta
       name="description"
-      content="Klassiek ganzenbord (63 vakjes) tot 6 spelers. Spiraalbord, speciale vakjes, deel de lobby-link."
+      content="Klassiek ganzenbord (63 vakjes) hotseat op dit apparaat, of multiplayer via een D-Game room."
     />
     <link rel="stylesheet" href="../css/site.css" />
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   </head>
   <body>
     <div class="app app-wide">
@@ -25,10 +23,10 @@
         <p id="lobby-hint" class="hint"></p>
 
         <section id="setup" class="panel">
-          <h2>Meedoen</h2>
+          <h2>Op dit apparaat</h2>
           <p class="lede">
-            Tot 6 spelers. Stoelen blijven aan jouw naam, ook als een ander later host.
-            Alleen wie aan de beurt is hoeft online te zijn.
+            Tot 6 spelers hotseat op één toestel. Multiplayer met vrienden: start een room op de
+            home-pagina.
           </p>
 
           <label class="field-label" for="player-name">Jouw naam</label>
@@ -45,34 +43,7 @@
             <button type="button" id="btn-local" class="btn btn-primary">
               Speel hier
             </button>
-            <button type="button" id="btn-host" class="btn btn-primary">
-              Maak room + toon QR
-            </button>
-          </div>
-
-          <div class="join-row">
-            <label for="join-code">Of join: scan de QR van de host</label>
-            <div class="join-controls">
-              <input
-                id="join-code"
-                type="text"
-                maxlength="8"
-                autocomplete="off"
-                spellcheck="false"
-                placeholder="CODE"
-              />
-              <button type="button" id="btn-join" class="btn btn-primary">Join</button>
-              <button type="button" id="btn-scan-qr" class="btn btn-primary">Scan QR</button>
-            </div>
-          </div>
-
-          <div id="recent-setup" class="recent-box hidden">
-            <h3 class="recent-title">Jouw recente rooms</h3>
-            <p class="recent-note">
-              Alleen rooms die jij eerder maakte of joinde (op dit apparaat). Geen live-lijst van
-              alle rooms online — dat kan niet zonder server.
-            </p>
-            <ul id="recent-setup-list" class="recent-list"></ul>
+            <a href="../room/" class="btn btn-ghost">Naar room (multiplayer)</a>
           </div>
         </section>
 
@@ -82,30 +53,12 @@
             <p id="lobby-count" class="lobby-count">0 / 6 spelers</p>
           </div>
 
-          <p class="lede">Iedereen die de link opent, verschijnt hier. Host houdt dit tabblad open.</p>
+          <p class="lede">Voeg spelers toe op dit apparaat, start daarna het spel.</p>
 
           <ul id="player-list" class="player-list"></ul>
 
-          <div class="invite-box invite-card">
-            <p class="invite-kicker">Jouw room</p>
-            <p class="invite-title">Laat anderen deze QR scannen</p>
-            <div class="invite-qr-wrap qr-canvas-wrap">
-              <div id="invite-qr-canvas" class="invite-qr-host" role="img" aria-label="QR-code"></div>
-            </div>
-            <p>Kamercode: <strong id="room-code"></strong></p>
-            <p class="invite-wait">Wachten tot spelers joinen… houd dit tabblad open.</p>
-            <a id="share-url" class="share-url" href="#"></a>
-            <div class="actions share-actions">
-              <button type="button" id="btn-copy-link" class="btn btn-primary">Kopieer link</button>
-              <button type="button" id="btn-share-whatsapp" class="btn btn-ghost">
-                WhatsApp
-              </button>
-              <button type="button" id="btn-share" class="btn btn-ghost">Andere apps…</button>
-            </div>
-          </div>
-
-          <div id="host-controls" class="host-controls hidden">
-            <div id="local-add" class="local-add hidden">
+          <div id="host-controls" class="host-controls">
+            <div id="local-add" class="local-add">
               <label class="field-label" for="local-player-name">Extra speler (dit apparaat)</label>
               <div class="join-controls">
                 <input
@@ -124,37 +77,8 @@
             </button>
           </div>
 
-          <p id="guest-waiting" class="hint hidden">Wachten tot de host start…</p>
-
-          <details id="switch-room" class="switch-room">
-            <summary>Andere room</summary>
-            <p class="recent-note">
-              Wissel van lobby, of open een recente room. De huidige verbinding wordt verbroken.
-            </p>
-            <ul id="recent-lobby-list" class="recent-list"></ul>
-            <div class="join-controls switch-join">
-              <input
-                id="switch-code"
-                type="text"
-                maxlength="8"
-                autocomplete="off"
-                spellcheck="false"
-                placeholder="Andere CODE"
-              />
-              <button type="button" id="btn-switch-join" class="btn btn-primary">Join</button>
-            </div>
-            <div class="actions">
-              <button type="button" id="btn-switch-new" class="btn btn-ghost">
-                Nieuwe lobby maken
-              </button>
-            </div>
-          </details>
-
           <div class="actions">
             <button type="button" id="btn-leave" class="btn btn-ghost">Verlaat lobby</button>
-            <button type="button" id="btn-reconnect" class="btn btn-ghost hidden">
-              Opnieuw verbinden
-            </button>
           </div>
         </section>
 
@@ -184,9 +108,6 @@
               Gooi dobbelsteen
             </button>
             <button type="button" id="btn-leave-game" class="btn btn-ghost">Verlaten</button>
-            <button type="button" id="btn-reconnect-game" class="btn btn-ghost hidden">
-              Opnieuw verbinden
-            </button>
           </div>
 
           <div id="win-actions" class="actions win-actions hidden">
