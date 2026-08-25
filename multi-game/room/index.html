@@ -40,7 +40,7 @@
             </button>
           </div>
           <div class="room-join">
-            <label for="join-code">Of join met code</label>
+            <label for="join-code">Of join met code / QR</label>
             <div class="join-row">
               <input
                 id="join-code"
@@ -49,13 +49,17 @@
                 autocomplete="off"
                 placeholder="AB7K2M"
               />
-              <button type="button" id="btn-join-room" class="btn btn-ghost">
+              <button type="button" id="btn-join-room" class="btn btn-primary">
                 Join
+              </button>
+              <button type="button" id="btn-scan-qr" class="btn btn-ghost">
+                Scan QR
               </button>
             </div>
           </div>
-          <p id="room-error" class="hint room-error hidden"></p>
         </section>
+
+        <p id="room-error" class="hint room-error hidden" role="alert"></p>
 
         <section id="panel-lobby" class="panel hidden">
           <div id="invite-card" class="invite-card hidden">

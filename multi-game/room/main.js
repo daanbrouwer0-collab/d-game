@@ -12,6 +12,8 @@ import { getPlayerId, playerLabel } from "../js/core/storage.js";
 import { saveRoom, clearRoom, loadActiveRoom } from "../js/p2p/room-memory.js";
 import { mountRoomStrip, mountShellNav, guardRoomNavigation } from "../js/shell/nav.js";
 import { showHostInviteCard } from "../js/shell/p2p-invite-ui.js";
+import { parseP2pInvite } from "../js/shell/p2p-invite.js";
+import { openQrScanner } from "../js/shell/qr-scanner.js";
 import { mountRoomChat } from "../js/shell/room-chat.js";
 import {
   renderRoomRoster,
@@ -88,6 +90,7 @@ const peerToPlayer = new Map();
 let roomChat = null;
 let sessionConnected = false;
 let hostStartInFlight = false;
+let joinInFlight = false;
 
 const playerId = getPlayerId();
 const roomCommit = createRoomHostCommit();
@@ -891,24 +894,38 @@ async function startHost() {
 }
 
 async function joinRoom(code) {
+  if (joinInFlight || hostStartInFlight) return;
+  joinInFlight = true;
   setError("");
   const c = String(code || "")
     .trim()
     .toUpperCase();
   if (!c) {
-    setError("Vul een roomcode in.");
+    setError("Vul een roomcode in of scan de QR van de host.");
+    joinInFlight = false;
     return;
+  }
+
+  if (session) {
+    await session.destroy();
+    session = null;
   }
 
   const s = createRoomSession({ maxGuests: 5 });
   bindSession(s);
+  showPanel("lobby");
+  setStatus("Verbinden…");
 
   try {
-    s.join(c);
+    // Must wait for PeerJS data channel — hello before open is dropped.
+    await s.join(c);
     s.writeRoomToUrl(c);
     roomLog = loadRoomLogByCode(c);
 
-    s.sendHello({ playerId, name: playerLabel() });
+    const helloOk = s.sendHello({ playerId, name: playerLabel() });
+    if (!helloOk) {
+      throw new Error("Verbonden, maar hello mislukte — probeer opnieuw.");
+    }
 
     saveRoom({
       code: c,
@@ -917,14 +934,17 @@ async function joinRoom(code) {
       isRoomShell: true,
     });
 
-    showPanel("lobby");
     initRoomChat();
     renderRoster();
+    persistRoomDesk();
   } catch (err) {
     setError(err instanceof Error ? err.message : String(err));
     await s.destroy();
     session = null;
+    roomLog = null;
     showPanel("idle");
+  } finally {
+    joinInFlight = false;
   }
 }
 
@@ -949,6 +969,22 @@ document.getElementById("btn-join-room")?.addEventListener("click", () => {
 });
 joinInput?.addEventListener("keydown", (e) => {
   if (e.key === "Enter") joinRoom(joinInput.value);
+});
+document.getElementById("btn-scan-qr")?.addEventListener("click", () => {
+  setError("");
+  openQrScanner({
+    hint: "Richt op de QR van de host",
+    onScan: async (raw) => {
+      const invite = parseP2pInvite(raw);
+      if (!invite) {
+        setError("Geen geldige room-uitnodiging in deze QR.");
+        return;
+      }
+      if (joinInput) joinInput.value = invite.code;
+      await joinRoom(invite.code);
+    },
+    onError: () => setError("Camera kon niet starten."),
+  });
 });
 btnStartVoted?.addEventListener("click", startVotedGame);
 btnBackLobby?.addEventListener("click", () => endGame("back_to_lobby"));
@@ -980,11 +1016,9 @@ guardRoomNavigation({
 });
 
 const urlRoom = readRoomFromUrl();
-if (urlRoom && !hostStartInFlight) {
-  const mem = loadActiveRoom();
-  const resumeHost =
-    readHostIntentFromUrl() ||
-    (mem?.isRoomShell && mem.role === "host" && mem.code === urlRoom);
-  if (resumeHost) startHost();
+if (urlRoom && !hostStartInFlight && !joinInFlight) {
+  // Share/QR links never include as=host — always join as guest.
+  // Only explicit ?as=host (Host opnieuw / Ga verder als host) resumes hosting.
+  if (readHostIntentFromUrl()) startHost();
   else joinRoom(urlRoom);
 }
