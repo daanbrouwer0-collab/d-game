@@ -4,7 +4,8 @@ window.RobotRallyApp = {
   autoSaveTimer: null,
   sessionReady: false,
 
-  init() {
+  init(opts = {}) {
+    const embedded = opts.embedded === true || window.__DGAME_EMBEDDED;
     this.engine = new RobotRallyEngine();
     const canvas = document.getElementById('board-canvas');
 
@@ -15,7 +16,11 @@ window.RobotRallyApp = {
     this.setupAutoSave();
 
     Nav.init();
-    SessionMenu.init();
+    if (!embedded) {
+      SessionMenu.init();
+    } else {
+      SessionMenu.hideModal?.();
+    }
     AppMenu.init();
     CharacterManager.init();
 
@@ -296,6 +301,7 @@ window.RobotRallyApp = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  if (window.__DGAME_EMBEDDED) return;
   if (new URLSearchParams(location.search).get('embedded') === '1') return;
   window.RobotRallyApp.init();
 });

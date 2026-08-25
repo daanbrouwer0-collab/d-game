@@ -11,8 +11,8 @@ import {
 import { parseP2pInvite } from "../js/shell/p2p-invite.js";
 import { showHostInviteCard } from "../js/shell/p2p-invite-ui.js";
 import { openQrScanner, closeQrScanner } from "../js/shell/qr-scanner.js";
-import { mountRoomStrip, mountShellNav } from "../js/shell/nav.js";
-import { mountRoomMultiplayerBanner } from "../js/shell/room-only-multiplayer.js";
+import { mountShellNav } from "../js/shell/nav.js";
+import { setupStandaloneLocalGame } from "../js/shell/room-only-multiplayer.js";
 import {
   readHostIntentFromUrl,
   readRoomFromUrl,
@@ -23,8 +23,7 @@ import { Room } from "./room.js";
 import { UI } from "./ui.js";
 
 mountShellNav({ active: "games", base: "../" });
-mountRoomStrip({ base: "../", currentGameId: GAME_ID });
-mountRoomMultiplayerBanner();
+setupStandaloneLocalGame();
 
 const GAME_PATH = "/ganzenbord/";
 
@@ -678,6 +677,11 @@ async function bootFromUrl() {
   }
 
   refreshRecent();
+  try {
+    await startHost({ name: ui.playerName(), transport: "local" });
+  } catch (err) {
+    ui.setError(humanizePeerError(err));
+  }
 }
 
 watchShellRoute(() => {

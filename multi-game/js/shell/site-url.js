@@ -114,6 +114,22 @@ export function getUrlParams(search = getUrlSearch()) {
 }
 
 /**
+ * Game runs inside room shell iframe (not standalone page).
+ * @returns {boolean}
+ */
+export function isEmbeddedGame() {
+  if (typeof window !== "undefined") {
+    if (window.__DGAME_EMBEDDED) return true;
+    try {
+      if (getUrlParams().get("embedded") === "1") return true;
+    } catch {
+      /* ignore */
+    }
+  }
+  return false;
+}
+
+/**
  * @param {string} [search]
  * @returns {string | null}
  */

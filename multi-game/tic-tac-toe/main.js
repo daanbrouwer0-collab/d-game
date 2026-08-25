@@ -1,7 +1,7 @@
 import { createRoom, transportFromUrl } from "../js/core/room.js";
 import { getDisplayName, playerLabel, saveRoom, setDisplayName } from "../js/core/storage.js";
-import { mountRoomStrip, mountShellNav } from "../js/shell/nav.js";
-import { mountRoomMultiplayerBanner } from "../js/shell/room-only-multiplayer.js";
+import { mountShellNav } from "../js/shell/nav.js";
+import { setupStandaloneLocalGame } from "../js/shell/room-only-multiplayer.js";
 import { parseP2pInvite } from "../js/shell/p2p-invite.js";
 import { openQrScanner } from "../js/shell/qr-scanner.js";
 import { showHostInviteCard } from "../js/shell/p2p-invite-ui.js";
@@ -16,8 +16,7 @@ import { seatsFromLog } from "./log.js";
 import { UI } from "./ui.js";
 
 mountShellNav({ active: "games", base: "../" });
-mountRoomStrip({ base: "../", currentGameId: GAME_ID });
-mountRoomMultiplayerBanner();
+setupStandaloneLocalGame();
 
 const GAME_PATH = "/tic-tac-toe/";
 
@@ -537,3 +536,25 @@ watchShellRoute(() => {
     joinRoom(room);
   }
 });
+
+async function bootLocalDefault() {
+  if (readRoomFromUrl()) return;
+  if (session?.isConnected?.()) return;
+  rememberName();
+  ui.setLobbyError("");
+  try {
+    await teardown({ clearUrl: true });
+    ensureSession("local");
+    await session.host();
+    shareUrl = null;
+    ui.hideHostInvite();
+    engine.startLocalHotseat();
+    ui.showGame();
+    ui.setConnectionStatus("connected", "Op dit apparaat");
+    syncBoard();
+  } catch (err) {
+    ui.setLobbyError(humanizePeerError(err));
+  }
+}
+
+bootLocalDefault();

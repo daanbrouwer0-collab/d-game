@@ -14,16 +14,22 @@ import { drawQr } from "../js/shell/qr-ui.js";
 import { parseP2pInvite } from "../js/shell/p2p-invite.js";
 import { openQrScanner } from "../js/shell/qr-scanner.js";
 import { showHostInviteCard } from "../js/shell/p2p-invite-ui.js";
-import { mountShellNav, mountRoomStrip } from "../js/shell/nav.js";
+import { mountShellNav } from "../js/shell/nav.js";
+import {
+  setupStandaloneLocalGame,
+} from "../js/shell/room-only-multiplayer.js";
 import {
   clearRoomFromUrl,
+  isEmbeddedGame,
   readHostIntentFromUrl,
   readRoomFromUrl,
   writeRoomToUrl,
 } from "../js/shell/site-url.js";
 
-mountShellNav({ active: "games", base: "../" });
-mountRoomStrip({ base: "../", currentGameId: "robotrun" });
+if (!isEmbeddedGame()) {
+  mountShellNav({ active: "games", base: "../" });
+  setupStandaloneLocalGame();
+}
 
 window.RobotRunP2P = {
   createRoom,

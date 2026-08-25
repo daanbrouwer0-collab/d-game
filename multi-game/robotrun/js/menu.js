@@ -2,6 +2,8 @@ const SessionMenu = {
   selectedTransport: 'local',
 
   init() {
+    if (window.__DGAME_EMBEDDED) return;
+
     this.overlay = document.getElementById('menu-overlay');
     this.viewNew = document.getElementById('menu-view-new');
     this.viewHome = document.getElementById('menu-view-home');
@@ -44,16 +46,23 @@ const SessionMenu = {
 
     P2pLobbyUi.init();
 
-    const sessions = StorageManager.loadSessions();
-    if (sessions.length === 0) {
-      this.showModal('new');
-    } else {
-      this.showModal('home');
-    }
-
     this.setTransport('local');
     this.updatePlayerHelp();
     this.updateDifficultyHelp();
+
+    const sessions = StorageManager.loadSessions();
+    const active = StorageManager.getActiveSession();
+    if (active && !StorageManager.isP2pSession(active)) {
+      window.RobotRallyApp?.onSessionChanged(active, { restoreState: true });
+      return;
+    }
+    if (sessions.length === 0) {
+      if (this.sessionNameInput) this.sessionNameInput.value = 'RobotRun';
+      if (this.playerCountSelect) this.playerCountSelect.value = '2';
+      void this.handleCreateSession();
+      return;
+    }
+    this.showModal('home');
 
     this.handleIncomingP2pLink();
   },
@@ -63,33 +72,8 @@ const SessionMenu = {
       window.RobotRunP2P?.readRoomFromUrl?.() ||
       new URLSearchParams(window.location.search).get("room");
     if (!room?.trim()) return;
-    const asHost = Boolean(window.RobotRunP2P?.readHostIntentFromUrl?.());
-    try {
-      if (asHost) {
-        await P2pSessionController.createHostLobby({
-          name: "RobotRun",
-          roomCode: room.trim().toUpperCase(),
-        });
-        P2pSessionController.wireHostAutosnapshots();
-        Toast.show("Room opnieuw gehost");
-      } else {
-        await P2pSessionController.joinRoom(room.trim());
-        Toast.show("Lobby gejoined via link");
-      }
-      if (window.RobotRunP2P?.clearRoomFromUrl) {
-        window.RobotRunP2P.clearRoomFromUrl("/robotrun/");
-      } else {
-        const params = new URLSearchParams(window.location.search);
-        params.delete("room");
-        params.delete("as");
-        const qs = params.toString();
-        window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
-      }
-      this.showModal("p2p-lobby");
-    } catch (err) {
-      Toast.show(err.message || (asHost ? "Hosten via link mislukt" : "Joinen via link mislukt"));
-      this.openP2pLobbyView();
-    }
+    // Legacy ?room= links → room shell (handled in index.html); no per-game lobby.
+    window.location.replace(`../room/?room=${encodeURIComponent(room.trim().toUpperCase())}`);
   },
 
   setTransport(transport) {

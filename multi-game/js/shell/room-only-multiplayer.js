@@ -4,7 +4,10 @@ import {
   readHostIntentFromUrl,
   readRoomFromUrl,
   ROOM_PATH,
+  isEmbeddedGame,
 } from "./site-url.js";
+
+export { isEmbeddedGame };
 
 /**
  * Legacy per-game ?room= links → room shell.
@@ -24,6 +27,23 @@ export function redirectLegacyGameRoomToShell() {
 }
 
 /**
+ * Standalone game page: hide per-game P2P lobby; multiplayer = room shell only.
+ * @param {ParentNode | null} [root]
+ */
+export function setupStandaloneLocalGame(root = document) {
+  hideLegacyP2pLobby(root);
+  const scope = root instanceof Document ? root : root || document;
+  scope.querySelector(".room-multiplayer-banner")?.remove();
+  scope.getElementById?.("room-strip")?.remove();
+  if (scope === document) {
+    document.documentElement.classList.remove("has-room-strip");
+  } else {
+    document.getElementById("room-strip")?.remove();
+    document.documentElement.classList.remove("has-room-strip");
+  }
+}
+
+/**
  * Hide standalone P2P lobby UI; multiplayer runs in room/ only.
  * @param {ParentNode | null} [root]
  */
@@ -34,7 +54,8 @@ export function hideLegacyP2pLobby(root = document) {
   };
   hide("#host-info, .invite-box, .invite-card");
   hide("#btn-host, #btn-join, #btn-scan-qr, #btn-session-p2p-lobby");
-  hide(".join-row, .join-controls");
+  hide(".join-row, .join-controls, .transport-toggle");
+  hide("#menu-view-p2p-lobby, #p2p-join-panel");
   scope.querySelectorAll("label[for='join-code']").forEach((el) => {
     el.classList.add("hidden");
   });
