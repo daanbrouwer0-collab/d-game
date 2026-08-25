@@ -636,8 +636,8 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 136px;
-  overflow-y: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 .program-row {
@@ -735,17 +735,26 @@
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
-  overflow: visible;
+  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: visible;
+  overscroll-behavior: none;
   padding: 4px 2px 8px;
   min-height: 0;
   align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  /* Geen horizontale swipe-scroll meer op de hand */
+  touch-action: manipulation;
 }
 
 .card-item {
   width: 100%;
   min-width: 0;
+  max-width: 100%;
   height: 84px;
-  flex-shrink: 0;
+  flex-shrink: 1;
   background: linear-gradient(180deg, rgba(20, 32, 58, 0.96), rgba(8, 14, 28, 0.98));
   border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: var(--radius-sm);

@@ -280,7 +280,8 @@ function adoptLogPacket(ctrl, raw) {
   const merged = applySyncPacket(ctrl.log, packet);
   if (!merged.ok) return;
   ctrl.log = merged.log;
-  ctrl.syncFromEmbeddedLog();
+  const hadBoard = !!window.RobotRallyApp?.engine?.board;
+  ctrl.syncFromEmbeddedLog({ enterPlay: !hadBoard });
 }
 
 /**
@@ -364,12 +365,16 @@ export function patchP2pSessionForRoom() {
   ctrl.syncFromEmbeddedLog = function syncFromEmbeddedLog({ enterPlay = false } = {}) {
     const restored = this.restoreFromEmbeddedLog();
     if (!restored) return;
+    const seats =
+      Array.isArray(restored.seats) && restored.seats.length
+        ? restored.seats
+        : (this.lobby?.seats || []);
     this.lobby = {
       ...(this.lobby || {}),
-      seats: restored.seats,
-      boardData: restored.boardData,
-      gameState: restored.gameState,
-      status: restored.status,
+      seats,
+      boardData: restored.boardData || this.lobby?.boardData,
+      gameState: restored.gameState || this.lobby?.gameState,
+      status: restored.status || this.lobby?.status,
       settings: restored.settings || this.lobby?.settings,
       roomCode: this.session?.roomCode,
     };

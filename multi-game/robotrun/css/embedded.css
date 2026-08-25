@@ -50,6 +50,37 @@ html.dgame-embedded #board-canvas {
 
 html.dgame-embedded #programming-panel {
   flex: 0 0 auto;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+/* Start/ready/exec: geen kaartenpaneel, geen page-scroll naar kaarten */
+html.dgame-embedded #game-wrap.match-ready-mode #programming-panel,
+html.dgame-embedded #game-wrap.match-countdown-mode #programming-panel,
+html.dgame-embedded #game-wrap.ready-mode #programming-panel,
+html.dgame-embedded #game-wrap.executing-mode #programming-panel,
+html.dgame-embedded #game-wrap.privacy-locked #programming-panel {
+  display: none !important;
+}
+
+html.dgame-embedded #screen-play:has(#game-wrap.match-ready-mode),
+html.dgame-embedded #screen-play:has(#game-wrap.match-countdown-mode),
+html.dgame-embedded #screen-play:has(#game-wrap.ready-mode),
+html.dgame-embedded #screen-play:has(#game-wrap.executing-mode) {
+  overflow: hidden;
+}
+
+html.dgame-embedded #cards-hand,
+html.dgame-embedded .cards-hand-wrap {
+  overflow-x: hidden !important;
+  overflow-y: visible;
+  overscroll-behavior: none;
+  max-width: 100%;
+}
+
+/* P2P: geen aparte scrollbare program-board strip (eigen hand volstaat) */
+html.dgame-embedded #program-board {
+  display: none !important;
 }
 
 html.dgame-embedded .rr-leave-bar {

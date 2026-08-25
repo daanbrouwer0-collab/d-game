@@ -513,6 +513,7 @@ function commitPlayerInGame(pid) {
   if (!sid) return;
   if (roomState().inGamePlayers.has(pid)) {
     pushPresenceToGame();
+    pushSessionLogCatchUp();
     return;
   }
   const updated = roomHost.setPlayerInGame(roomLog, {
@@ -524,6 +525,18 @@ function commitPlayerInGame(pid) {
   saveRoomLogByCode(session.roomCode, roomLog);
   broadcastRoomLog(tipSeq(roomLog) - 1);
   pushPresenceToGame();
+  pushSessionLogCatchUp();
+}
+
+/** Re-send full session log so late/slow game iframes still get start/snap. */
+function pushSessionLogCatchUp() {
+  if (session?.role !== "host" || !sessionHost?.log || !activeSession) return;
+  if (!(sessionHost.log.events || []).length) return;
+  session.broadcast(RoomMsg.SESSION_LOG, {
+    sessionId: activeSession.sessionId,
+    gameId: activeSession.gameId,
+    packet: encodeSyncPacket(sessionHost.log, 0),
+  });
 }
 
 function commitPlayerOutGame(pid) {
