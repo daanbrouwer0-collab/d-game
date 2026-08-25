@@ -38,6 +38,11 @@ export function mountGameBridge(iframe) {
 
     if (data.type === BridgeMsg.SESSION_ENDED) {
       onGameOut?.({ gameType: "__session_ended__", payload: data.payload });
+      return;
+    }
+
+    if (data.type === BridgeMsg.LEAVE_GAME) {
+      onGameOut?.({ gameType: "__leave_game__", payload: null });
     }
   }
 

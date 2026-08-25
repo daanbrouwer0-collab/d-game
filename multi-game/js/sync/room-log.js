@@ -10,6 +10,8 @@ export const RoomEvent = Object.freeze({
   CHAT_MESSAGE: "room.chat_message",
   SESSION_START: "room.session_start",
   SESSION_END: "room.session_end",
+  SESSION_PLAYER_IN: "room.session_player_in",
+  SESSION_PLAYER_OUT: "room.session_player_out",
 });
 
 export function newSessionId() {
@@ -48,6 +50,10 @@ export function replayRoom(log) {
   /** @type {{ messageId: string, playerId: string, name: string, text: string, ts: number, seq: number }[]} */
   const chat = [];
   let chatSeq = 0;
+  /** @type {Set<string>} */
+  let inGamePlayers = new Set();
+  /** @type {string | null} */
+  let presenceSessionId = null;
 
   for (const ev of log?.events || []) {
     const p = /** @type {Record<string, unknown>} */ (ev.payload || {});
@@ -99,6 +105,20 @@ export function replayRoom(log) {
           sessionId: String(p.sessionId || ""),
           gameId: String(p.gameId || ""),
         };
+        inGamePlayers = new Set();
+        presenceSessionId = activeSession.sessionId;
+        break;
+      }
+      case RoomEvent.SESSION_PLAYER_IN: {
+        const sid = String(p.sessionId || "");
+        const pid = String(p.playerId || "");
+        if (sid && pid && sid === presenceSessionId) inGamePlayers.add(pid);
+        break;
+      }
+      case RoomEvent.SESSION_PLAYER_OUT: {
+        const sid = String(p.sessionId || "");
+        const pid = String(p.playerId || "");
+        if (sid && pid && sid === presenceSessionId) inGamePlayers.delete(pid);
         break;
       }
       case RoomEvent.SESSION_END: {
@@ -108,6 +128,8 @@ export function replayRoom(log) {
           reason: String(p.reason || "finished"),
         });
         if (activeSession?.sessionId === p.sessionId) activeSession = null;
+        inGamePlayers = new Set();
+        presenceSessionId = null;
         votes.clear();
         break;
       }
@@ -115,7 +137,39 @@ export function replayRoom(log) {
         break;
     }
   }
-  return { members, activeSession, history, votes, hostPlayerId, chat, chatSeq };
+  return {
+    members,
+    activeSession,
+    history,
+    votes,
+    hostPlayerId,
+    chat,
+    chatSeq,
+    inGamePlayers,
+  };
+}
+
+/**
+ * @param {import("./event-log.js").EventLog} log
+ * @param {string} sessionId
+ * @returns {string[]}
+ */
+export function getSessionStartRoster(log, sessionId) {
+  const sid = String(sessionId || "");
+  /** @type {string[]} */
+  let roster = [];
+  for (const ev of log?.events || []) {
+    if (ev.type !== RoomEvent.SESSION_START) continue;
+    const p = /** @type {{ sessionId?: string, roster?: unknown[] }} */ (
+      ev.payload || {}
+    );
+    if (String(p.sessionId || "") !== sid) continue;
+    if (!Array.isArray(p.roster)) continue;
+    roster = p.roster
+      .map((m) => String(/** @type {{ playerId?: string }} */ (m).playerId || ""))
+      .filter(Boolean);
+  }
+  return roster;
 }
 
 export function commitRoomEvent(log, type, payload) {

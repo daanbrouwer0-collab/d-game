@@ -126,21 +126,80 @@
 .playing-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.35rem 0.65rem;
   border-bottom: 1px solid var(--border, #e8e8e8);
+  flex-shrink: 0;
+  min-height: 2.25rem;
+}
+
+.playing-bar.is-spectator::before {
+  content: "Kijken";
+  margin-right: auto;
+  font-size: 0.85rem;
+  color: var(--muted, #666);
+}
+
+.playing-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.playing-bar .btn-compact {
+  padding: 0.3rem 0.55rem;
+  font-size: 0.875rem;
+  min-height: 0;
+}
+
+.game-session-banner {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--accent, #2563eb);
+  border-radius: var(--radius, 10px);
+  background: color-mix(in srgb, var(--accent, #2563eb) 8%, var(--cell, #fff));
+}
+
+.game-session-banner p {
+  margin: 0 0 0.35rem;
+}
+
+.game-session-banner .hint {
+  margin-bottom: 0.65rem;
 }
 
 .game-frame {
   width: 100%;
   min-height: 60vh;
-  height: min(70vh, 720px);
+  height: min(calc(100dvh - 9rem), 720px);
   border: 0;
   display: block;
   background: var(--bg, #fafafa);
   /* Keep taps inside the iframe on mobile (avoid parent chrome stealing them). */
   touch-action: manipulation;
+}
+
+/* Layer 0 chrome hidden while a game is active in the room (layer 1 playing). */
+body:has(.app-room #panel-playing:not(.hidden)) .shell-nav,
+body:has(.app-room #panel-playing:not(.hidden)) #room-strip {
+  display: none !important;
+}
+
+html.has-shell-nav body:has(.app-room #panel-playing:not(.hidden)) {
+  padding-bottom: 0;
+}
+
+.app-room:has(#panel-playing:not(.hidden)) .header,
+.app-room:has(#panel-playing:not(.hidden)) .room-chrome {
+  display: none;
+}
+
+.app-room:has(#panel-playing:not(.hidden)) .panel-playing {
+  min-height: calc(100dvh - env(safe-area-inset-top, 0px));
+  display: flex;
+  flex-direction: column;
 }
 
 @media (max-width: 640px) {
@@ -158,8 +217,17 @@
   }
 
   .game-frame {
-    min-height: calc(100dvh - 8rem);
-    height: calc(100dvh - 8rem);
+    min-height: calc(100dvh - 2.5rem);
+    height: calc(100dvh - 2.5rem);
+    flex: 1;
+  }
+}
+
+@media (min-width: 641px) {
+  .app-room:has(#panel-playing:not(.hidden)) .game-frame {
+    flex: 1;
+    min-height: calc(100dvh - 2.75rem);
+    height: calc(100dvh - 2.75rem);
   }
 }
 

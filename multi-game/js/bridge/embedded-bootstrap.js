@@ -26,6 +26,11 @@ export function notifySessionEnded(payload = {}) {
   );
 }
 
+/** Guest pauses local game view; room session stays active for rejoin. */
+export function notifyLeaveGame() {
+  window.parent.postMessage({ type: BridgeMsg.LEAVE_GAME }, "*");
+}
+
 /**
  * Host-only: roep aan wanneer sessie klaar is (win, draw, quit).
  * @param {() => boolean} isFinished

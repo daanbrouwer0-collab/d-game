@@ -35,6 +35,8 @@ export function contextFromInit(transport, init) {
     gameId: String(init.gameId || ""),
     playerId: String(init.playerId || ""),
     name: String(init.name || "").trim() || "Speler",
+    participation:
+      init.participation === "spectator" ? "spectator" : "player",
     roster: Array.isArray(init.roster)
       ? init.roster.map((m) => ({
           playerId: String(/** @type {{ playerId?: string }} */ (m).playerId || ""),

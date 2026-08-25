@@ -1,4 +1,9 @@
-import { runEmbeddedGame, notifySessionEnded } from "../js/bridge/embedded-bootstrap.js";
+import { runEmbeddedGame } from "../js/bridge/embedded-bootstrap.js";
+import {
+  hideEmbeddedLeaveButtons,
+  stripEmbeddedChrome,
+  applySpectatorMode,
+} from "../js/shell/embedded-chrome.js";
 import { TURN_SECONDS } from "./game.js";
 import { Room } from "./room.js";
 import { UI } from "./ui.js";
@@ -8,6 +13,7 @@ const ui = new UI();
 let room = null;
 /** @type {import('../js/bridge/bridge-transport.js').BridgeTransport | null} */
 let transport = null;
+let isSpectator = false;
 
 function syncView() {
   if (!room || !transport) return;
@@ -59,25 +65,17 @@ function wireRoom(r) {
 }
 
 ui.btnRoll?.addEventListener("click", () => {
-  if (!room) return;
+  if (!room || isSpectator) return;
   const result = room.tryRoll();
   if (!result.ok) ui.setError(result.reason || "Kon niet gooien");
   else ui.setError("");
 });
 
 ui.btnRematch?.addEventListener("click", () => {
-  if (!room) return;
+  if (!room || isSpectator) return;
   const result = room.tryRematch();
   if (!result.ok) ui.setError(result.reason || "Kon niet opnieuw starten");
   else ui.setError("");
-});
-
-ui.btnToLobby?.addEventListener("click", () => {
-  notifySessionEnded({ reason: "back_to_lobby" });
-});
-
-ui.btnLeaveGame?.addEventListener("click", () => {
-  notifySessionEnded({ reason: "left" });
 });
 
 if (typeof document !== "undefined") {
@@ -92,12 +90,14 @@ if (typeof document !== "undefined") {
 runEmbeddedGame({
   gameId: "ganzenbord",
   prepareUI() {
+    stripEmbeddedChrome();
     ui.setup?.classList.add("hidden");
     ui.lobby?.classList.add("hidden");
-    document.querySelector(".nav")?.classList.add("hidden");
-    document.querySelector(".header .nav")?.classList.add("hidden");
+    hideEmbeddedLeaveButtons("#btn-leave, #btn-leave-game, #btn-to-lobby");
   },
   start(ctx) {
+    isSpectator = ctx.participation === "spectator";
+    applySpectatorMode(isSpectator);
     transport = ctx.transport;
     transport.onStatus = (status) => {
       ui.setConnectionStatus(status === "connected" ? "connected" : status);
@@ -111,8 +111,8 @@ runEmbeddedGame({
       name: ctx.name,
       roster: ctx.roster,
     });
-    ui.setConnectionStatus("connected", "Via room");
     ui.setError("");
+    hideEmbeddedLeaveButtons("#btn-leave, #btn-leave-game, #btn-to-lobby");
     syncView();
   },
 });

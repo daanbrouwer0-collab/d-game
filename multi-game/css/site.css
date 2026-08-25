@@ -1179,6 +1179,36 @@ html.page-ganzenbord body {
   margin-bottom: 0;
 }
 
+/* —— Embedded game (layer 2 in room iframe) —— */
+html.dgame-embedded .app {
+  padding: 0;
+  max-width: none;
+}
+
+html.dgame-embedded header.header,
+html.dgame-embedded .nav {
+  display: none !important;
+}
+
+html.dgame-embedded #btn-leave,
+html.dgame-embedded #btn-leave-game,
+html.dgame-embedded #btn-to-lobby,
+html.dgame-embedded .embedded-leave,
+html.dgame-embedded #connection-status {
+  display: none !important;
+}
+
+html.dgame-spectator .board .cell,
+html.dgame-spectator [data-action] {
+  pointer-events: none;
+}
+
+html.dgame-spectator #btn-restart,
+html.dgame-spectator #btn-roll,
+html.dgame-spectator #btn-rematch {
+  display: none !important;
+}
+
 /* —— Shell tabs —— */
 html.has-shell-nav body {
   padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));

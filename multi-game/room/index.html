@@ -79,6 +79,14 @@
             </div>
           </div>
 
+          <div id="game-session-banner" class="game-session-banner panel hidden" role="status">
+            <p><strong id="game-session-title"></strong> is bezig</p>
+            <p id="game-session-hint" class="hint"></p>
+            <button type="button" id="btn-go-to-game" class="btn btn-primary">
+              Ga naar spel
+            </button>
+          </div>
+
           <h2>Stem op een spel</h2>
           <p id="picker-hint" class="hint"></p>
           <ul id="game-picker" class="game-picker"></ul>
@@ -95,10 +103,24 @@
 
         <section id="panel-playing" class="panel panel-playing hidden">
           <div class="playing-bar">
-            <p id="playing-label" class="hint"></p>
-            <button type="button" id="btn-back-lobby" class="btn btn-ghost hidden">
-              Terug naar stemmen
-            </button>
+            <div class="playing-bar-actions">
+              <button
+                type="button"
+                id="btn-leave-game"
+                class="btn btn-ghost btn-compact"
+                title="Terug naar stemmen"
+              >
+                ← Lobby
+              </button>
+              <button
+                type="button"
+                id="btn-end-session"
+                class="btn btn-ghost btn-compact hidden"
+                title="Spel beëindigen voor iedereen"
+              >
+                Stop
+              </button>
+            </div>
           </div>
           <iframe
             id="game-frame"

@@ -4,6 +4,7 @@ import {
   replayRoom,
   commitRoomEvent,
   newSessionId,
+  getSessionStartRoster,
 } from "./room-log.js";
 
 let log = createRoomLog("ab7k2m");
@@ -69,4 +70,27 @@ console.assert(state.activeSession === null);
 console.assert(state.history.length === 1);
 console.assert(state.votes.size === 0, "votes cleared on session end");
 console.assert(state.chat.length === 2, "chat blijft na session_end");
+console.assert(state.inGamePlayers.size === 0, "inGame cleared on session end");
+log = commitRoomEvent(log, RoomEvent.SESSION_START, {
+  sessionId: sid,
+  gameId: "tic-tac-toe",
+  roster: [{ playerId: "p1" }, { playerId: "p2" }],
+}).log;
+log = commitRoomEvent(log, RoomEvent.SESSION_PLAYER_IN, {
+  sessionId: sid,
+  playerId: "p1",
+}).log;
+state = replayRoom(log);
+console.assert(state.inGamePlayers.has("p1"));
+console.assert(!state.inGamePlayers.has("p2"));
+log = commitRoomEvent(log, RoomEvent.SESSION_PLAYER_OUT, {
+  sessionId: sid,
+  playerId: "p1",
+}).log;
+state = replayRoom(log);
+console.assert(!state.inGamePlayers.has("p1"));
+console.assert(
+  getSessionStartRoster(log, sid).join(",") === "p1,p2",
+  "start roster",
+);
 console.log("room-log ok");

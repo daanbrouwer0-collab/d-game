@@ -1,8 +1,12 @@
 import {
   runEmbeddedGame,
-  notifySessionEnded,
   watchSessionEnd,
 } from "../js/bridge/embedded-bootstrap.js";
+import {
+  hideEmbeddedLeaveButtons,
+  stripEmbeddedChrome,
+  applySpectatorMode,
+} from "../js/shell/embedded-chrome.js";
 import { playerLabel } from "../js/core/storage.js";
 import { TURN_SECONDS } from "./game.js";
 import { GameEngine } from "./engine.js";
@@ -12,6 +16,7 @@ import { UI } from "./ui.js";
 const ui = new UI();
 /** @type {GameEngine | null} */
 let engine = null;
+let isSpectator = false;
 const maybeEnd = watchSessionEnd(
   () =>
     !!engine &&
@@ -64,7 +69,7 @@ function wireEngine() {
 }
 
 ui.onCellClick((index) => {
-  if (!engine) return;
+  if (!engine || isSpectator) return;
   const result = engine.tryMove(index);
   if (!result.ok && result.reason && ui.resultLabel) {
     ui.resultLabel.textContent = result.reason;
@@ -72,16 +77,16 @@ ui.onCellClick((index) => {
 });
 
 ui.btnRestart?.addEventListener("click", () => engine?.requestRestart());
-ui.btnLeave?.addEventListener("click", () =>
-  notifySessionEnded({ reason: "left" }),
-);
 
 runEmbeddedGame({
   gameId: "tic-tac-toe",
   prepareUI() {
-    document.getElementById("lobby")?.classList.add("hidden");
+    stripEmbeddedChrome();
+    hideEmbeddedLeaveButtons();
   },
   start(ctx) {
+    isSpectator = ctx.participation === "spectator";
+    applySpectatorMode(isSpectator);
     engine = new GameEngine(ctx.transport);
     wireEngine();
     engine.bootstrapEmbedded({
@@ -91,8 +96,8 @@ runEmbeddedGame({
       name: ctx.name,
       roster: ctx.roster,
     });
-    ui.setConnectionStatus("connected", "Via room");
     ui.showGame();
+    hideEmbeddedLeaveButtons();
     syncBoard();
   },
 });

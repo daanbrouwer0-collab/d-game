@@ -6,5 +6,6 @@ export const BridgeMsg = Object.freeze({
   GAME_OUT: "dgame:game-out",
   GAME_IN: "dgame:game-in",
   SESSION_ENDED: "dgame:session-ended",
+  LEAVE_GAME: "dgame:leave-game",
   READY: "dgame:ready",
 });

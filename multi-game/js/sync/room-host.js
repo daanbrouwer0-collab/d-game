@@ -110,6 +110,26 @@ export function createRoomHostCommit() {
     },
     /**
      * @param {import("./event-log.js").EventLog} log
+     * @param {{ sessionId: string, playerId: string }} opts
+     */
+    setPlayerInGame(log, { sessionId, playerId }) {
+      return commit.commit(log, RoomEvent.SESSION_PLAYER_IN, {
+        sessionId,
+        playerId,
+      });
+    },
+    /**
+     * @param {import("./event-log.js").EventLog} log
+     * @param {{ sessionId: string, playerId: string }} opts
+     */
+    setPlayerOutGame(log, { sessionId, playerId }) {
+      return commit.commit(log, RoomEvent.SESSION_PLAYER_OUT, {
+        sessionId,
+        playerId,
+      });
+    },
+    /**
+     * @param {import("./event-log.js").EventLog} log
      * @param {number} [fromSeq]
      */
     encodeRoomLog(log, fromSeq = 0) {

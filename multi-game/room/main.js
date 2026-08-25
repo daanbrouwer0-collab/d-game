@@ -35,6 +35,7 @@ import {
 } from "../js/sync/event-log.js";
 import {
   RoomEvent,
+  getSessionStartRoster,
   replayRoom,
   newSessionId,
   commitRoomEvent,
@@ -65,8 +66,13 @@ const gameFrame = /** @type {HTMLIFrameElement} */ (
 );
 /** @type {string | null} */
 let gameFrameBlobUrl = null;
-const playingLabel = document.getElementById("playing-label");
-const btnBackLobby = document.getElementById("btn-back-lobby");
+const playingBar = document.querySelector(".playing-bar");
+const btnLeaveGame = document.getElementById("btn-leave-game");
+const btnEndSession = document.getElementById("btn-end-session");
+const btnGoToGame = document.getElementById("btn-go-to-game");
+const gameSessionBanner = document.getElementById("game-session-banner");
+const gameSessionTitle = document.getElementById("game-session-title");
+const gameSessionHint = document.getElementById("game-session-hint");
 const joinInput = /** @type {HTMLInputElement} */ (
   document.getElementById("join-code")
 );
@@ -169,6 +175,7 @@ function renderRoster() {
   renderChat();
   syncChatMode();
   syncHostInvite();
+  syncGameSessionBanner();
 }
 
 function initRoomChat() {
@@ -264,8 +271,9 @@ function renderGamePicker() {
   const winner = pickWinningGame(tallies, playableIds);
   const myVote = state.votes.get(playerId) || null;
 
-  pickerHint.textContent =
-    count < 2
+  pickerHint.textContent = state.activeSession
+    ? "Er loopt nog een spel — stemmen gaat open zodra iedereen het spel heeft verlaten."
+    : count < 2
       ? "Wacht op minstens 2 spelers om te stemmen."
       : `${count} speler${count === 1 ? "" : "s"} — stem op een spel hieronder.`;
 
@@ -401,6 +409,189 @@ function clearGameFrame() {
   gameFrame.src = "about:blank";
 }
 
+function syncPlayingBarButtons() {
+  if (!session) return;
+  btnLeaveGame?.classList.remove("hidden");
+  btnEndSession?.classList.toggle("hidden", session.role !== "host");
+}
+
+/** @param {"player"|"spectator"} [participation] */
+function syncPlayingBarHint(participation) {
+  playingBar?.classList.toggle("is-spectator", participation === "spectator");
+}
+
+/**
+ * @param {string} sessionId
+ * @param {string} gameId
+ * @returns {"player"|"spectator"}
+ */
+function resolveParticipation(sessionId, gameId) {
+  if (!session || !roomLog) return "spectator";
+  const startRoster = getSessionStartRoster(roomLog, sessionId);
+  if (!startRoster.includes(playerId)) return "spectator";
+  if (playerHasSeatInSessionLog(sessionId, gameId, playerId)) return "player";
+  const log = loadSessionLog(session.roomCode, sessionId, gameId);
+  if (!log?.events?.length) return "player";
+  return "spectator";
+}
+
+/**
+ * @param {string} sessionId
+ * @param {string} gameId
+ * @param {string} pid
+ */
+function playerHasSeatInSessionLog(sessionId, gameId, pid) {
+  if (!session) return false;
+  const log = loadSessionLog(session.roomCode, sessionId, gameId);
+  const id = String(pid || "");
+  for (const ev of log?.events || []) {
+    if (ev.type !== "seat") continue;
+    const p = /** @type {{ playerId?: string, userId?: string }} */ (
+      ev.payload || {}
+    );
+    if (String(p.playerId || p.userId || "") === id) return true;
+  }
+  return false;
+}
+
+function syncGameSessionBanner() {
+  if (!gameSessionBanner) return;
+  const state = roomState();
+  const running = !!state.activeSession && !activeSession && !!session;
+  gameSessionBanner.classList.toggle("hidden", !running);
+  if (!running || !state.activeSession) return;
+
+  const { sessionId, gameId } = state.activeSession;
+  if (gameSessionTitle) {
+    gameSessionTitle.textContent = getGameTitle(gameId);
+  }
+
+  const participation = resolveParticipation(sessionId, gameId);
+  if (participation === "spectator") {
+    if (gameSessionHint) {
+      gameSessionHint.textContent =
+        "Je kijkt alleen mee — geen zetten.";
+    }
+    if (btnGoToGame) btnGoToGame.textContent = "Ga naar spel (kijken)";
+  } else if (session.role === "host") {
+    if (gameSessionHint) {
+      gameSessionHint.textContent =
+        "Spelers kunnen nog in het spel zitten — jij bent in de lobby.";
+    }
+    if (btnGoToGame) btnGoToGame.textContent = "Ga naar spel";
+  } else {
+    if (gameSessionHint) {
+      gameSessionHint.textContent =
+        "Je bent uit het spel — ga terug om verder te spelen.";
+    }
+    if (btnGoToGame) btnGoToGame.textContent = "Ga naar spel";
+  }
+}
+
+function commitPlayerInGame(pid) {
+  if (!session || session.role !== "host" || !roomLog || !roomHost) return;
+  const sid = roomState().activeSession?.sessionId;
+  if (!sid) return;
+  const updated = roomHost.setPlayerInGame(roomLog, {
+    sessionId: sid,
+    playerId: pid,
+  });
+  if (!updated.ok) return;
+  roomLog = updated.log;
+  saveRoomLogByCode(session.roomCode, roomLog);
+  broadcastRoomLog(tipSeq(roomLog) - 1);
+}
+
+function commitPlayerOutGame(pid) {
+  if (!session || session.role !== "host" || !roomLog || !roomHost) return;
+  const sid = roomState().activeSession?.sessionId;
+  if (!sid) return;
+  const updated = roomHost.setPlayerOutGame(roomLog, {
+    sessionId: sid,
+    playerId: pid,
+  });
+  if (!updated.ok) return;
+  roomLog = updated.log;
+  saveRoomLogByCode(session.roomCode, roomLog);
+  broadcastRoomLog(tipSeq(roomLog) - 1);
+  checkAllLeftAndEnd();
+}
+
+function checkAllLeftAndEnd() {
+  if (session?.role !== "host" || !roomLog) return;
+  const state = roomState();
+  if (!state.activeSession) return;
+  const members = rosterArray().map((m) => m.playerId);
+  if (!members.length) return;
+  const allOut = members.every((id) => !state.inGamePlayers.has(id));
+  if (allOut) endGame("all_left");
+}
+
+function signalPlayerInGame() {
+  if (!session) return;
+  if (session.role === "host") commitPlayerInGame(playerId);
+  else {
+    session.send(RoomMsg.ROOM_INTENT, {
+      kind: "session_player_in",
+      playerId,
+    });
+  }
+}
+
+function signalPlayerOutGame() {
+  if (!session) return;
+  if (session.role === "host") commitPlayerOutGame(playerId);
+  else {
+    session.send(RoomMsg.ROOM_INTENT, {
+      kind: "session_player_out",
+      playerId,
+    });
+  }
+}
+
+function pauseLocalGame() {
+  if (gameBridge) {
+    gameBridge.destroy();
+    gameBridge = null;
+  }
+  clearGameFrame();
+  activeSession = null;
+  signalPlayerOutGame();
+  showPanel("lobby");
+  syncPlayingBarHint();
+  renderRoster();
+  syncChatMode();
+  syncGameSessionBanner();
+  persistRoomDesk();
+}
+
+function goToGame() {
+  if (!session || !roomLog) return;
+  const state = roomState();
+  if (!state.activeSession) return;
+
+  activeSession = state.activeSession;
+  if (!sessionHost) {
+    sessionHost = createSessionHost({
+      gameId: state.activeSession.gameId,
+      sessionId: state.activeSession.sessionId,
+      roomCode: session.roomCode,
+    });
+  }
+
+  const log = loadSessionLog(
+    session.roomCode,
+    state.activeSession.sessionId,
+    state.activeSession.gameId,
+  );
+  mountActiveGame(
+    state.activeSession.gameId,
+    state.activeSession.sessionId,
+    encodeSyncPacket(log, 0),
+  );
+  syncGameSessionBanner();
+}
+
 function returnToVoting() {
   if (gameBridge) {
     gameBridge.destroy();
@@ -410,9 +601,10 @@ function returnToVoting() {
   activeSession = null;
   sessionHost = null;
   showPanel("lobby");
-  playingLabel.textContent = "";
+  syncPlayingBarHint();
   renderRoster();
   syncChatMode();
+  syncGameSessionBanner();
   persistRoomDesk();
 }
 
@@ -426,25 +618,12 @@ function adoptRoomPacket(packet) {
 
   const state = roomState();
 
-  if (state.activeSession && !prevSession) {
-    activeSession = state.activeSession;
-    if (session?.role === "guest") {
-      sessionHost = createSessionHost({
-        gameId: state.activeSession.gameId,
-        sessionId: state.activeSession.sessionId,
-        roomCode: session.roomCode,
-      });
-      mountActiveGame(
-        state.activeSession.gameId,
-        state.activeSession.sessionId,
-        null,
-      );
-    }
-  } else if (!state.activeSession && prevSession) {
+  if (!state.activeSession && prevSession) {
     returnToVoting();
   }
 
   renderRoster();
+  syncGameSessionBanner();
   persistRoomDesk();
 }
 
@@ -470,6 +649,22 @@ function handleRoomIntent(payload, fromPeerId) {
     if (!pid || !text) return;
     if (fromPeerId && peerToPlayer.get(fromPeerId) !== pid) return;
     commitChat(pid, text);
+    return;
+  }
+
+  if (p.kind === "session_player_in") {
+    const pid = String(p.playerId || "");
+    if (!pid) return;
+    if (fromPeerId && peerToPlayer.get(fromPeerId) !== pid) return;
+    commitPlayerInGame(pid);
+    return;
+  }
+
+  if (p.kind === "session_player_out") {
+    const pid = String(p.playerId || "");
+    if (!pid) return;
+    if (fromPeerId && peerToPlayer.get(fromPeerId) !== pid) return;
+    commitPlayerOutGame(pid);
   }
 }
 
@@ -589,29 +784,29 @@ function handleWelcome(payload) {
     sessionLog?: import('../js/sync/event-log.js').SyncPacket,
   }} */ (payload || {});
   if (p.roomLog) adoptRoomPacket(p.roomLog);
-  if (p.activeSession && session && !activeSession) {
-    activeSession = p.activeSession;
-    if (p.sessionLog) {
-      const local = loadSessionLog(
+  if (p.activeSession && session && p.sessionLog) {
+    const local = loadSessionLog(
+      session.roomCode,
+      p.activeSession.sessionId,
+      p.activeSession.gameId,
+    );
+    const adopted = adoptHostPacket(local, p.sessionLog);
+    if (adopted.ok) {
+      saveSessionLog(
         session.roomCode,
         p.activeSession.sessionId,
         p.activeSession.gameId,
+        adopted.log,
       );
-      const adopted = adoptHostPacket(local, p.sessionLog);
-      if (adopted.ok) {
-        saveSessionLog(
-          session.roomCode,
-          p.activeSession.sessionId,
-          p.activeSession.gameId,
-          adopted.log,
-        );
-      }
     }
-    mountActiveGame(
-      p.activeSession.gameId,
-      p.activeSession.sessionId,
-      p.sessionLog || null,
-    );
+    if (!sessionHost) {
+      sessionHost = createSessionHost({
+        gameId: p.activeSession.gameId,
+        sessionId: p.activeSession.sessionId,
+        roomCode: session.roomCode,
+      });
+    }
+    sessionHost.setLog(adopted.ok ? adopted.log : local);
   }
   renderRoster();
 }
@@ -635,13 +830,25 @@ function handleSessionLog(payload, fromPeerId) {
 }
 
 function relayGameOut(msg) {
-  if (!session || !activeSession) return;
+  if (!session) return;
   const { gameType, payload } = msg;
 
+  if (gameType === "__leave_game__") {
+    pauseLocalGame();
+    return;
+  }
+
+  if (!activeSession) return;
+
   if (gameType === "__session_ended__") {
-    endGame(
-      String(/** @type {{ reason?: string }} */ (payload || {}).reason || "finished"),
+    const reason = String(
+      /** @type {{ reason?: string }} */ (payload || {}).reason || "finished",
     );
+    if (session.role === "guest" && reason === "left") {
+      pauseLocalGame();
+      return;
+    }
+    endGame(reason);
     return;
   }
 
@@ -759,9 +966,12 @@ async function mountActiveGame(gameId, sessionId, sessionLogPacket) {
   const game = getGame(gameId);
   if (!game || !session) return;
 
+  const participation = resolveParticipation(sessionId, gameId);
+  activeSession = { sessionId, gameId };
   showPanel("playing");
-  playingLabel.textContent = game.title;
-  btnBackLobby.classList.toggle("hidden", session.role !== "host");
+  syncPlayingBarHint(participation);
+  syncPlayingBarButtons();
+  syncGameSessionBanner();
   syncChatMode();
 
   if (gameBridge) gameBridge.destroy();
@@ -782,6 +992,7 @@ async function mountActiveGame(gameId, sessionId, sessionLogPacket) {
       gameId,
       playerId,
       name: playerLabel(),
+      participation,
       roster: rosterArray().map((m) => ({
         playerId: m.playerId,
         name: m.name,
@@ -789,6 +1000,8 @@ async function mountActiveGame(gameId, sessionId, sessionLogPacket) {
       log: sessionLogPacket || encodeSyncPacket(log, 0),
     };
   };
+
+  signalPlayerInGame();
 
   // Queue init; bridge delivers when the game posts READY
   // (iframe onload races ahead of deferred module scripts).
@@ -809,16 +1022,19 @@ async function mountActiveGame(gameId, sessionId, sessionLogPacket) {
     setError(
       err instanceof Error ? err.message : "Kon het spel niet laden.",
     );
-    returnToVoting();
+    pauseLocalGame();
   }
 }
 
 function endGame(reason = "back_to_lobby") {
-  if (!session || !activeSession || !roomLog) return;
+  if (!session || !roomLog) return;
+  const state = roomState();
+  const sid = state.activeSession;
+  if (!sid) return;
   if (session.role === "host") {
     const ended = roomHost.endSession(roomLog, {
-      sessionId: activeSession.sessionId,
-      gameId: activeSession.gameId,
+      sessionId: sid.sessionId,
+      gameId: sid.gameId,
       reason,
     });
     if (ended.ok) {
@@ -899,17 +1115,21 @@ async function startHost() {
 
     const state = roomState();
     if (state.activeSession) {
-      activeSession = state.activeSession;
       sessionHost = createSessionHost({
         gameId: state.activeSession.gameId,
         sessionId: state.activeSession.sessionId,
         roomCode: code,
       });
-      mountActiveGame(
-        state.activeSession.gameId,
-        state.activeSession.sessionId,
-        null,
-      );
+      if (state.inGamePlayers.has(playerId)) {
+        activeSession = state.activeSession;
+        mountActiveGame(
+          state.activeSession.gameId,
+          state.activeSession.sessionId,
+          null,
+        );
+      } else {
+        syncGameSessionBanner();
+      }
     }
   } catch (err) {
     setError(err instanceof Error ? err.message : String(err));
@@ -978,10 +1198,11 @@ async function joinRoom(code) {
 }
 
 async function leaveRoom() {
-  if (activeSession && session?.role === "host") {
+  if (activeSession) {
+    pauseLocalGame();
+  }
+  if (session?.role === "host" && roomState().activeSession) {
     endGame("left");
-  } else {
-    returnToVoting();
   }
   if (session) await session.destroy();
   session = null;
@@ -1016,7 +1237,9 @@ document.getElementById("btn-scan-qr")?.addEventListener("click", () => {
   });
 });
 btnStartVoted?.addEventListener("click", startVotedGame);
-btnBackLobby?.addEventListener("click", () => endGame("back_to_lobby"));
+btnLeaveGame?.addEventListener("click", () => pauseLocalGame());
+btnEndSession?.addEventListener("click", () => endGame("host_abort"));
+btnGoToGame?.addEventListener("click", () => goToGame());
 document.getElementById("btn-leave-room")?.addEventListener("click", leaveRoom);
 
 document.getElementById("btn-copy-invite")?.addEventListener("click", async () => {

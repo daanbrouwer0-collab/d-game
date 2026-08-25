@@ -8,6 +8,8 @@ export class BridgeTransport {
     this.transport = "bridge";
     /** @type {'host'|'guest'|null} */
     this.role = null;
+    /** @type {'player'|'spectator'} */
+    this.participation = "player";
     this.roomCode = null;
     this.maxGuests = 5;
     this.maxPlayers = 6;
@@ -34,6 +36,7 @@ export class BridgeTransport {
    */
   send(type, payload = null) {
     if (!this._ready) return false;
+    if (this.participation === "spectator") return false;
     window.parent.postMessage(
       { type: BridgeMsg.GAME_OUT, gameType: type, payload },
       "*",
@@ -94,6 +97,8 @@ export function connectGameBridge(transport, onInit) {
     if (!data || typeof data !== "object") return;
 
     if (data.type === BridgeMsg.SESSION_INIT) {
+      transport.participation =
+        data.participation === "spectator" ? "spectator" : "player";
       transport.markReady(
         /** @type {'host'|'guest'} */ (data.role),
         String(data.roomCode || ""),
