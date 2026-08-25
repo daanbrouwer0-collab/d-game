@@ -54,7 +54,7 @@ export const GAMES = [
     embedded: {
       entry: "js/embedded.js",
       syncProfile: "snapshot",
-      roomReady: false,
+      roomReady: true,
     },
   },
 ];

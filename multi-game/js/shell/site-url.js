@@ -255,11 +255,9 @@ export function buildGameEmbeddedUrl(gamePath, params) {
   searchParams.set("room", String(params.room || "").trim().toUpperCase());
   searchParams.set("session", params.session);
   const path = toHashPath(gamePath);
-  if (isHashShell()) {
-    return `#${path}?${searchParams.toString()}`;
-  }
-  const basePath = location.pathname.replace(/[^/]+$/, "");
-  return `${basePath}${path.replace(/^\//, "")}?${searchParams.toString()}`;
+  // Room page lives in room/ (srcdoc base or /room/index.html). Nested game iframe
+  // must load a sibling game path — never a shell hash (#...) which navigates to CDN root.
+  return `../${path}?${searchParams.toString()}`;
 }
 
 /**

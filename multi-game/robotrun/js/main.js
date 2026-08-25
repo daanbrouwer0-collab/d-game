@@ -296,5 +296,6 @@ window.RobotRallyApp = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  if (new URLSearchParams(location.search).get('embedded') === '1') return;
   window.RobotRallyApp.init();
 });
