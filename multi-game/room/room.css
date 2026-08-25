@@ -135,9 +135,32 @@
 .game-frame {
   width: 100%;
   min-height: 60vh;
+  height: min(70vh, 720px);
   border: 0;
   display: block;
   background: var(--bg, #fafafa);
+  /* Keep taps inside the iframe on mobile (avoid parent chrome stealing them). */
+  touch-action: manipulation;
+}
+
+@media (max-width: 640px) {
+  body:has(.app-room #panel-playing:not(.hidden)) .shell-nav,
+  body:has(.app-room #panel-playing:not(.hidden)) #room-strip {
+    display: none !important;
+  }
+
+  html.has-shell-nav body:has(.app-room #panel-playing:not(.hidden)) {
+    padding-bottom: 0;
+  }
+
+  .app-room:has(#panel-playing:not(.hidden)) .room-chrome {
+    display: none;
+  }
+
+  .game-frame {
+    min-height: calc(100dvh - 8rem);
+    height: calc(100dvh - 8rem);
+  }
 }
 
 .invite-card {

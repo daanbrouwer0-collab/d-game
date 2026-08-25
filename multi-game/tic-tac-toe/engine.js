@@ -108,12 +108,21 @@ export class GameEngine {
   }
 
   /**
-   * Embedded in room shell — log and role come from SESSION_INIT.
-   * @param {{ role: 'host'|'guest', log?: unknown }} init
+   * Embedded in room shell — log, role and roster come from SESSION_INIT.
+   * @param {{
+   *   role: 'host'|'guest',
+   *   log?: unknown,
+   *   playerId?: string,
+   *   name?: string,
+   *   roster?: { playerId: string, name: string }[],
+   * }} init
    */
   bootstrapEmbedded(init) {
     this.hotseat = false;
-    this.playerName = playerLabel();
+    if (init.playerId) this.playerId = String(init.playerId);
+    this.playerName =
+      String(init.name || "").trim() || playerLabel() || "Speler";
+
     if (init.log) {
       const packet = /** @type {import('../js/sync/event-log.js').SyncPacket} */ (
         init.log
@@ -126,18 +135,39 @@ export class GameEngine {
         if (coerced) this.log = coerced;
       }
     }
+
+    const roster = Array.isArray(init.roster) ? init.roster : [];
+
     if (init.role === "host") {
-      this.startAsHost();
-    } else {
-      this.localMark = markForPlayer(
-        seatsFromLog(this.log),
-        this.playerId,
-        this.playerName,
-      );
+      this.localMark = this.#claimSeat(this.playerId, this.playerName);
+      for (const member of roster) {
+        const pid = String(member.playerId || "");
+        if (!pid || pid === this.playerId) continue;
+        this.#claimSeat(pid, String(member.name || "Speler").trim() || "Speler", {
+          otherThan: this.localMark,
+        });
+      }
+      this.#ensureBoardSetup();
       this.#replay();
+      if (this.session.transport === "bridge" && this.log.events.length) {
+        this.session.broadcast(
+          GameMsg.LOG,
+          this.hostCommit.encodeSince(this.log, 0),
+        );
+      }
       this.onReady?.(this.localMark);
       this.onState?.(cloneState(this.state));
+      return;
     }
+
+    this.localMark = markForPlayer(
+      seatsFromLog(this.log),
+      this.playerId,
+      this.playerName,
+    );
+    this.#replay();
+    this.onReady?.(this.localMark);
+    this.onState?.(cloneState(this.state));
   }
 
   onPeerConnected() {
@@ -573,6 +603,13 @@ export class GameEngine {
       case GameMsg.LOG: {
         if (this.session.role === "host") break;
         this.#adoptHostLog(msg.payload);
+        if (!this.localMark) {
+          this.localMark = markForPlayer(
+            seatsFromLog(this.log),
+            this.playerId,
+            this.playerName,
+          );
+        }
         this.onReady?.(this.localMark);
         break;
       }
@@ -622,6 +659,11 @@ export class GameEngine {
         const from = msg.fromPeerId || "";
         const intentId = payload.intentId;
         const actorPlayerId = String(payload.actorPlayerId || "");
+
+        // Room bridge: bind PeerJS peer → playerId on first intent (like ganzenbord).
+        if (this.session.transport === "bridge" && from && actorPlayerId) {
+          this.hostCommit.bindPeer(from, actorPlayerId);
+        }
 
         if (payload.kind === "restart") {
           const bound = this.hostCommit.acceptBoundIntent({

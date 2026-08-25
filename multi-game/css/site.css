@@ -1049,6 +1049,8 @@ html.page-ganzenbord body {
   font-weight: 700;
   cursor: pointer;
   transition: background 0.15s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .board.board-4 .cell {

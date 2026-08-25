@@ -87,6 +87,9 @@ runEmbeddedGame({
     engine.bootstrapEmbedded({
       role: ctx.role,
       log: ctx.log,
+      playerId: ctx.playerId,
+      name: ctx.name,
+      roster: ctx.roster,
     });
     ui.setConnectionStatus("connected", "Via room");
     ui.showGame();

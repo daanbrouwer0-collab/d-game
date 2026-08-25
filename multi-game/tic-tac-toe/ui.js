@@ -345,8 +345,17 @@ export class UI {
    */
   onCellClick(handler) {
     this.cells.forEach((cell) => {
-      cell.addEventListener("click", () => {
+      let lastAt = 0;
+      const fire = () => {
+        if (cell.disabled) return;
+        const now = Date.now();
+        if (now - lastAt < 350) return;
+        lastAt = now;
         handler(Number(cell.dataset.index));
+      };
+      cell.addEventListener("click", fire);
+      cell.addEventListener("pointerup", (e) => {
+        if (e.pointerType === "touch" || e.pointerType === "pen") fire();
       });
     });
   }
