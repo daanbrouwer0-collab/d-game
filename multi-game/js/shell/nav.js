@@ -9,25 +9,21 @@ import {
 const TAB_PATHS = {
   games: "index.html",
   lobby: "lobby/index.html",
-  friends: "friends/index.html",
-  netwerk: "netwerk/index.html",
   geheugen: "geheugen/index.html",
 };
 
 /**
  * Inject shared bottom tab navigation for the D-Game sandbox shell.
- * @param {{ active: 'games'|'lobby'|'friends'|'netwerk'|'geheugen', base?: string }} opts
+ * @param {{ active: 'games'|'lobby'|'geheugen', base?: string }} opts
  */
 export function mountShellNav({ active, base = "" }) {
   const root = base.endsWith("/") || base === "" ? base : `${base}/`;
   const hash = isHashShell();
 
   const tabs = [
-    { id: "games", label: "Games", href: `${root}index.html` },
-    { id: "lobby", label: "Lobby", href: `${root}lobby/` },
-    { id: "friends", label: "Friends", href: `${root}friends/` },
-    { id: "netwerk", label: "Netwerk", href: `${root}netwerk/` },
-    { id: "geheugen", label: "Geheugen", href: `${root}geheugen/` },
+    { id: "games", label: "Home", href: `${root}index.html` },
+    { id: "lobby", label: "Rooms", href: `${root}lobby/` },
+    { id: "geheugen", label: "Me", href: `${root}geheugen/` },
   ];
 
   const normalized = tabs.map((t) => {

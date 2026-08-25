@@ -3,10 +3,9 @@ import {
   listDeskCards,
   navigateDeskCard,
 } from "../js/core/desk.js";
-import { mountRoomStrip, mountShellNav } from "../js/shell/nav.js";
+import { mountShellNav } from "../js/shell/nav.js";
 
 mountShellNav({ active: "lobby", base: "../" });
-mountRoomStrip({ base: "../" });
 
 const listEl = document.getElementById("lobby-list");
 const emptyEl = document.getElementById("lobby-empty");
@@ -46,7 +45,6 @@ function render() {
       const [gameId, code] = btn.getAttribute("data-remove").split("|");
       forgetDeskRoom(gameId, code);
       render();
-      mountRoomStrip({ base: "../" });
     });
   });
 }

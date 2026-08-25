@@ -3,23 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lobby — D-Game</title>
+    <title>Rooms — D-Game</title>
     <link rel="stylesheet" href="../css/site.css" />
   </head>
   <body>
     <div class="app app-home">
       <header class="header">
-        <h1 class="brand">Lobby</h1>
+        <h1 class="brand">Rooms</h1>
         <p class="tagline">Spellen die jij speelt of later kunt afmaken.</p>
       </header>
       <main>
         <section class="panel">
+          <div class="actions home-room-actions">
+            <a href="../room/?as=host" class="btn btn-primary">Maak room</a>
+            <a href="../room/" class="btn btn-ghost">Join</a>
+          </div>
+        </section>
+
+        <section class="panel">
           <h2>Mijn rooms</h2>
-          <p class="lede">
-            Recente rooms op dit apparaat. Multiplayer speel je in de room — niet via losse spel-lobby&apos;s.
-          </p>
           <ul id="lobby-list" class="lobby-list"></ul>
-          <p id="lobby-empty" class="hint hidden">Nog geen lobbies — start een spel.</p>
+          <p id="lobby-empty" class="hint hidden">Nog geen rooms — maak er een hierboven.</p>
         </section>
       </main>
     </div>

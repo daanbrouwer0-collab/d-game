@@ -30,13 +30,12 @@ Open [http://localhost:8080](http://localhost:8080).
 
 | Tab | Pad | Inhoud |
 |-----|-----|--------|
-| Games | `/` | Catalogus + link naar room |
-| **Handleiding** | `/handleiding/` | Multiplayer uitleg voor spelers |
-| **Room** | `/room/` | **Multiplayer: start/join, picker, embedded spellen** |
-| Lobby | `/lobby/` | Recente rooms (hervatten) |
-| Friends | `/friends/` | Lokale vrienden |
-| Netwerk | `/netwerk/` | P2P-lab (echo, QR) |
-| Geheugen | `/geheugen/` | Profiel, logs wissen |
+| Home | `/` | Brand, Multi Player → Rooms, single-device games |
+| Rooms | `/lobby/` | Recente rooms (hervatten) |
+| Me | `/geheugen/` | Profiel, wissen; link naar Netwerk |
+| Netwerk | `/netwerk/` | P2P-lab (via Me) |
+| Room | `/room/` | Multiplayer start/join, picker, embedded spellen |
+| Handleiding | `/handleiding/` | Multiplayer uitleg |
 
 ## Multiplayer — twee paden
 

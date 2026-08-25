@@ -5,7 +5,7 @@ import { parseP2pInvite } from "../js/shell/p2p-invite.js";
 import { openQrScanner } from "../js/shell/qr-scanner.js";
 import { drawQr } from "../js/shell/qr-ui.js";
 
-mountShellNav({ active: "netwerk", base: "../" });
+mountShellNav({ active: "geheugen", base: "../" });
 
 const LAB_GAME_ID = "lab-p2p";
 const LAB_PATH = "/netwerk/";

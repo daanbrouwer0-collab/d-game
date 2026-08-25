@@ -10,7 +10,7 @@ import {
 } from "../js/core/desk.js";
 import { getPlayerId, playerLabel } from "../js/core/storage.js";
 import { saveRoom, clearRoom, loadActiveRoom } from "../js/p2p/room-memory.js";
-import { mountRoomStrip, mountShellNav, guardRoomNavigation } from "../js/shell/nav.js";
+import { mountShellNav, guardRoomNavigation } from "../js/shell/nav.js";
 import { showHostInviteCard } from "../js/shell/p2p-invite-ui.js";
 import { parseP2pInvite } from "../js/shell/p2p-invite.js";
 import { openQrScanner } from "../js/shell/qr-scanner.js";
@@ -47,7 +47,6 @@ import { createSessionHost } from "../js/bridge/session-host.js";
 import { SyncMsg } from "../js/sync/sync-msg.js";
 
 mountShellNav({ active: "lobby", base: "../" });
-mountRoomStrip({ base: "../" });
 
 const panelIdle = document.getElementById("panel-idle");
 const panelLobby = document.getElementById("panel-lobby");
@@ -140,21 +139,22 @@ function getGameTitle(gameId) {
   return getGame(gameId)?.title || gameId;
 }
 
-function syncHostInvite() {
+function syncInviteCard() {
   const card = document.getElementById("invite-card");
   if (!card) return;
-  if (session?.role !== "host") {
+  const code = session?.roomCode || "";
+  if (!session || !code) {
     card.classList.add("hidden");
     return;
   }
   card.classList.remove("hidden");
-  const code = session.roomCode || "";
   const codeEl = document.getElementById("invite-code");
-  if (codeEl && code && !codeEl.textContent) codeEl.textContent = code;
+  if (codeEl && !codeEl.textContent) codeEl.textContent = code;
   const urlEl = /** @type {HTMLAnchorElement | null} */ (
     document.getElementById("invite-url")
   );
-  const url = shareUrl || (code ? buildRoomShareUrl(code) : "");
+  const url = shareUrl || buildRoomShareUrl(code);
+  if (!shareUrl && url) shareUrl = url;
   if (urlEl && url) {
     urlEl.textContent = url;
     urlEl.href = url;
@@ -174,7 +174,7 @@ function renderRoster() {
   renderGamePicker();
   renderChat();
   syncChatMode();
-  syncHostInvite();
+  syncInviteCard();
   syncGameSessionBanner();
 }
 
@@ -1210,6 +1210,16 @@ async function joinRoom(code) {
       isRoomShell: true,
     });
 
+    shareUrl = buildRoomShareUrl(c);
+    await showHostInviteCard({
+      card: document.getElementById("invite-card"),
+      canvas: document.getElementById("invite-qr-host"),
+      codeEl: document.getElementById("invite-code"),
+      urlEl: /** @type {HTMLAnchorElement} */ (document.getElementById("invite-url")),
+      code: c,
+      url: shareUrl,
+    });
+
     initRoomChat();
     renderRoster();
     persistRoomDesk();
@@ -1295,9 +1305,9 @@ guardRoomNavigation({
 });
 
 const urlRoom = readRoomFromUrl();
-if (urlRoom && !hostStartInFlight && !joinInFlight) {
+if (!hostStartInFlight && !joinInFlight) {
   // Share/QR links never include as=host — always join as guest.
-  // Only explicit ?as=host (Host opnieuw / Ga verder als host) resumes hosting.
+  // Explicit ?as=host: resume that room as host, or create a new room.
   if (readHostIntentFromUrl()) startHost();
-  else joinRoom(urlRoom);
+  else if (urlRoom) joinRoom(urlRoom);
 }
