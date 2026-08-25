@@ -1,5 +1,5 @@
 import { createRoomSession } from "../js/core/room.js";
-import { gamesForPlayerCount, getGame, roomReadyGames } from "../js/core/catalog.js";
+import { GAMES, getGame, roomReadyGames } from "../js/core/catalog.js";
 import { isRoomPlayable } from "../js/bridge/embedded-contract.js";
 import {
   loadRoomLogByCode,
@@ -268,7 +268,7 @@ function renderGamePicker() {
       : `${count} speler${count === 1 ? "" : "s"} — stem op een spel hieronder.`;
 
   gamePicker.innerHTML = "";
-  for (const g of gamesForPlayerCount(999)) {
+  for (const g of GAMES) {
     const countOk = count >= g.minPlayers && count <= g.maxPlayers;
     const roomReady = isRoomPlayable(g.embedded);
     const ok = countOk && roomReady;
