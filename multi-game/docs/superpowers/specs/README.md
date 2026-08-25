@@ -1,6 +1,6 @@
 # Design specs — index
 
-**Laatst bijgewerkt:** 2026-08-24
+**Laatst bijgewerkt:** 2026-08-25
 
 Lees eerst [docs/README.md](../../README.md) voor de actieve documentatieset.
 
@@ -10,6 +10,9 @@ Lees eerst [docs/README.md](../../README.md) voor de actieve documentatieset.
 
 | Spec | Onderwerp |
 |------|-----------|
+| [2026-08-25-robotrun-room-playable-design.md](./2026-08-25-robotrun-room-playable-design.md) | RobotRun room: boot-fix + snapshot ronde-flow speelbaar |
+| [2026-08-25-game-end-screen-design.md](./2026-08-25-game-end-screen-design.md) | Room game end-screen overlay |
+| [2026-08-25-home-nav-rename-design.md](./2026-08-25-home-nav-rename-design.md) | Home / nav rename |
 | [2026-08-24-game-agnostic-rooms-design.md](./2026-08-24-game-agnostic-rooms-design.md) | Room ≠ game, twee log-lagen, room shell |
 | [2026-08-24-room-first-chat-design.md](./2026-08-24-room-first-chat-design.md) | Room-first navigatie + room chat (ingeklapt tijdens spel) |
 | [2026-08-24-embedded-games-standard-design.md](./2026-08-24-embedded-games-standard-design.md) | Embedded games adapter + catalog manifest |
