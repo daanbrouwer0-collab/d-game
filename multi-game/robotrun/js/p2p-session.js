@@ -55,6 +55,48 @@ const P2pSessionController = {
     return this.localSeat()?.robotId || null;
   },
 
+  /** Apply Me-tab colors/name onto the local robot (and lobby seat). */
+  applyLocalHubProfile() {
+    const app = window.RobotRallyApp;
+    const localId = this.localRobotId();
+    if (!app?.engine || !localId) return;
+    const hub = StorageManager.loadCharacter();
+    const colors = hub.colors || StorageManager.makeColors(hub.color);
+    const robot = app.engine.robots.find((r) => r.id === localId);
+    if (robot) {
+      robot.name = hub.name || robot.name;
+      robot.colors = { ...colors };
+      robot.color = colors.head;
+      robot.style = hub.style || robot.style || "scout";
+    }
+    const seat = this.localSeat();
+    if (seat) {
+      seat.name = hub.name || seat.name;
+      seat.color = colors.head;
+      seat.colors = { ...colors };
+      seat.style = hub.style || seat.style || "scout";
+    }
+  },
+
+  /** Guest: push Me-tab profile so host robots get the right colors. */
+  sendLocalProfileUpdate() {
+    if (this.isHost()) return;
+    const seat = this.localSeat();
+    if (!seat) return;
+    this.applyLocalHubProfile();
+    this.send("rr_seat_update", {
+      userId: this.playerId,
+      seat: {
+        userId: seat.userId,
+        robotId: seat.robotId,
+        name: seat.name,
+        color: seat.color,
+        colors: seat.colors,
+        style: seat.style,
+      },
+    });
+  },
+
   activeRoomKey() {
     return CONFIG.P2P?.ACTIVE_ROOM_KEY || "dgame-robotrun-p2p-active";
   },
@@ -216,13 +258,20 @@ const P2pSessionController = {
   },
 
   makeSeat(userId, index, profile, robotId) {
-    const color = StorageManager.getPlayerColor(profile);
+    const colors = profile?.colors
+      ? {
+          head: StorageManager.normalizeHex(profile.colors.head) || StorageManager.getPlayerColor(profile),
+          body: StorageManager.normalizeHex(profile.colors.body) || StorageManager.getPlayerColor(profile),
+          legs: StorageManager.normalizeHex(profile.colors.legs) || StorageManager.getPlayerColor(profile),
+        }
+      : StorageManager.makeColors(StorageManager.getPlayerColor(profile));
+    const color = colors.head;
     return {
       userId,
       robotId: robotId || `player_${index + 1}`,
       name: (profile?.name || `Speler ${index + 1}`).trim().slice(0, 24),
       color,
-      colors: profile?.colors || StorageManager.makeColors(color),
+      colors,
       style: profile?.style || "scout",
       ready: false,
     };
@@ -592,6 +641,26 @@ const P2pSessionController = {
     }
     this.lobby.seats = seats;
     this.lobby.updatedAt = Date.now();
+
+    // Mid-race profile update: paint robot with seat colors and republish.
+    const app = window.RobotRallyApp;
+    const merged = seats.find((s) => s.userId === seat.userId);
+    if (app?.engine && merged?.robotId && this.lobby.status === "playing") {
+      const robot = app.engine.robots.find((r) => r.id === merged.robotId);
+      if (robot) {
+        if (merged.name) robot.name = merged.name;
+        if (merged.colors) {
+          robot.colors = { ...merged.colors };
+          robot.color = merged.colors.head || merged.color;
+        } else if (merged.color) {
+          robot.colors = StorageManager.makeColors(merged.color);
+          robot.color = merged.color;
+        }
+        if (merged.style) robot.style = merged.style;
+        this.publishSnapshot().catch(() => {});
+      }
+    }
+
     this.broadcastLobby();
     this.renderLobbyUi();
   },
@@ -660,6 +729,7 @@ const P2pSessionController = {
       boardData,
       {
         startRound: true,
+        awaitMatchReady: true,
         startingLives: settings.startingLives,
         rngSeed: seed,
       },
@@ -764,6 +834,7 @@ const P2pSessionController = {
           }
         });
       }
+      this.applyLocalHubProfile();
       app.sessionReady = true;
 
       if (app.ui) {
@@ -785,6 +856,7 @@ const P2pSessionController = {
       if (enterPlay) {
         SessionMenu.hideModal?.();
         Nav.switchTab("play");
+        if (!this.isHost()) this.sendLocalProfileUpdate();
       }
     } finally {
       this.applyingSnapshot = false;
@@ -821,6 +893,7 @@ const P2pSessionController = {
     if (this.isHost()) {
       window.RobotRallyApp.engine.commitRegistersForRobot(robotId, registers);
       await this.publishSnapshot();
+      await this.maybeAutoStartExecution();
       return;
     }
     this.send("rr_intent_commit", {
@@ -830,9 +903,41 @@ const P2pSessionController = {
     });
   },
 
+  async maybeAutoStartExecution() {
+    if (!this.isHost()) return;
+    const engine = window.RobotRallyApp?.engine;
+    if (!engine || engine.phase !== "ready") return;
+    await this.sendPlay();
+  },
+
   async sendPlay() {
     if (!this.isHost()) throw new Error("Alleen de host mag Play drukken.");
+    if (window.RobotRallyApp?.engine?.phase !== "ready") return;
     window.RobotRallyApp.engine.startExecution();
+    await this.publishSnapshot();
+  },
+
+  async sendMatchReady() {
+    const robotId = this.localRobotId();
+    if (!robotId) throw new Error("Geen robot gekoppeld.");
+    if (this.isHost()) {
+      window.RobotRallyApp.engine.setMatchReady(robotId);
+      await this.publishSnapshot();
+      return;
+    }
+    this.send("rr_intent_match_ready", {
+      robotId,
+      userId: this.playerId,
+    });
+  },
+
+  async maybeFinishMatchCountdown() {
+    if (!this.isHost()) return;
+    const engine = window.RobotRallyApp?.engine;
+    if (!engine || engine.phase !== "match_countdown") return;
+    const endsAt = engine.matchCountdownEndsAt;
+    if (endsAt != null && Date.now() < endsAt) return;
+    engine.startMatchFromCountdown();
     await this.publishSnapshot();
   },
 
@@ -948,6 +1053,22 @@ const P2pSessionController = {
         bound.robotId,
         payload.registers,
       );
+      this.publishSnapshot()
+        .then(() => this.maybeAutoStartExecution())
+        .catch(() => {});
+      return;
+    }
+
+    if (type === "rr_intent_match_ready") {
+      const bound = window.RobotRunIntentBind?.resolveSeatAction?.(
+        this.lobby,
+        payload,
+        msg.fromPeerId,
+        this.peerToPlayer || {},
+      );
+      if (!bound) return;
+      if (bound.userId === this.playerId) return;
+      window.RobotRallyApp.engine.setMatchReady(bound.robotId);
       this.publishSnapshot().catch(() => {});
       return;
     }

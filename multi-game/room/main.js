@@ -204,11 +204,24 @@ function renderChat() {
   });
 }
 
+function placeRoomChat(playing) {
+  const root = document.getElementById("room-chat-root");
+  const chrome = document.getElementById("room-chrome");
+  const playSlot = document.getElementById("room-chat-play-slot");
+  if (!root || !chrome || !playSlot) return;
+  const target = playing ? playSlot : chrome;
+  if (root.parentElement !== target) {
+    target.appendChild(root);
+  }
+  root.dataset.dock = playing ? "play" : "lobby";
+}
+
 function syncChatMode() {
   if (!roomChat) return;
   const playing = !!roomState().activeSession || !!activeSession;
-  roomChat.setMode(playing ? "collapsed" : "open");
-  if (!playing) roomChat.markRead(roomState().chatSeq);
+  placeRoomChat(playing);
+  roomChat.setMode("open");
+  roomChat.markRead(roomState().chatSeq);
 }
 
 /**

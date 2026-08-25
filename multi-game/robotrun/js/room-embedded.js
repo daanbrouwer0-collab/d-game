@@ -79,6 +79,7 @@ export function bootstrapRoomEmbedded(ctx) {
     pushLogWire(ctrl);
   } else {
     ctrl.syncFromEmbeddedLog({ enterPlay: true });
+    ctrl.sendLocalProfileUpdate?.();
   }
 
   Nav.switchTab("play");
@@ -206,6 +207,7 @@ function startEmbeddedRace(ctrl) {
     boardData,
     {
       startRound: true,
+      awaitMatchReady: true,
       startingLives: settings.startingLives,
       rngSeed: seed,
     },
@@ -223,6 +225,7 @@ function startEmbeddedRace(ctrl) {
   });
 
   app.sessionReady = true;
+  ctrl.applyLocalHubProfile?.();
   if (app.ui) {
     app.ui.localP2pRobotId = ctrl.localRobotId();
     app.ui.p2pHostMode = true;

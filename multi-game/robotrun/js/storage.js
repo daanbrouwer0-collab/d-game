@@ -93,6 +93,47 @@ const StorageManager = {
   },
 
   loadCharacter() {
+    // Prefer shared hub profile (Me tab): dgame.character + dgame.displayName
+    try {
+      const hubRaw = localStorage.getItem('dgame.character');
+      if (hubRaw) {
+        const hub = JSON.parse(hubRaw);
+        if (hub && typeof hub === 'object') {
+          const colors = {
+            head: this.normalizeHex(hub.head) || '#cccccc',
+            body: this.normalizeHex(hub.body) || '#888888',
+            legs: this.normalizeHex(hub.legs) || '#444444',
+          };
+          let name = CONFIG.DEFAULT_CHARACTER.name;
+          try {
+            name = (localStorage.getItem('dgame.displayName') || '').trim() || name;
+          } catch {
+            /* ignore */
+          }
+          let style = CONFIG.DEFAULT_CHARACTER.style || 'scout';
+          try {
+            const localRaw = localStorage.getItem(CONFIG.CHAR_KEY);
+            if (localRaw) {
+              const local = JSON.parse(localRaw);
+              if (local?.style && CONFIG.ROBOT_STYLES.some((s) => s.id === local.style)) {
+                style = local.style;
+              }
+            }
+          } catch {
+            /* ignore */
+          }
+          return {
+            name: String(name).slice(0, 24),
+            color: colors.head,
+            colors,
+            style,
+          };
+        }
+      }
+    } catch {
+      /* fall through */
+    }
+
     try {
       const raw = localStorage.getItem(CONFIG.CHAR_KEY);
       if (!raw) {

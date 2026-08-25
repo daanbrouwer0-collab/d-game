@@ -14,6 +14,16 @@ class RobotRallyUI {
     this.lastProgrammingRobotId = null;
     this.localP2pRobotId = null;
     this.p2pHostMode = false;
+    this.isReplaying = false;
+    this.replayPoseById = null;
+    this.replayPromptTimer = null;
+    this.replayRunToken = 0;
+    this._programTimerInterval = null;
+    this._programTimerKey = '';
+    this._programTimerDeadline = 0;
+    this._programTimerExpiring = false;
+    this._matchCountdownInterval = null;
+    this._matchCountdownKey = '';
 
     this.initElements();
     this.bindEvents();
@@ -35,6 +45,7 @@ class RobotRallyUI {
     this.btnPowerDown = document.getElementById('btn-power-down');
     this.btnConfirmProgram = document.getElementById('btn-confirm-program');
     this.btnStartExecution = document.getElementById('btn-start-execution');
+    this.btnMatchReady = document.getElementById('btn-match-ready');
     this.gameOverOverlay = document.getElementById('game-over-overlay');
     this.goCard = document.getElementById('go-card');
     this.goTitle = document.getElementById('go-title');
@@ -44,6 +55,9 @@ class RobotRallyUI {
     this.actionLog = document.getElementById('action-log');
     this.selectionHint = document.getElementById('selection-hint');
     this.programmingPanel = document.getElementById('programming-panel');
+    this.programTimer = document.getElementById('program-timer');
+    this.programTimerFill = document.getElementById('program-timer-fill');
+    this.programTimerLabel = document.getElementById('program-timer-label');
     this.upgradeShop = document.getElementById('upgrade-shop');
     this.gameWrap = document.getElementById('game-wrap');
     this.activePlayerCard = document.getElementById('active-player-card');
@@ -52,6 +66,8 @@ class RobotRallyUI {
     this.activePlayerText = document.getElementById('active-player-text');
     this.activePlayerStatus = document.getElementById('active-player-status');
     this.boardFrame = document.getElementById('board-frame');
+    this.boardReplayPrompt = document.getElementById('board-replay-prompt');
+    this.btnBoardReplay = document.getElementById('btn-board-replay');
     this.playbackOverlay = document.getElementById('playback-overlay');
     this.playbackStatusCard = this.playbackOverlay?.querySelector('.playback-status-card') || null;
     this.playbackTitle = document.getElementById('playback-title');
@@ -80,7 +96,22 @@ class RobotRallyUI {
 
   bindEvents() {
     this.btnStartExecution?.addEventListener('click', () => this.handlePrimaryOverlayAction());
+    this.btnMatchReady?.addEventListener('click', () => this.handleMatchReady());
     this.btnConfirmProgram?.addEventListener('click', () => this.runProgram());
+    document.getElementById('btn-rr-leave-game')?.addEventListener('click', () => {
+      this.leaveGame();
+    });
+    this.btnBoardReplay?.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this.startBoardReplay();
+    });
+    this.canvas?.addEventListener('click', () => this.onBoardTap());
+    this.canvas?.addEventListener('touchend', (event) => {
+      if (event.changedTouches?.length) {
+        event.preventDefault();
+        this.onBoardTap();
+      }
+    }, { passive: false });
     this.btnPowerDown?.addEventListener('click', () => {
       const robot = this.getProgrammingRobot();
       if (!robot) return;
@@ -162,6 +193,30 @@ class RobotRallyUI {
   updateRobotAnimStates() {
     if (!this.engine || !this.engine.robots) return;
 
+    if (this.isReplaying && this.replayPoseById) {
+      this.engine.robots.forEach((robot) => {
+        const pose = this.replayPoseById[robot.id];
+        if (!pose || pose.eliminated || pose.x < 0 || pose.y < 0) {
+          delete this.robotAnimStates[robot.id];
+          return;
+        }
+        const targetAngle = [0, Math.PI / 2, Math.PI, -Math.PI / 2][pose.dir] || 0;
+        const state = this.robotAnimStates[robot.id] || {
+          x: pose.x,
+          y: pose.y,
+          angle: targetAngle,
+        };
+        state.x += (pose.x - state.x) * 0.35;
+        state.y += (pose.y - state.y) * 0.35;
+        let delta = targetAngle - state.angle;
+        while (delta < -Math.PI) delta += Math.PI * 2;
+        while (delta > Math.PI) delta -= Math.PI * 2;
+        state.angle += delta * 0.4;
+        this.robotAnimStates[robot.id] = state;
+      });
+      return;
+    }
+
     this.engine.robots.forEach(robot => {
       if (robot.x < 0 || robot.y < 0 || robot.eliminated) {
         delete this.robotAnimStates[robot.id];
@@ -208,6 +263,8 @@ class RobotRallyUI {
     this.renderUpgradeChoiceOverlay();
     this.updateButtons();
     this.syncExecutionTimer();
+    this.syncProgrammingTimer();
+    this.syncMatchCountdown();
 
     if (this.engine.phase === 'finished') {
       // Room shell shows the shared end overlay; keep the board visible underneath.
@@ -231,6 +288,24 @@ class RobotRallyUI {
 
   updatePanelTitle(currentRobot) {
     if (!this.panelTitle) return;
+
+    if (this.engine.phase === 'match_ready') {
+      this.panelTitle.textContent = 'Ready check';
+      if (this.selectionHint) {
+        const readyCount = (this.engine.matchReadyRobotIds || []).length;
+        const total = this.engine.getMatchReadyHumans?.().length || 0;
+        this.selectionHint.textContent = `Iedereen moet Ready drukken (${readyCount}/${total}).`;
+      }
+      return;
+    }
+
+    if (this.engine.phase === 'match_countdown') {
+      this.panelTitle.textContent = 'Start over…';
+      if (this.selectionHint) {
+        this.selectionHint.textContent = 'Even wachten — daarna programmeer je 60 seconden.';
+      }
+      return;
+    }
 
     if (this.engine.phase === 'programming') {
       if (!this.isProgrammingUnlocked(currentRobot)) {
@@ -260,9 +335,7 @@ class RobotRallyUI {
       this.panelTitle.textContent = 'Alles staat klaar';
       if (this.selectionHint) {
         this.selectionHint.textContent = this.isP2pMode()
-          ? (this.isP2pHost()
-            ? 'Iedereen is ready. Jij bent host — druk op Play.'
-            : 'Iedereen is ready. Wacht tot de host Play drukt.')
+          ? 'Iedereen is ready — ronde start automatisch.'
           : 'Alle spelers hebben bevestigd. Druk op Play om de ronde af te spelen.';
       }
       return;
@@ -302,10 +375,27 @@ class RobotRallyUI {
       return;
     }
 
+    const committed = this.isP2pMode() && currentRobot && this.engine.isRobotCommitted?.(currentRobot.id);
+    if (committed && (this.engine.phase === 'programming' || this.engine.phase === 'ready')) {
+      const info = document.createElement('div');
+      info.className = 'cards-hand-message';
+      const readyCount = (this.engine.committedRobotIds || []).length;
+      const total = this.engine.getProgrammableHumans?.().length || 0;
+      info.textContent = this.engine.phase === 'ready'
+        ? 'Jouw programma staat klaar. Ronde start automatisch…'
+        : `Jouw programma staat klaar. Wachten op anderen (${readyCount}/${total})…`;
+      this.cardsHandWrap.appendChild(info);
+      return;
+    }
+
     if (this.engine.phase !== 'programming' || currentRobot.isBot) {
       const info = document.createElement('div');
       info.className = 'cards-hand-message';
-      if (this.engine.phase === 'ready') {
+      if (this.engine.phase === 'match_ready') {
+        info.textContent = 'Druk op Ready om te starten. Daarna wachten we op de anderen.';
+      } else if (this.engine.phase === 'match_countdown') {
+        info.textContent = 'Iedereen is ready — het spel start zo.';
+      } else if (this.engine.phase === 'ready') {
         info.textContent = 'Alle kaarten zijn bevestigd. Druk op Play om de acties op het bord te starten.';
       } else if (this.engine.phase === 'executing') {
         info.textContent = 'Registers worden rustig afgespeeld op het bord.';
@@ -376,8 +466,14 @@ class RobotRallyUI {
 
   renderRegisterSlots() {
     const currentRobot = this.getFocusedRobot();
+    const committed = this.isP2pMode() && currentRobot && this.engine.isRobotCommitted?.(currentRobot.id);
+    const hideCommittedCards = committed
+      && (this.engine.phase === 'programming' || this.engine.phase === 'ready');
+
     let displayCards = [null, null, null, null, null];
-    if (this.engine.phase === 'programming' && currentRobot) {
+    if (hideCommittedCards) {
+      displayCards = [null, null, null, null, null];
+    } else if (this.engine.phase === 'programming' && currentRobot) {
       if (this.isProgrammingUnlocked(currentRobot)) {
         this.ensureProgrammingRegisters(currentRobot);
         displayCards = this.selectedRegisters;
@@ -397,7 +493,10 @@ class RobotRallyUI {
       slot.classList.toggle('filled', !!card);
       slot.classList.toggle('locked-register', locked);
       slot.classList.toggle('active-register', isActive);
-      slot.title = locked ? 'Vastgezet door schade' : '';
+      slot.classList.toggle('committed-empty', hideCommittedCards);
+      slot.title = hideCommittedCards
+        ? 'Programma bevestigd'
+        : (locked ? 'Vastgezet door schade' : '');
 
       if (card) {
         slot.innerHTML = `
@@ -410,6 +509,7 @@ class RobotRallyUI {
         slot.innerHTML = `
           <span class="register-num">${index + 1}</span>
           ${locked ? '<span class="register-lock">vast</span>' : ''}
+          ${hideCommittedCards ? '<span class="register-lock">klaar</span>' : ''}
         `;
       }
     });
@@ -448,7 +548,11 @@ class RobotRallyUI {
     }
 
     if (this.hudRegister) {
-      if (this.engine.phase === 'programming') {
+      if (this.engine.phase === 'match_ready') {
+        this.hudRegister.textContent = 'Ready check';
+      } else if (this.engine.phase === 'match_countdown') {
+        this.hudRegister.textContent = 'Start over…';
+      } else if (this.engine.phase === 'programming') {
         this.hudRegister.textContent = `R${this.engine.roundNumber} · programmeren`;
       } else if (this.engine.phase === 'ready') {
         this.hudRegister.textContent = `R${this.engine.roundNumber} · klaar`;
@@ -475,7 +579,14 @@ class RobotRallyUI {
     const maxCp = this.engine.board.checkpointsCount || 1;
     const maxLives = this.engine.startingLives || CONFIG.DEFAULT_STARTING_LIVES || CONFIG.STARTING_LIVES || 3;
     const maxUpgrades = CONFIG.MAX_UPGRADES || 4;
-    const robots = this.engine.robots.filter(robot => !robot.eliminated);
+    const localId = this.isP2pMode() ? this.localP2pRobotId : null;
+    let robots = this.engine.robots.filter(robot => !robot.eliminated);
+    if (localId) {
+      robots = [
+        ...robots.filter((r) => r.id === localId),
+        ...robots.filter((r) => r.id !== localId),
+      ];
+    }
     const scrollLeft = this.playerStatusBar.scrollLeft;
 
     if (!robots.length) {
@@ -490,12 +601,20 @@ class RobotRallyUI {
       const hp = Math.max(0, Math.min(maxHp, robot.hp != null ? robot.hp : maxHp));
       const lifeRatio = hp / maxHp;
       const livesLeft = Math.max(0, robot.lives || 0);
-      const isTurn = this.isP2pMode()
-        ? ((this.engine.phase === 'programming' || this.engine.phase === 'ready') && !this.engine.isRobotCommitted?.(robot.id))
-        : (this.engine.phase === 'programming' && turnRobot && turnRobot.id === robot.id);
-      const isReady = this.isP2pMode() && this.engine.isRobotCommitted?.(robot.id);
+      const isYou = !!(localId && robot.id === localId);
+      const matchGate = this.engine.phase === 'match_ready' || this.engine.phase === 'match_countdown';
+      const isMatchReady = matchGate && this.engine.isRobotMatchReady?.(robot.id);
+      const isTurn = matchGate
+        ? (this.engine.phase === 'match_ready' && !isMatchReady)
+        : this.isP2pMode()
+          ? ((this.engine.phase === 'programming' || this.engine.phase === 'ready') && !this.engine.isRobotCommitted?.(robot.id))
+          : (this.engine.phase === 'programming' && turnRobot && turnRobot.id === robot.id);
+      const isReady = matchGate
+        ? !!isMatchReady
+        : (this.isP2pMode() && this.engine.isRobotCommitted?.(robot.id));
       const isDown = robot.needsRespawn || robot.x < 0;
       const owned = robot.upgrades || [];
+      const displayName = this.shortName(robot, 12);
 
       const flags = Array.from({ length: maxCp }, (_, i) => {
         const num = i + 1;
@@ -518,10 +637,18 @@ class RobotRallyUI {
         return `<span class="player-status-upgrade" title="${tip}" aria-label="${tip}">${this.getUpgradeIconSvg(upgrade.id)}</span>`;
       }).join('');
 
+      const tipParts = [
+        isYou ? 'Jij' : this.getDisplayPlayerName(robot),
+        matchGate
+          ? (isReady ? 'Ready' : 'Wacht…')
+          : (isReady ? 'Ready' : (isTurn ? 'Programmeert' : '')),
+      ].filter(Boolean);
+
       return `
-        <div class="player-status-chip${isTurn ? ' is-turn' : ''}${isReady ? ' is-ready' : ''}${isDown ? ' is-down' : ''}" style="--chip-color:${color}" title="${isReady ? 'Ready' : (isTurn ? 'Programmeert' : '')}">
+        <div class="player-status-chip${isYou ? ' is-you' : ''}${isTurn ? ' is-turn' : ''}${isReady ? ' is-ready' : ''}${isDown ? ' is-down' : ''}" style="--chip-color:${color}" title="${tipParts.join(' · ')}">
           <div class="player-status-top">
             <span class="player-status-swatch" aria-hidden="true"></span>
+            <span class="player-status-name">${isYou ? `Jij · ${displayName}` : displayName}</span>
             <span class="player-status-flags" title="Behaalde vlaggen">${flags}</span>
           </div>
           <div class="player-status-lives" title="Opnieuw beginnen: ${livesLeft}/${maxLives}">${lives}</div>
@@ -655,8 +782,10 @@ class RobotRallyUI {
     const allOpenFilled = openEmpty === 0;
 
     if (this.btnPowerDown) {
-      const canToggle = this.engine.phase === 'programming' && unlocked && currentRobot && !currentRobot.isBot && !currentRobot.eliminated && !currentRobot.shutdownActive;
+      const alreadyCommitted = this.isP2pMode() && currentRobot && this.engine.isRobotCommitted?.(currentRobot.id);
+      const canToggle = this.engine.phase === 'programming' && unlocked && currentRobot && !currentRobot.isBot && !currentRobot.eliminated && !currentRobot.shutdownActive && !alreadyCommitted;
       const isArmed = !!(currentRobot && currentRobot.pendingPowerDown);
+      this.btnPowerDown.classList.toggle('hidden', !!alreadyCommitted && this.isP2pMode());
       this.btnPowerDown.disabled = !canToggle;
       this.btnPowerDown.classList.toggle('danger', isArmed);
       this.btnPowerDown.classList.toggle('alt', !isArmed);
@@ -681,7 +810,7 @@ class RobotRallyUI {
     }
   }
 
-  runProgram() {
+  runProgram({ allowPartial = false } = {}) {
     if (this.engine.phase !== 'programming' && !(this.isP2pMode() && this.engine.phase === 'ready')) return;
     const robot = this.getProgrammingRobot();
     if (!robot) return;
@@ -693,7 +822,7 @@ class RobotRallyUI {
     const openEmpty = this.selectedRegisters.some((card, index) => (
       !this.engine.isRegisterLocked(robot, index) && card === null
     ));
-    if (openEmpty) {
+    if (openEmpty && !allowPartial) {
       Toast.show('Vul eerst alle open registers in.');
       return;
     }
@@ -703,17 +832,92 @@ class RobotRallyUI {
         .then(() => {
           this.selectedRegisters = [null, null, null, null, null];
           this.programmingRegistersRobotId = null;
+          this._programTimerExpiring = false;
+          this.clearProgrammingTimer();
           this.updateCardsUI();
         })
-        .catch((err) => Toast.show(err.message || 'Bevestigen mislukt'));
+        .catch((err) => {
+          this._programTimerExpiring = false;
+          Toast.show(err.message || 'Bevestigen mislukt');
+          this.updateCardsUI();
+        });
       return;
     }
 
     this.engine.commitCurrentPlayerRegisters(this.selectedRegisters);
     this.selectedRegisters = [null, null, null, null, null];
     this.programmingRegistersRobotId = null;
+    this._programTimerExpiring = false;
+    this.clearProgrammingTimer();
     this.updateCardsUI();
     this.canvas?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  leaveGame() {
+    if (document.documentElement.classList.contains('dgame-embedded')) {
+      window.parent.postMessage({ type: 'dgame:leave-game' }, '*');
+      return;
+    }
+    if (typeof Nav !== 'undefined' && Nav.switchTab) {
+      Nav.switchTab('courses');
+      return;
+    }
+    Toast.show('Terug naar menu');
+  }
+
+  canOfferBoardReplay() {
+    const replay = this.engine?.lastRoundReplay;
+    if (!replay?.frames?.length) return false;
+    if (this.isReplaying) return false;
+    if (this.engine.phase === 'executing') return false;
+    return true;
+  }
+
+  onBoardTap() {
+    if (!this.canOfferBoardReplay()) {
+      this.hideBoardReplayPrompt();
+      return;
+    }
+    this.showBoardReplayPrompt();
+  }
+
+  showBoardReplayPrompt() {
+    if (!this.boardReplayPrompt) return;
+    this.boardReplayPrompt.classList.remove('hidden');
+    clearTimeout(this.replayPromptTimer);
+    this.replayPromptTimer = setTimeout(() => this.hideBoardReplayPrompt(), 4000);
+  }
+
+  hideBoardReplayPrompt() {
+    clearTimeout(this.replayPromptTimer);
+    this.replayPromptTimer = null;
+    this.boardReplayPrompt?.classList.add('hidden');
+  }
+
+  async startBoardReplay() {
+    const frames = this.engine?.lastRoundReplay?.frames;
+    if (!frames?.length || this.isReplaying) return;
+    this.hideBoardReplayPrompt();
+    this.isReplaying = true;
+    const token = ++this.replayRunToken;
+    Toast.show(`Replay ronde ${this.engine.lastRoundReplay.roundNumber}`);
+
+    for (let i = 0; i < frames.length; i++) {
+      if (token !== this.replayRunToken) return;
+      const frame = frames[i];
+      this.replayPoseById = {};
+      (frame.robots || []).forEach((pose) => {
+        this.replayPoseById[pose.id] = { ...pose };
+      });
+      this.render();
+      await new Promise((resolve) => setTimeout(resolve, 900));
+    }
+
+    if (token !== this.replayRunToken) return;
+    this.isReplaying = false;
+    this.replayPoseById = null;
+    this.updateCardsUI();
+    Toast.show('Replay klaar');
   }
 
   clearRegisters() {
@@ -1415,11 +1619,15 @@ class RobotRallyUI {
   applyPanelState() {
     const phase = this.engine.phase;
     const privacyLocked = this.isPrivacyGateVisible();
-    const shouldCollapse = phase === 'executing' || phase === 'ready' || phase === 'upgrade_choice' || privacyLocked;
+    const matchGate = phase === 'match_ready' || phase === 'match_countdown';
+    const shouldCollapse = phase === 'executing' || phase === 'ready' || phase === 'upgrade_choice'
+      || privacyLocked || matchGate;
     this.gameWrap?.classList.toggle('panel-collapsed', shouldCollapse);
     this.gameWrap?.classList.toggle('ready-mode', phase === 'ready');
     this.gameWrap?.classList.toggle('executing-mode', phase === 'executing');
     this.gameWrap?.classList.toggle('upgrade-choice-mode', phase === 'upgrade_choice');
+    this.gameWrap?.classList.toggle('match-ready-mode', phase === 'match_ready');
+    this.gameWrap?.classList.toggle('match-countdown-mode', phase === 'match_countdown');
     this.gameWrap?.classList.toggle('privacy-locked', privacyLocked);
     this.app?.classList.toggle('playback-only', phase === 'executing');
     this.updateBoardBorder();
@@ -1479,6 +1687,139 @@ class RobotRallyUI {
     }
   }
 
+  clearProgrammingTimer() {
+    if (this._programTimerInterval != null) {
+      clearTimeout(this._programTimerInterval);
+      this._programTimerInterval = null;
+    }
+    this._programTimerKey = '';
+    this._programTimerDeadline = 0;
+    this._programTimerExpiring = false;
+    this.programTimer?.classList.add('hidden');
+    this.programTimer?.classList.remove('is-urgent');
+    if (this.programTimerFill) this.programTimerFill.style.width = '100%';
+    if (this.programTimerLabel) {
+      this.programTimerLabel.textContent = `${CONFIG.PROGRAMMING_SECONDS || 60}s`;
+    }
+  }
+
+  syncProgrammingTimer() {
+    const robot = this.getProgrammingRobot();
+    const seconds = CONFIG.PROGRAMMING_SECONDS || 60;
+    const shouldRun = this.engine.phase === 'programming'
+      && robot
+      && !robot.isBot
+      && !robot.eliminated
+      && !robot.shutdownActive
+      && this.isProgrammingUnlocked(robot)
+      && !(this.isP2pMode() && this.engine.isRobotCommitted?.(robot.id));
+
+    if (!shouldRun) {
+      if (!this._programTimerExpiring) this.clearProgrammingTimer();
+      return;
+    }
+
+    if (this._programTimerExpiring) {
+      this.programTimer?.classList.remove('hidden');
+      this.programTimer?.classList.add('is-urgent');
+      if (this.programTimerFill) this.programTimerFill.style.width = '0%';
+      if (this.programTimerLabel) this.programTimerLabel.textContent = '0s';
+      return;
+    }
+
+    const key = `${this.engine.roundNumber}:${robot.id}`;
+    this.programTimer?.classList.remove('hidden');
+
+    if (key === this._programTimerKey && this._programTimerInterval != null) {
+      return;
+    }
+
+    if (this._programTimerInterval != null) {
+      clearTimeout(this._programTimerInterval);
+      this._programTimerInterval = null;
+    }
+
+    this._programTimerKey = key;
+    this._programTimerDeadline = Date.now() + seconds * 1000;
+    this.programTimer?.classList.remove('is-urgent');
+    if (this.programTimerFill) this.programTimerFill.style.width = '100%';
+    if (this.programTimerLabel) this.programTimerLabel.textContent = `${seconds}s`;
+
+    const tick = () => {
+      if (this._programTimerKey !== key) return;
+      const leftMs = Math.max(0, this._programTimerDeadline - Date.now());
+      const leftSec = Math.ceil(leftMs / 1000);
+      if (this.programTimerFill) {
+        this.programTimerFill.style.width = `${(leftMs / (seconds * 1000)) * 100}%`;
+      }
+      if (this.programTimerLabel) {
+        this.programTimerLabel.textContent = `${leftSec}s`;
+      }
+      this.programTimer?.classList.toggle('is-urgent', leftSec <= 10);
+
+      if (leftMs <= 0) {
+        this._programTimerInterval = null;
+        this.onProgrammingTimerExpire(robot);
+        return;
+      }
+      this._programTimerInterval = setTimeout(tick, Math.min(250, leftMs));
+    };
+
+    this._programTimerInterval = setTimeout(tick, 200);
+  }
+
+  fillEmptyRegistersRandomly(robot) {
+    if (!robot) return;
+    this.ensureProgrammingRegisters(robot);
+    const usedIds = new Set(
+      this.selectedRegisters.filter(Boolean).map((card) => card.id),
+    );
+    const pool = (robot.hand || [])
+      .filter((card) => card && !usedIds.has(card.id))
+      .map((card) => ({ ...card }));
+
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = pool[i];
+      pool[i] = pool[j];
+      pool[j] = tmp;
+    }
+
+    for (let index = 0; index < 5; index++) {
+      if (this.engine.isRegisterLocked(robot, index)) continue;
+      if (this.selectedRegisters[index]) continue;
+      const next = pool.shift();
+      if (!next) break;
+      this.selectedRegisters[index] = next;
+    }
+  }
+
+  onProgrammingTimerExpire(robot) {
+    if (this._programTimerExpiring) return;
+    if (this.engine.phase !== 'programming') {
+      this.clearProgrammingTimer();
+      return;
+    }
+    const current = this.getProgrammingRobot();
+    if (!current || current.id !== robot?.id) {
+      this.clearProgrammingTimer();
+      return;
+    }
+    if (this.isP2pMode() && this.engine.isRobotCommitted?.(current.id)) {
+      this.clearProgrammingTimer();
+      return;
+    }
+
+    this._programTimerExpiring = true;
+    if (this._programTimerInterval != null) {
+      clearTimeout(this._programTimerInterval);
+      this._programTimerInterval = null;
+    }
+    this.fillEmptyRegistersRandomly(current);
+    Toast.show('Tijd om! Lege slots zijn random gevuld.');
+    this.runProgram({ allowPartial: true });
+  }
+
   renderUpgradeShop(currentRobot) {
     if (!this.upgradeShop || !currentRobot) return;
 
@@ -1520,7 +1861,14 @@ class RobotRallyUI {
       this.activePlayerStatus.textContent = `HP ${currentRobot.hp}/${currentRobot.maxHp} • DMG ${currentRobot.damage} • CP ${cp}/${this.engine.board.checkpointsCount}`;
     }
     if (this.activePlayerText) {
-      if (this.engine.phase === 'programming' && !this.isProgrammingUnlocked(currentRobot)) {
+      if (this.engine.phase === 'match_ready') {
+        const iAmReady = this.engine.isRobotMatchReady?.(currentRobot.id);
+        this.activePlayerText.textContent = iAmReady
+          ? 'Je bent ready — wacht op de anderen.'
+          : 'Druk op Ready als je er bent.';
+      } else if (this.engine.phase === 'match_countdown') {
+        this.activePlayerText.textContent = 'Iedereen is ready — het spel start zo.';
+      } else if (this.engine.phase === 'programming' && !this.isProgrammingUnlocked(currentRobot)) {
         this.activePlayerText.textContent = `Geef het toestel door en druk op "Programmeer ${this.getDisplayPlayerName(currentRobot)}".`;
       } else if (this.engine.phase === 'programming') {
         this.activePlayerText.textContent = 'Jouw beurt: scroll naar beneden en kies 5 kaarten.';
@@ -1546,24 +1894,68 @@ class RobotRallyUI {
     if (!this.playbackOverlay) return;
     const phase = this.engine.phase;
     const currentRobot = this.getFocusedRobot();
+    const localRobot = this.getProgrammingRobot();
     const privacyLocked = this.isPrivacyGateVisible(currentRobot);
     const readyMode = phase === 'ready';
-    const p2pGuestReady = this.isP2pMode() && readyMode && !this.isP2pHost();
-    // Alleen knop voor spelerbeurt / Play — geen meldingen tijdens executie.
-    const show = privacyLocked || readyMode;
+    const matchReadyPhase = phase === 'match_ready';
+    const matchCountdownPhase = phase === 'match_countdown';
+    const matchGate = matchReadyPhase || matchCountdownPhase;
+    const iAmReady = !!(localRobot && this.engine.isRobotMatchReady?.(localRobot.id));
+    const readyCount = (this.engine.matchReadyRobotIds || []).length;
+    const readyTotal = this.engine.getMatchReadyHumans?.().length || 0;
+    const p2pAutoReady = this.isP2pMode() && readyMode;
+    // Hotseat privacy / Play, of P2P match-ready gate.
+    const showPlay = privacyLocked || (readyMode && !this.isP2pMode());
+    const showMatchReadyBtn = matchReadyPhase && !iAmReady;
+    const show = showPlay || matchGate;
+
     this.playbackOverlay.classList.toggle('hidden', !show);
     this.playbackOverlay.classList.toggle('is-privacy-gate', privacyLocked);
-    this.playbackOverlay.classList.toggle('is-ready-gate', readyMode);
-    this.playbackStatusCard?.classList.add('hidden');
-    this.btnStartExecution?.classList.toggle('hidden', !show);
+    this.playbackOverlay.classList.toggle('is-ready-gate', readyMode && !this.isP2pMode());
+    this.playbackOverlay.classList.toggle('is-match-ready-gate', matchGate);
+    this.playbackOverlay.classList.toggle('is-match-countdown', matchCountdownPhase);
 
-    if (!show) return;
+    if (matchGate) {
+      this.playbackStatusCard?.classList.remove('hidden');
+      if (matchCountdownPhase) {
+        const endsAt = this.engine.matchCountdownEndsAt;
+        const leftSec = endsAt != null
+          ? Math.max(0, Math.ceil((endsAt - Date.now()) / 1000))
+          : (CONFIG.MATCH_COUNTDOWN_SECONDS || 10);
+        if (this.playbackTitle) this.playbackTitle.textContent = 'Iedereen is ready';
+        if (this.playbackText) this.playbackText.textContent = String(leftSec);
+      } else if (iAmReady) {
+        if (this.playbackTitle) this.playbackTitle.textContent = 'Je bent ready';
+        if (this.playbackText) {
+          this.playbackText.textContent = `Wacht op anderen (${readyCount}/${readyTotal})…`;
+        }
+      } else {
+        if (this.playbackTitle) this.playbackTitle.textContent = 'Klaar om te starten?';
+        if (this.playbackText) {
+          this.playbackText.textContent = `Druk op Ready. (${readyCount}/${readyTotal} ready)`;
+        }
+      }
+    } else {
+      this.playbackStatusCard?.classList.add('hidden');
+    }
+
+    this.btnStartExecution?.classList.toggle('hidden', !showPlay);
+    this.btnMatchReady?.classList.toggle('hidden', !showMatchReadyBtn);
+    if (this.btnMatchReady) {
+      this.btnMatchReady.disabled = !showMatchReadyBtn;
+    }
+
+    if (p2pAutoReady && this.selectionHint) {
+      this.selectionHint.textContent = 'Iedereen is ready — ronde start automatisch.';
+    }
+
+    if (!showPlay) return;
 
     if (this.btnStartExecution) {
-      this.btnStartExecution.disabled = p2pGuestReady;
+      this.btnStartExecution.disabled = false;
       this.btnStartExecution.classList.toggle('success', false);
       this.btnStartExecution.classList.toggle('player-turn-btn', privacyLocked);
-      this.btnStartExecution.classList.toggle('rainbow-play-btn', readyMode && !p2pGuestReady);
+      this.btnStartExecution.classList.toggle('rainbow-play-btn', readyMode && !this.isP2pMode());
 
       if (privacyLocked && currentRobot) {
         const color = this.getRobotColor(currentRobot);
@@ -1573,12 +1965,71 @@ class RobotRallyUI {
       } else if (readyMode) {
         this.btnStartExecution.style.removeProperty('--player-btn-color');
         this.btnStartExecution.style.removeProperty('--player-btn-color-dark');
-        this.btnStartExecution.textContent = p2pGuestReady ? 'Wachten op host…' : 'Play ▶';
+        this.btnStartExecution.textContent = 'Play ▶';
       } else {
         this.btnStartExecution.style.removeProperty('--player-btn-color');
         this.btnStartExecution.style.removeProperty('--player-btn-color-dark');
       }
     }
+  }
+
+  clearMatchCountdown() {
+    if (this._matchCountdownInterval != null) {
+      clearTimeout(this._matchCountdownInterval);
+      this._matchCountdownInterval = null;
+    }
+    this._matchCountdownKey = '';
+  }
+
+  syncMatchCountdown() {
+    const phase = this.engine.phase;
+    if (phase !== 'match_countdown') {
+      this.clearMatchCountdown();
+      return;
+    }
+
+    const endsAt = this.engine.matchCountdownEndsAt;
+    const key = String(endsAt || 'pending');
+    if (key !== this._matchCountdownKey) {
+      this.clearMatchCountdown();
+      this._matchCountdownKey = key;
+    }
+
+    const tick = () => {
+      if (this.engine.phase !== 'match_countdown') {
+        this.clearMatchCountdown();
+        return;
+      }
+      const deadline = this.engine.matchCountdownEndsAt;
+      const leftMs = deadline != null ? Math.max(0, deadline - Date.now()) : 0;
+      this.renderPlaybackOverlay();
+
+      if (leftMs <= 0) {
+        this._matchCountdownInterval = null;
+        if (this.isP2pHost() && P2pSessionController?.maybeFinishMatchCountdown) {
+          P2pSessionController.maybeFinishMatchCountdown().catch(() => {});
+        }
+        return;
+      }
+      this._matchCountdownInterval = setTimeout(tick, Math.min(250, leftMs));
+    };
+
+    if (this._matchCountdownInterval == null) {
+      this._matchCountdownInterval = setTimeout(tick, 50);
+    }
+  }
+
+  handleMatchReady() {
+    if (!this.isP2pMode() || this.engine.phase !== 'match_ready') return;
+    const robot = this.getProgrammingRobot();
+    if (!robot || this.engine.isRobotMatchReady?.(robot.id)) return;
+    if (!P2pSessionController?.sendMatchReady) {
+      Toast.show('Ready lukte niet.');
+      return;
+    }
+    P2pSessionController.sendMatchReady()
+      .then(() => this.updateCardsUI())
+      .catch((err) => Toast.show(err.message || 'Ready lukte niet'));
   }
 
   shadeHex(hex, amount) {

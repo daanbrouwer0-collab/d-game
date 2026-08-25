@@ -189,7 +189,8 @@ Spec: [2026-08-24-game-agnostic-rooms-design.md](./superpowers/specs/2026-08-24-
 
 - Gast → `ROOM_INTENT { kind: 'chat', playerId, text }` → host `postChat` → `ROOM_LOG`
 - Chat blijft over spelrondes (niet gewist bij `session_start` / `session_end`)
-- UI in room shell: open in lobby; **ingeklapt + badge** tijdens spel (klik opent drawer)
+- UI in room shell: open in lobby; **open onder de game-iframe** tijdens spel
+- Spec (tijdens spel): [2026-08-25-room-chat-during-play-design.md](./superpowers/specs/2026-08-25-room-chat-during-play-design.md)
 - Rate limit host-side: 10 berichten / 60s per speler; max 500 tekens
 - **Niet** in session logs; embedded spellen zien chat niet
 

@@ -95,6 +95,10 @@ const CONFIG = {
   },
 
   DEFAULT_HAND_SIZE: 9,
+  /** Seconds everyone waits after all Ready before first round. */
+  MATCH_COUNTDOWN_SECONDS: 10,
+  /** Seconds to fill registers before empty slots are auto-filled. */
+  PROGRAMMING_SECONDS: 60,
   /** Mag onder 5 zakken: dan gaan de laatste registers op slot. */
   MIN_HAND_SIZE: 0,
   STARTING_ENERGY: 1,

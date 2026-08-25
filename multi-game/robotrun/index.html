@@ -33,14 +33,24 @@
               <div id="playback-text" class="playback-text">Alle spelers hebben hun kaarten gekozen.</div>
             </div>
             <button id="btn-start-execution" class="btn success playback-btn hidden" type="button">Play ▶</button>
+            <button id="btn-match-ready" class="btn success playback-btn hidden" type="button">Ready</button>
           </div>
           <div id="board-frame" class="board-frame">
             <canvas id="board-canvas"></canvas>
+            <div id="board-replay-prompt" class="board-replay-prompt hidden">
+              <button id="btn-board-replay" class="btn success board-replay-btn" type="button">Replay</button>
+            </div>
           </div>
         </div>
 
         <!-- Programming Cards Panel -->
         <div id="programming-panel">
+          <div id="program-timer" class="program-timer hidden" aria-live="polite">
+            <div class="program-timer-track">
+              <div id="program-timer-fill" class="program-timer-fill"></div>
+            </div>
+            <span id="program-timer-label" class="program-timer-label">60s</span>
+          </div>
           <div class="registers-row">
             <div class="register-slot" data-index="0"><span class="register-num">1</span></div>
             <div class="register-slot" data-index="1"><span class="register-num">2</span></div>
@@ -65,6 +75,10 @@
           <span id="hud-hp" class="hidden"></span>
           <span id="hud-energy" class="hidden"></span>
           <span id="hud-register" class="hidden"></span>
+        </div>
+
+        <div class="rr-leave-bar">
+          <button id="btn-rr-leave-game" class="btn alt rr-leave-btn" type="button">Verlaat game</button>
         </div>
 
         <!-- Game Over / Win Overlay -->

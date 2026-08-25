@@ -249,6 +249,12 @@ html.has-shell-nav body:has(.app-room #panel-playing:not(.hidden)) {
   flex-direction: column;
 }
 
+.app-room:has(#panel-playing:not(.hidden)) .game-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+
 @media (max-width: 640px) {
   body:has(.app-room #panel-playing:not(.hidden)) .shell-nav,
   body:has(.app-room #panel-playing:not(.hidden)) #room-strip {
@@ -261,20 +267,6 @@ html.has-shell-nav body:has(.app-room #panel-playing:not(.hidden)) {
 
   .app-room:has(#panel-playing:not(.hidden)) .room-chrome {
     display: none;
-  }
-
-  .game-frame {
-    min-height: calc(100dvh - 2.5rem);
-    height: calc(100dvh - 2.5rem);
-    flex: 1;
-  }
-}
-
-@media (min-width: 641px) {
-  .app-room:has(#panel-playing:not(.hidden)) .game-frame {
-    flex: 1;
-    min-height: calc(100dvh - 2.75rem);
-    height: calc(100dvh - 2.75rem);
   }
 }
 
@@ -324,6 +316,33 @@ html.has-shell-nav body:has(.app-room #panel-playing:not(.hidden)) {
 
 .room-chat-root {
   margin-top: 0.5rem;
+}
+
+.room-chat-play-slot {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border, #e8e8e8);
+  background: var(--cell, #fff);
+}
+
+.room-chat-play-slot:empty {
+  display: none;
+}
+
+.room-chat-root[data-dock="play"] {
+  margin-top: 0;
+}
+
+.room-chat-root[data-dock="play"] .room-chat {
+  padding: 0.5rem 0.75rem 0.65rem;
+}
+
+.room-chat-root[data-dock="play"] .room-chat-toggle {
+  display: none;
+}
+
+.room-chat-root[data-dock="play"] .room-chat-messages,
+.room-chat-root[data-dock="play"] .room-chat[data-mode="open"] .room-chat-messages {
+  max-height: min(28vh, 12rem);
 }
 
 .room-chat {

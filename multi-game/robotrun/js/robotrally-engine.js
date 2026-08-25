@@ -17,10 +17,16 @@ class RobotRallyEngine {
     this.pendingUpgradeQueue = [];
     this.currentUpgradeChoice = null;
     this.committedRobotIds = [];
+    this.matchReadyRobotIds = [];
+    this.matchCountdownEndsAt = null;
     this.rngSeed = null;
     this._rngState = null;
     this.onStateChange = null;
     this.onLogMessage = null;
+    /** @type {Array<{ registerIndex: number, robots: Array<{ id: string, x: number, y: number, dir: number }> }>} */
+    this.currentRoundReplayFrames = [];
+    /** @type {{ roundNumber: number, frames: typeof this.currentRoundReplayFrames } | null} */
+    this.lastRoundReplay = null;
     this.courses = this.initCourses();
   }
 
@@ -1265,7 +1271,22 @@ class RobotRallyEngine {
       gameMode: this.gameMode,
       playerCount: this.playerCount,
       committedRobotIds: [...(this.committedRobotIds || [])],
+      matchReadyRobotIds: [...(this.matchReadyRobotIds || [])],
+      matchCountdownEndsAt: this.matchCountdownEndsAt,
       rngSeed: this.rngSeed,
+      currentRoundReplayFrames: (this.currentRoundReplayFrames || []).map((frame) => ({
+        registerIndex: frame.registerIndex,
+        robots: (frame.robots || []).map((r) => ({ ...r })),
+      })),
+      lastRoundReplay: this.lastRoundReplay
+        ? {
+            roundNumber: this.lastRoundReplay.roundNumber,
+            frames: (this.lastRoundReplay.frames || []).map((frame) => ({
+              registerIndex: frame.registerIndex,
+              robots: (frame.robots || []).map((r) => ({ ...r })),
+            })),
+          }
+        : null,
       pendingUpgradeQueue: (this.pendingUpgradeQueue || []).map(entry => ({ ...entry })),
       currentUpgradeChoice: this.currentUpgradeChoice
         ? {
@@ -1315,7 +1336,29 @@ class RobotRallyEngine {
     this.activeRegisterCards = [];
     this.lastLaserBursts = [];
     this.committedRobotIds = Array.isArray(state.committedRobotIds) ? [...state.committedRobotIds] : [];
+    this.matchReadyRobotIds = Array.isArray(state.matchReadyRobotIds) ? [...state.matchReadyRobotIds] : [];
+    this.matchCountdownEndsAt = state.matchCountdownEndsAt != null
+      ? Number(state.matchCountdownEndsAt)
+      : null;
+    if (this.matchCountdownEndsAt != null && !Number.isFinite(this.matchCountdownEndsAt)) {
+      this.matchCountdownEndsAt = null;
+    }
     if (state.rngSeed != null) this.setRngSeed(state.rngSeed);
+    this.currentRoundReplayFrames = Array.isArray(state.currentRoundReplayFrames)
+      ? state.currentRoundReplayFrames.map((frame) => ({
+          registerIndex: frame.registerIndex,
+          robots: (frame.robots || []).map((r) => ({ ...r })),
+        }))
+      : [];
+    this.lastRoundReplay = state.lastRoundReplay
+      ? {
+          roundNumber: state.lastRoundReplay.roundNumber,
+          frames: (state.lastRoundReplay.frames || []).map((frame) => ({
+            registerIndex: frame.registerIndex,
+            robots: (frame.robots || []).map((r) => ({ ...r })),
+          })),
+        }
+      : null;
     this.pendingUpgradeQueue = Array.isArray(state.pendingUpgradeQueue)
       ? state.pendingUpgradeQueue.map(entry => ({ ...entry }))
       : [];
@@ -1394,6 +1437,8 @@ class RobotRallyEngine {
     this.pendingUpgradeQueue = [];
     this.currentUpgradeChoice = null;
     this.committedRobotIds = [];
+    this.matchReadyRobotIds = [];
+    this.matchCountdownEndsAt = null;
     if (options.rngSeed != null) this.setRngSeed(options.rngSeed);
     else if (this.isP2pMode()) this.setRngSeed(Date.now());
 
@@ -1462,8 +1507,78 @@ class RobotRallyEngine {
 
     this.pushLog(`${this.board.name} geladen · ${this.robots.filter(r => !r.isBot).length} spelers · starts aan de ${this.board.startEdge || 'rand'}.`);
     if (startRound) {
-      this.startNewRound();
+      if (options.awaitMatchReady && this.isP2pMode()) {
+        this.beginMatchReady();
+      } else {
+        this.startNewRound();
+      }
     }
+  }
+
+  getMatchReadyHumans() {
+    return this.robots.filter((robot) => (
+      robot && !robot.isBot && this.isRobotInGame(robot)
+    ));
+  }
+
+  isRobotMatchReady(robotId) {
+    return (this.matchReadyRobotIds || []).includes(robotId);
+  }
+
+  beginMatchReady() {
+    this.phase = 'match_ready';
+    this.registerIndex = 0;
+    this.roundNumber = 1;
+    this.matchReadyRobotIds = [];
+    this.matchCountdownEndsAt = null;
+    this.committedRobotIds = [];
+    this.robots.forEach((robot) => {
+      robot.hand = [];
+      robot.registers = [null, null, null, null, null];
+    });
+    this.pushLog('Iedereen klaar? Druk op Ready om te starten.');
+    this.emitStateChange();
+  }
+
+  setMatchReady(robotId) {
+    if (this.phase !== 'match_ready') return false;
+    const robot = this.robots.find((entry) => entry.id === robotId);
+    if (!robot || robot.isBot || !this.isRobotInGame(robot)) return false;
+    if (!this.matchReadyRobotIds.includes(robot.id)) {
+      this.matchReadyRobotIds.push(robot.id);
+      this.pushLog(`${robot.name} is ready.`);
+    }
+    const humans = this.getMatchReadyHumans();
+    const allReady = humans.length > 0 && humans.every((entry) => this.isRobotMatchReady(entry.id));
+    if (allReady) {
+      this.beginMatchCountdown();
+    } else {
+      this.emitStateChange();
+    }
+    return true;
+  }
+
+  beginMatchCountdown() {
+    if (this.phase === 'match_countdown' && this.matchCountdownEndsAt != null && this.matchCountdownEndsAt > Date.now()) {
+      this.emitStateChange();
+      return true;
+    }
+    if (this.phase !== 'match_ready' && this.phase !== 'match_countdown') return false;
+    const seconds = CONFIG.MATCH_COUNTDOWN_SECONDS || 10;
+    this.phase = 'match_countdown';
+    this.matchCountdownEndsAt = Date.now() + seconds * 1000;
+    this.pushLog(`Iedereen is ready — start over ${seconds} seconden.`);
+    this.emitStateChange();
+    return true;
+  }
+
+  /** Host: start first programming round after countdown. */
+  startMatchFromCountdown() {
+    if (this.phase !== 'match_countdown') return false;
+    this.matchCountdownEndsAt = null;
+    this.matchReadyRobotIds = [];
+    this.startNewRound();
+    return true;
   }
 
   refreshRobotStats(robot) {
@@ -1647,7 +1762,11 @@ class RobotRallyEngine {
     if (allReady) {
       this.phase = 'ready';
       this.registerIndex = 0;
-      this.pushLog('Alle programma\'s staan klaar. Host kan Play drukken.');
+      this.pushLog(
+        this.isP2pMode()
+          ? 'Alle programma\'s staan klaar. Ronde start automatisch.'
+          : 'Alle programma\'s staan klaar. Druk op Play om de ronde te starten.'
+      );
     } else if (this.phase === 'ready') {
       this.phase = 'programming';
     }
@@ -1754,8 +1873,36 @@ class RobotRallyEngine {
     this.registerIndex = 0;
     this.lastLaserBursts = [];
     this.currentUpgradeChoice = null;
-    this.pushLog('Play ingedrukt. Registers worden nu uitgevoerd.');
+    this.currentRoundReplayFrames = [];
+    this.captureReplayFrame(0);
+    this.pushLog('Registers worden nu uitgevoerd.');
     this.emitStateChange();
+  }
+
+  captureReplayFrame(registerIndex = this.registerIndex) {
+    const frame = {
+      registerIndex: Number(registerIndex) || 0,
+      robots: (this.robots || []).map((robot) => ({
+        id: robot.id,
+        x: robot.x,
+        y: robot.y,
+        dir: robot.dir,
+        eliminated: !!robot.eliminated,
+      })),
+    };
+    this.currentRoundReplayFrames.push(frame);
+  }
+
+  finalizeRoundReplay() {
+    if (!(this.currentRoundReplayFrames || []).length) return;
+    this.lastRoundReplay = {
+      roundNumber: this.roundNumber,
+      frames: this.currentRoundReplayFrames.map((frame) => ({
+        registerIndex: frame.registerIndex,
+        robots: (frame.robots || []).map((r) => ({ ...r })),
+      })),
+    };
+    this.currentRoundReplayFrames = [];
   }
 
   getUpgradeOffer(robot) {
@@ -1932,6 +2079,7 @@ class RobotRallyEngine {
     // Checkpoints tellen pas aan het einde van de ronde (na 5 registers).
 
     this.registerIndex += 1;
+    this.captureReplayFrame(this.registerIndex);
     this.emitStateChange();
   }
 
@@ -2370,6 +2518,7 @@ class RobotRallyEngine {
 
   checkRoundEnd() {
     const living = this.robots.filter(robot => this.isRobotInGame(robot));
+    this.finalizeRoundReplay();
     if (living.length <= 1) {
       this.phase = 'finished';
       this.winner = living[0] || null;

@@ -11,7 +11,7 @@ Voortbouwt op: [2026-08-24-game-agnostic-rooms-design.md](./2026-08-24-game-agno
 
 1. **Room-first:** de site wordt ervaren vanuit de room — groep, roster, chat en spelkeuze horen bij één context (`#room/?room=CODE`).
 2. **Room chat:** tekstberichten tussen spelers, gesynchroniseerd via P2P, zichtbaar over meerdere spelrondes heen.
-3. **Chat tijdens spel (keuze C):** chat is **ingeklapt** tijdens een actieve spelronde; een **badge** toont ongelezen berichten. In lobby/stem-fase staat chat **open**.
+3. **Chat tijdens spel:** open onder de game-iframe ([2026-08-25 update](./2026-08-25-room-chat-during-play-design.md); vervangt keuze C collapsed+badge). In lobby/stem-fase staat chat **open** bij de roster.
 
 ---
 
@@ -43,7 +43,9 @@ Voortbouwt op: [2026-08-24-game-agnostic-rooms-design.md](./2026-08-24-game-agno
 
 **Lobby / stemmen:** chat-panel **open** (standaard), volle hoogte naast of onder roster.
 
-**Tijdens spel:** chat-panel **ingeklapt** tot één regel (“💬 Chat” + badge). Klik opent drawer/expand boven het spel (overlay of slide-in), zonder iframe te unmounten.
+**Tijdens spel:** ~~chat-panel **ingeklapt** tot één regel (“💬 Chat” + badge). Klik opent drawer/expand boven het spel (overlay of slide-in), zonder iframe te unmounten.~~
+
+> **Update 2026-08-25:** tijdens spel is **A — open onder iframe** — zie [2026-08-25-room-chat-during-play-design.md](./2026-08-25-room-chat-during-play-design.md). Keuze C (collapsed+badge) is vervangen.
 
 **Na session_end:** chat blijft; panel keert terug naar **open** in lobby.
 
@@ -242,7 +244,7 @@ Host commit lokaal + broadcast — geen intent nodig.
 |-----------|-------|
 | Chat opslag | Room-log event `room.chat_message` |
 | Sync | Host commit + `ROOM_LOG` (zelfde als stemmen) |
-| Tijdens spel | **C — ingeklapt + badge** |
+| Tijdens spel | ~~**C — ingeklapt + badge**~~ → **A — open onder iframe** ([2026-08-25](./2026-08-25-room-chat-during-play-design.md)) |
 | Lobby | Chat open |
 | Game data | Onaangeroerd; session logs puur |
 | P2P topologie | Ongewijzigd |

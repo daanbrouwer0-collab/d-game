@@ -52,6 +52,11 @@ html.dgame-embedded #programming-panel {
   flex: 0 0 auto;
 }
 
+html.dgame-embedded .rr-leave-bar {
+  display: flex !important;
+  flex: 0 0 auto;
+}
+
 html.dgame-embedded #game-over-overlay {
   display: none !important;
 }
