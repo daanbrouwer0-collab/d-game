@@ -73,7 +73,7 @@ js/shell/site-url.js      #room/?room=, embedded URLs
 |------|---------------|----------------|---------|
 | Tic-tac-toe | Ja | Ja | Ja |
 | Ganzenbord | Ja (`embedded.js`) | Ja | Ja |
-| RobotRun | Stub | Ja | Ja |
+| RobotRun | Ja | Ja | Ja |
 
 ## Documentatie
 

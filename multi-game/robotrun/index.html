@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="css/menu.css">
   <link rel="stylesheet" href="css/hud.css">
   <link rel="stylesheet" href="css/board.css">
+  <link rel="stylesheet" href="css/embedded.css">
   <script type="module" src="p2p-bridge.js"></script>
 </head>
   <body>
@@ -170,7 +171,7 @@
             <h3 class="help-heading">Verloop van een ronde</h3>
             <ol class="help-list help-list-ordered">
               <li><strong>Doorgeven</strong> — De knop toont alleen de naam van de speler die mag programmeren. Kaarten blijven verborgen tot die speler op de knop drukt.</li>
-              <li><strong>Programmeren</strong> — Kies 5 kaarten voor de 5 registers. Bevestig als je klaar bent; daarna is de volgende speler aan de beurt.</li>
+              <li><strong>Programmeren</strong> — Kies 5 kaarten voor de 5 registers. In multiplayer programmeert iedereen tegelijk; bevestig als je klaar bent. Als iedereen klaar is, drukt de host op Play.</li>
               <li><strong>Play</strong> — Als iedereen klaar is, speelt de ronde af op het bord (registers 1→5).</li>
               <li><strong>Prioriteit</strong> — Per register handelt eerst de robot met het hoogste kaartnummer (prioriteit).</li>
             </ol>
@@ -386,6 +387,7 @@
   <script src="js/toast.js"></script>
   <script src="js/robot-draw.js"></script>
   <script src="js/nav.js"></script>
+  <script src="js/intent-bind.js"></script>
   <script src="js/p2p-session.js"></script>
   <script src="js/menu.js"></script>
   <script src="js/app-menu.js"></script>
@@ -393,19 +395,14 @@
   <script src="js/robotrally-engine.js"></script>
   <script src="js/robotrally-ai.js"></script>
   <script src="js/robotrally-ui.js"></script>
+  <script src="js/main.js"></script>
   <script type="module">
     import { getUrlParams } from "../js/shell/site-url.js";
     import { redirectLegacyGameRoomToShell } from "../js/shell/room-only-multiplayer.js";
     if (getUrlParams().get("embedded") === "1") {
       await import("./js/embedded.js");
     } else if (!redirectLegacyGameRoomToShell()) {
-      await new Promise((resolve, reject) => {
-        const s = document.createElement("script");
-        s.src = "js/main.js";
-        s.onload = resolve;
-        s.onerror = reject;
-        document.body.appendChild(s);
-      });
+      /* main.js already loaded; DOMContentLoaded calls RobotRallyApp.init() */
     }
   </script>
 </body>

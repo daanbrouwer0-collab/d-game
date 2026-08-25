@@ -175,7 +175,7 @@ Room-events **nooit** in session log. Game-events **nooit** in room log.
 |------|---------------|------------------------|
 | Tic-tac-toe | Ja (`embedded.js`) | Ja |
 | Ganzenbord | Ja (`embedded.js`) | Ja |
-| RobotRun | Stub | Ja |
+| RobotRun | Ja (`embedded.js`) | Ja |
 
 Wire types room shell: `js/sync/room-msg.js` (`room_log`, `session_intent`, `session_log`, …).
 

@@ -1401,6 +1401,7 @@ class RobotRallyUI {
   getProgrammingRobot() {
     if (this.isP2pMode() && this.localP2pRobotId) {
       return this.engine.robots.find(robot => robot.id === this.localP2pRobotId)
+        || this.engine.robots.find(robot => robot.peerUserId === P2pSessionController?.playerId)
         || this.engine.robots.find(robot => robot.peerUserId === P2pSessionController?.localPeerId)
         || null;
     }
@@ -1656,6 +1657,10 @@ class RobotRallyUI {
     }
     if (this.engine.phase === 'programming') {
       this.runProgram();
+      return;
+    }
+    if (this.isP2pMode() && !this.isP2pHost()) {
+      Toast.show('Alleen de host kan Play drukken.');
       return;
     }
     this.startExecution();

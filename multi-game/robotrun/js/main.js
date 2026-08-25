@@ -30,13 +30,17 @@ window.RobotRallyApp = {
 
     // Refresh always lands on Home to pick a session — do not auto-resume.
     const players = StorageManager.loadPlayers();
-    this.engine.loadCourse(null, players, CONFIG.GAME_MODES.HOTSEAT, 2);
+    if (!embedded) {
+      this.engine.loadCourse(null, players, CONFIG.GAME_MODES.HOTSEAT, 2);
+    }
     this.sessionReady = false;
     Toast.hide();
 
     if (this.ui) {
-      this.ui.resizeCanvas();
-      this.ui.updateCardsUI();
+      if (this.engine.board) {
+        this.ui.resizeCanvas();
+        this.ui.updateCardsUI();
+      }
     }
   },
 

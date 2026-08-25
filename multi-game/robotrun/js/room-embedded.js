@@ -82,6 +82,12 @@ export function bootstrapRoomEmbedded(ctx) {
   }
 
   Nav.switchTab("play");
+  const app = window.RobotRallyApp;
+  if (app?.ui) {
+    app.ui.resizeCanvas();
+    app.ui.updateCardsUI();
+    app.ui.render?.();
+  }
   Toast.show("RobotRun — programmeer tegelijk!");
 }
 
@@ -223,10 +229,22 @@ function startEmbeddedRace(ctrl) {
     app.ui.programmingUnlockedRobotId = ctrl.localRobotId();
     app.ui.resizeCanvas();
     app.ui.updateCardsUI();
+    app.ui.render?.();
   }
 
+  Nav.switchTab("play");
   ctrl.wireHostAutosnapshots();
   ctrl.publishSnapshot?.().catch(() => {});
+}
+
+/**
+ * Strip room-shell fields from guest intents before host handling.
+ * @param {unknown} payload
+ */
+function normalizeIntentPayload(payload) {
+  if (!payload || typeof payload !== "object") return {};
+  const { sessionId, gameId, wireType, ...rest } = /** @type {Record<string, unknown>} */ (payload);
+  return rest;
 }
 
 /**
@@ -243,7 +261,7 @@ function handleTransportMessage(ctrl, msg) {
   if (ctrl.isHost()) {
     ctrl.handleMessage({
       type: msg.type,
-      payload: msg.payload || {},
+      payload: normalizeIntentPayload(msg.payload),
       fromPeerId: msg.fromPeerId || null,
     });
   }

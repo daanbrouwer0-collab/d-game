@@ -20,6 +20,7 @@ const P2pSessionController = {
   lastError: null,
   applyingSnapshot: false,
   joinInFlight: false,
+  lastSnapshotAt: 0,
   _snapTimer: null,
   _deskSnapAt: 0,
 
@@ -753,6 +754,7 @@ const P2pSessionController = {
         );
       }
       app.engine.importGameState(gameState);
+      // Extra safety: wipe foreign hands after import (D-robotrally matrix-session pattern).
       if (!this.isHost() && localId) {
         app.engine.robots.forEach((robot) => {
           if (robot.id === localId) return;
@@ -781,11 +783,12 @@ const P2pSessionController = {
       }
 
       if (enterPlay) {
-        SessionMenu.hideModal();
+        SessionMenu.hideModal?.();
         Nav.switchTab("play");
       }
     } finally {
       this.applyingSnapshot = false;
+      this.lastSnapshotAt = Date.now();
     }
   },
 
@@ -933,9 +936,16 @@ const P2pSessionController = {
     if (!this.isHost()) return;
 
     if (type === "rr_intent_commit") {
-      if (payload.userId === this.playerId) return;
+      const bound = window.RobotRunIntentBind?.resolveSeatAction?.(
+        this.lobby,
+        payload,
+        msg.fromPeerId,
+        this.peerToPlayer || {},
+      );
+      if (!bound) return;
+      if (bound.userId === this.playerId) return;
       window.RobotRallyApp.engine.commitRegistersForRobot(
-        payload.robotId,
+        bound.robotId,
         payload.registers,
       );
       this.publishSnapshot().catch(() => {});
@@ -943,9 +953,16 @@ const P2pSessionController = {
     }
 
     if (type === "rr_intent_upgrade") {
-      if (payload.userId === this.playerId) return;
+      const bound = window.RobotRunIntentBind?.resolveSeatAction?.(
+        this.lobby,
+        payload,
+        msg.fromPeerId,
+        this.peerToPlayer || {},
+      );
+      if (!bound) return;
+      if (bound.userId === this.playerId) return;
       const choice = window.RobotRallyApp.engine.currentUpgradeChoice;
-      if (choice && choice.robotId === payload.robotId) {
+      if (choice && choice.robotId === bound.robotId) {
         window.RobotRallyApp.engine.chooseUpgrade(payload.upgradeId);
         this.publishSnapshot().catch(() => {});
       }
@@ -969,6 +986,12 @@ const P2pSessionController = {
       if (typeof previous === "function") previous();
       if (!this.isActive() || !this.isHost() || this.applyingSnapshot) return;
       if (this.lobby?.status !== "playing") return;
+      const phase = app.engine.phase;
+      if (phase === "finished") {
+        clearTimeout(this._snapTimer);
+        this.publishSnapshot().catch(() => {});
+        return;
+      }
       clearTimeout(this._snapTimer);
       this._snapTimer = setTimeout(() => {
         this.publishSnapshot().catch(() => {});

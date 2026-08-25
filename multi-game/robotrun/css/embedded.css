@@ -1,0 +1,57 @@
+/* Room iframe: only the race UI matters (aligned with D-robotrally play layout) */
+html.dgame-embedded .bottom-nav,
+html.dgame-embedded #menu-scrim,
+html.dgame-embedded #menu-popup,
+html.dgame-embedded #session-modal,
+html.dgame-embedded #screen-courses,
+html.dgame-embedded #screen-character,
+html.dgame-embedded #screen-help,
+html.dgame-embedded #screen-settings {
+  display: none !important;
+}
+
+html.dgame-embedded #screen-play {
+  display: flex !important;
+  flex-direction: column;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+html.dgame-embedded #game-wrap {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+html.dgame-embedded .player-status-bar {
+  flex: 0 0 auto;
+}
+
+html.dgame-embedded #canvas-container {
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: 12rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: linear-gradient(180deg, #151820 0%, #0e1116 100%);
+}
+
+html.dgame-embedded #board-canvas {
+  display: block;
+  max-width: 100%;
+}
+
+html.dgame-embedded #programming-panel {
+  flex: 0 0 auto;
+}
+
+html.dgame-embedded #game-over-overlay {
+  display: none !important;
+}
