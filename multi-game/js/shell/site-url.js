@@ -82,6 +82,10 @@ export function toHashPath(gamePath) {
  * @returns {string}
  */
 export function getUrlSearch() {
+  if (typeof window !== "undefined" && window.__DGAME_EMBEDDED_SEARCH) {
+    const injected = String(window.__DGAME_EMBEDDED_SEARCH);
+    return injected.startsWith("?") ? injected : `?${injected}`;
+  }
   if (window.location.search && window.location.search.length > 1) {
     return window.location.search;
   }
@@ -258,6 +262,95 @@ export function buildGameEmbeddedUrl(gamePath, params) {
   // Room page lives in room/ (srcdoc base or /room/index.html). Nested game iframe
   // must load a sibling game path — never a shell hash (#...) which navigates to CDN root.
   return `../${path}?${searchParams.toString()}`;
+}
+
+/**
+ * CDN root for multi-game assets (jsDelivr gh/…/multi-game).
+ * @returns {string | null}
+ */
+export function resolveCdnBase() {
+  try {
+    const shellBase = shellWindow().__dgameShell?.getCdnBase?.();
+    if (shellBase) return String(shellBase).replace(/\/$/, "");
+  } catch {
+    /* ignore */
+  }
+  const baseEl = document.querySelector("base[href]");
+  if (baseEl?.href) {
+    try {
+      const url = new URL(baseEl.href);
+      const marker = "/multi-game/";
+      const idx = url.pathname.indexOf(marker);
+      if (idx >= 0) {
+        return `${url.origin}${url.pathname.slice(0, idx + marker.length - 1)}`;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
+}
+
+/**
+ * @param {string} html
+ * @param {string} pagePath
+ * @param {string} cdnBase
+ * @param {string} searchQuery leading "?"
+ */
+function rewriteEmbeddedGameHtml(html, pagePath, cdnBase, searchQuery) {
+  const pageDir = pagePath.includes("/")
+    ? pagePath.slice(0, pagePath.lastIndexOf("/") + 1)
+    : "";
+  const pageBase = `${cdnBase}/${pageDir}`;
+  const embedBoot = `<script>window.__DGAME_EMBEDDED=1;window.__DGAME_EMBEDDED_SEARCH=${JSON.stringify(searchQuery)};</script>`;
+  if (!/<base\s/i.test(html)) {
+    return html.replace(
+      /<head([^>]*)>/i,
+      `<head$1><base href="${pageBase}">${embedBoot}`,
+    );
+  }
+  return html.replace(/<head([^>]*)>/i, `<head$1>${embedBoot}`);
+}
+
+/**
+ * Load embedded game in a nested iframe.
+ * jsDelivr serves .html as text/plain — a direct src shows HTML source.
+ * Fetch + blob URL (text/html) renders correctly; local dev falls back to relative src.
+ *
+ * @param {HTMLIFrameElement} frame
+ * @param {string} gamePath
+ * @param {{ room: string, session: string, embedded?: number|string }} params
+ * @returns {Promise<string|null>} blob URL to revoke when unmounting, or null
+ */
+export async function mountEmbeddedGameFrame(frame, gamePath, params) {
+  const searchParams = new URLSearchParams();
+  searchParams.set("embedded", String(params.embedded ?? 1));
+  searchParams.set("room", String(params.room || "").trim().toUpperCase());
+  searchParams.set("session", params.session);
+  const searchQuery = `?${searchParams.toString()}`;
+  const pagePath = toHashPath(gamePath);
+  const cdnBase = resolveCdnBase();
+
+  if (cdnBase) {
+    const res = await fetch(`${cdnBase}/${pagePath}`, { cache: "no-cache" });
+    if (!res.ok) {
+      throw new Error(`Spel niet gevonden: ${pagePath}`);
+    }
+    const html = rewriteEmbeddedGameHtml(
+      await res.text(),
+      pagePath,
+      cdnBase,
+      searchQuery,
+    );
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const blobUrl = URL.createObjectURL(blob);
+    frame.removeAttribute("srcdoc");
+    frame.src = blobUrl;
+    return blobUrl;
+  }
+
+  frame.src = buildGameEmbeddedUrl(gamePath, params);
+  return null;
 }
 
 /**

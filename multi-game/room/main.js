@@ -23,8 +23,8 @@ import {
 import {
   readHostIntentFromUrl,
   readRoomFromUrl,
-  buildGameEmbeddedUrl,
   buildRoomShareUrl,
+  mountEmbeddedGameFrame,
   writeRoomCodeToUrl,
 } from "../js/shell/site-url.js";
 import { TransportType } from "../js/p2p/protocol.js";
@@ -63,6 +63,8 @@ const btnStartVoted = document.getElementById("btn-start-voted");
 const gameFrame = /** @type {HTMLIFrameElement} */ (
   document.getElementById("game-frame")
 );
+/** @type {string | null} */
+let gameFrameBlobUrl = null;
 const playingLabel = document.getElementById("playing-label");
 const btnBackLobby = document.getElementById("btn-back-lobby");
 const joinInput = /** @type {HTMLInputElement} */ (
@@ -390,12 +392,21 @@ function broadcastRoomLog(fromSeq = 0) {
   });
 }
 
+function clearGameFrame() {
+  if (gameFrameBlobUrl) {
+    URL.revokeObjectURL(gameFrameBlobUrl);
+    gameFrameBlobUrl = null;
+  }
+  gameFrame.removeAttribute("srcdoc");
+  gameFrame.src = "about:blank";
+}
+
 function returnToVoting() {
   if (gameBridge) {
     gameBridge.destroy();
     gameBridge = null;
   }
-  gameFrame.src = "about:blank";
+  clearGameFrame();
   activeSession = null;
   sessionHost = null;
   showPanel("lobby");
@@ -744,7 +755,7 @@ function startVotedGame() {
  * @param {string} sessionId
  * @param {unknown} [sessionLogPacket]
  */
-function mountActiveGame(gameId, sessionId, sessionLogPacket) {
+async function mountActiveGame(gameId, sessionId, sessionLogPacket) {
   const game = getGame(gameId);
   if (!game || !session) return;
 
@@ -757,12 +768,7 @@ function mountActiveGame(gameId, sessionId, sessionLogPacket) {
   gameBridge = mountGameBridge(gameFrame);
   gameBridge.onGameOut(relayGameOut);
 
-  const src = buildGameEmbeddedUrl(game.path, {
-    room: session.roomCode,
-    session: sessionId,
-    embedded: 1,
-  });
-  gameFrame.src = src;
+  clearGameFrame();
 
   gameFrame.onload = () => {
     const log =
@@ -782,6 +788,19 @@ function mountActiveGame(gameId, sessionId, sessionLogPacket) {
       log: sessionLogPacket || encodeSyncPacket(log, 0),
     });
   };
+
+  try {
+    gameFrameBlobUrl = await mountEmbeddedGameFrame(gameFrame, game.path, {
+      room: session.roomCode,
+      session: sessionId,
+      embedded: 1,
+    });
+  } catch (err) {
+    setError(
+      err instanceof Error ? err.message : "Kon het spel niet laden.",
+    );
+    returnToVoting();
+  }
 }
 
 function endGame(reason = "back_to_lobby") {
