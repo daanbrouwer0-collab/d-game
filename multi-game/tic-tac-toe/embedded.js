@@ -23,7 +23,22 @@ const maybeEnd = watchSessionEnd(
   () =>
     !!engine &&
     (engine.state.status === "won" || engine.state.status === "draw"),
-  "finished",
+  () => {
+    if (!engine) return { reason: "finished", summary: "Spel afgelopen" };
+    if (engine.state.status === "draw") {
+      return { reason: "draw", summary: "Gelijkspel" };
+    }
+    const mark = /** @type {'X'|'O'} */ (engine.state.winner);
+    const seats = seatsFromLog(engine.log);
+    const seat = seats[mark];
+    const name = String(seat?.name || "").trim() || mark;
+    return {
+      reason: "finished",
+      winnerName: name,
+      winnerId: seat?.playerId || null,
+      summary: `${name} wint`,
+    };
+  },
 );
 
 /**
@@ -42,6 +57,10 @@ function syncBoard() {
     isHost: engine.session.role === "host",
     seats: seatsFromLog(engine.log),
   });
+  if (ui.btnRestart) {
+    ui.btnRestart.classList.add("hidden");
+    ui.btnRestart.disabled = true;
+  }
   syncTurnTimer();
   maybeEnd();
 }
@@ -107,6 +126,10 @@ runEmbeddedGame({
   prepareUI() {
     stripEmbeddedChrome();
     hideEmbeddedLeaveButtons();
+    if (ui.btnRestart) {
+      ui.btnRestart.classList.add("hidden");
+      ui.btnRestart.disabled = true;
+    }
   },
   start(ctx) {
     isSpectator = ctx.participation === "spectator";
@@ -124,6 +147,10 @@ runEmbeddedGame({
     });
     ui.showGame();
     hideEmbeddedLeaveButtons();
+    if (ui.btnRestart) {
+      ui.btnRestart.classList.add("hidden");
+      ui.btnRestart.disabled = true;
+    }
     syncBoard();
   },
 });

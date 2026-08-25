@@ -24,6 +24,36 @@ const RECENT_KEY = "dgame.rooms.recent";
  */
 const PLAYER_ID_KEY = "dgame.playerId";
 
+/** @returns {string} */
+function randomGrayHex() {
+  const g = 48 + Math.floor(Math.random() * 160); // #30–#AF
+  const hex = g.toString(16).padStart(2, "0");
+  return `#${hex}${hex}${hex}`;
+}
+
+/** @returns {string} */
+function randomPlayerName() {
+  const n = 1 + Math.floor(Math.random() * 9999);
+  return `Speler ${n}`;
+}
+
+/**
+ * First visit: assign Speler + number and grayscale character colors.
+ * Idempotent — keeps existing profile.
+ */
+export function ensureLocalProfile() {
+  if (!getDisplayName()) {
+    setDisplayName(randomPlayerName());
+  }
+  if (!getCharacter()) {
+    setCharacter({
+      head: randomGrayHex(),
+      body: randomGrayHex(),
+      legs: randomGrayHex(),
+    });
+  }
+}
+
 export function getDisplayName() {
   try {
     return (localStorage.getItem(NAME_KEY) || "").trim();
@@ -53,6 +83,7 @@ export function getPlayerId() {
  * @returns {string}
  */
 export function playerLabel() {
+  ensureLocalProfile();
   return getDisplayName() || "Speler";
 }
 
@@ -255,6 +286,7 @@ export function clearAllSandboxData() {
   } catch {
     /* ignore */
   }
+  ensureLocalProfile();
 }
 
 /**

@@ -16,7 +16,26 @@
         <section class="panel">
           <div class="actions home-room-actions">
             <a href="../room/?as=host" class="btn btn-primary">Maak room</a>
-            <a href="../room/" class="btn btn-ghost">Join</a>
+            <button type="button" id="btn-toggle-join" class="btn btn-ghost">Join</button>
+          </div>
+          <div id="join-box" class="room-join hidden">
+            <label for="join-code">Roomcode</label>
+            <div class="join-row">
+              <input
+                id="join-code"
+                type="text"
+                maxlength="12"
+                autocomplete="off"
+                placeholder="AB7K2M"
+              />
+              <button type="button" id="btn-join-room" class="btn btn-primary">
+                Join
+              </button>
+              <button type="button" id="btn-scan-qr" class="btn btn-ghost">
+                Scan QR
+              </button>
+            </div>
+            <p id="join-error" class="hint hidden" role="alert"></p>
           </div>
         </section>
 

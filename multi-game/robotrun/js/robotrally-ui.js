@@ -210,7 +210,12 @@ class RobotRallyUI {
     this.syncExecutionTimer();
 
     if (this.engine.phase === 'finished') {
-      this.showGameOverScreen();
+      // Room shell shows the shared end overlay; keep the board visible underneath.
+      if (document.documentElement.classList.contains('dgame-embedded')) {
+        this.gameOverOverlay?.classList.add('hidden');
+      } else {
+        this.showGameOverScreen();
+      }
     } else {
       this.gameOverOverlay?.classList.add('hidden');
     }

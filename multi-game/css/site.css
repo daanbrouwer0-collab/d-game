@@ -910,6 +910,35 @@ html.page-ganzenbord body {
   min-width: 7rem;
 }
 
+.room-join {
+  margin-top: 1rem;
+}
+
+.room-join label {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.room-join .join-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0;
+  flex-wrap: wrap;
+}
+
+.room-join .join-row input {
+  flex: 1;
+  min-width: 6rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--cell);
+  color: var(--text);
+  font: inherit;
+}
+
 .host-info,
 .invite-card {
   margin-top: 1.1rem;

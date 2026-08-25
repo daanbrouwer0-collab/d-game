@@ -28,57 +28,13 @@
       </div>
 
       <main>
-        <section id="panel-idle" class="panel">
-          <h2>Multiplayer room</h2>
-          <p class="lede">
-            Start een room voor je groep, nodig iedereen uit met één link, en
-            stem daarna op een spel.
-          </p>
-          <div class="room-actions">
-            <button type="button" id="btn-start-room" class="btn btn-primary">
-              Start room
-            </button>
-          </div>
-          <div class="room-join">
-            <label for="join-code">Of join met code / QR</label>
-            <div class="join-row">
-              <input
-                id="join-code"
-                type="text"
-                maxlength="12"
-                autocomplete="off"
-                placeholder="AB7K2M"
-              />
-              <button type="button" id="btn-join-room" class="btn btn-primary">
-                Join
-              </button>
-              <button type="button" id="btn-scan-qr" class="btn btn-ghost">
-                Scan QR
-              </button>
-            </div>
-          </div>
+        <section id="panel-idle" class="panel hidden">
+          <p class="lede">Room starten…</p>
         </section>
 
         <p id="room-error" class="hint room-error hidden" role="alert"></p>
 
         <section id="panel-lobby" class="panel hidden">
-          <div id="invite-card" class="invite-card hidden">
-            <h2>Uitnodigen</h2>
-            <p class="room-code-line">Code: <strong id="invite-code"></strong></p>
-            <div
-              id="invite-qr-host"
-              class="invite-qr-host invite-qr-wrap"
-              role="img"
-              aria-label="QR-code"
-            ></div>
-            <p><a id="invite-url" class="share-url" href="#" target="_blank" rel="noopener"></a></p>
-            <div class="actions share-actions">
-              <button type="button" id="btn-copy-invite" class="btn btn-primary">
-                Kopieer link
-              </button>
-            </div>
-          </div>
-
           <div id="game-session-banner" class="game-session-banner panel hidden" role="status">
             <p><strong id="game-session-title"></strong> is bezig</p>
             <p id="game-session-hint" class="hint"></p>
@@ -98,6 +54,26 @@
             <button type="button" id="btn-leave-room" class="btn btn-ghost">
               Room verlaten
             </button>
+          </div>
+
+          <div id="invite-card" class="invite-card hidden">
+            <h2>Uitnodigen</h2>
+            <p class="room-code-line">Code: <strong id="invite-code"></strong></p>
+            <div
+              id="invite-qr-host"
+              class="invite-qr-host invite-qr-wrap"
+              role="img"
+              aria-label="QR-code"
+            ></div>
+            <p><a id="invite-url" class="share-url" href="#" target="_blank" rel="noopener"></a></p>
+            <div class="actions share-actions">
+              <button type="button" id="btn-copy-invite" class="btn btn-ghost">
+                Kopieer link
+              </button>
+              <button type="button" id="btn-share-invite" class="btn btn-primary">
+                Deel link
+              </button>
+            </div>
           </div>
         </section>
 
@@ -128,6 +104,15 @@
             class="game-frame"
             sandbox="allow-scripts allow-same-origin allow-forms"
           ></iframe>
+          <div id="game-end-overlay" class="game-end-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="game-end-title">
+            <div class="game-end-card">
+              <p id="game-end-title" class="game-end-title">Spel afgelopen</p>
+              <p id="game-end-summary" class="game-end-summary hint"></p>
+              <button type="button" id="btn-dismiss-end" class="btn btn-primary">
+                Terug naar stemmen
+              </button>
+            </div>
+          </div>
         </section>
       </main>
     </div>

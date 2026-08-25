@@ -48,7 +48,19 @@ export function bootstrapRoomEmbedded(ctx) {
 
   const maybeEnd = watchSessionEnd(
     () => window.RobotRallyApp?.engine?.phase === "finished",
-    "finished",
+    () => {
+      const winner = window.RobotRallyApp?.engine?.winner;
+      const name = String(winner?.name || "").trim();
+      if (name) {
+        return {
+          reason: "finished",
+          winnerName: name,
+          winnerId: winner?.id || winner?.peerUserId || null,
+          summary: `${name} wint`,
+        };
+      }
+      return { reason: "finished", summary: "Spel afgelopen" };
+    },
   );
   const prevChange = window.RobotRallyApp.engine.onStateChange;
   window.RobotRallyApp.engine.onStateChange = () => {

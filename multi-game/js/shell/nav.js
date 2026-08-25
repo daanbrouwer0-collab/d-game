@@ -1,4 +1,5 @@
 import { listDeskCards, navigateDeskCard } from "../core/desk.js";
+import { ensureLocalProfile } from "../core/storage.js";
 import {
   bindShellClicks,
   isHashShell,
@@ -17,6 +18,7 @@ const TAB_PATHS = {
  * @param {{ active: 'games'|'lobby'|'geheugen', base?: string }} opts
  */
 export function mountShellNav({ active, base = "" }) {
+  ensureLocalProfile();
   const root = base.endsWith("/") || base === "" ? base : `${base}/`;
   const hash = isHashShell();
 

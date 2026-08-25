@@ -3,6 +3,7 @@ import {
   clearAllSandboxData,
   clearEventLogs,
   clearFriends,
+  ensureLocalProfile,
   getCharacter,
   getDisplayName,
   setCharacter,
@@ -30,6 +31,7 @@ function refreshStats() {
 }
 
 function loadProfile() {
+  ensureLocalProfile();
   nameInput.value = getDisplayName();
   const ch = getCharacter() || {
     head: "#cccccc",

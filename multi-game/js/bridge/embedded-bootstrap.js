@@ -14,13 +14,23 @@ import { contextFromInit } from "./embedded-contract.js";
  */
 
 /**
- * @param {{ reason?: string }} [payload]
+ * @param {{
+ *   reason?: string,
+ *   winnerName?: string | null,
+ *   winnerId?: string | null,
+ *   summary?: string | null,
+ * }} [payload]
  */
 export function notifySessionEnded(payload = {}) {
   window.parent.postMessage(
     {
       type: BridgeMsg.SESSION_ENDED,
-      payload: { reason: payload.reason || "finished" },
+      payload: {
+        reason: payload.reason || "finished",
+        winnerName: payload.winnerName || null,
+        winnerId: payload.winnerId || null,
+        summary: payload.summary || null,
+      },
     },
     "*",
   );
@@ -34,14 +44,23 @@ export function notifyLeaveGame() {
 /**
  * Host-only: roep aan wanneer sessie klaar is (win, draw, quit).
  * @param {() => boolean} isFinished
- * @param {string} [reason]
+ * @param {string | (() => {
+ *   reason?: string,
+ *   winnerName?: string | null,
+ *   winnerId?: string | null,
+ *   summary?: string | null,
+ * })} [reasonOrPayload]
  */
-export function watchSessionEnd(isFinished, reason = "finished") {
+export function watchSessionEnd(isFinished, reasonOrPayload = "finished") {
   let sent = false;
   return () => {
     if (sent || !isFinished()) return;
     sent = true;
-    notifySessionEnded({ reason });
+    const payload =
+      typeof reasonOrPayload === "function"
+        ? reasonOrPayload() || {}
+        : { reason: reasonOrPayload };
+    notifySessionEnded(payload);
   };
 }
 

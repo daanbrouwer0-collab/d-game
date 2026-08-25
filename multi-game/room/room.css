@@ -121,6 +121,7 @@
 
 .panel-playing {
   padding: 0;
+  position: relative;
 }
 
 .playing-bar {
@@ -179,6 +180,52 @@
   background: var(--bg, #fafafa);
   /* Keep taps inside the iframe on mobile (avoid parent chrome stealing them). */
   touch-action: manipulation;
+}
+
+.game-end-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 20, 31, 0.55);
+  pointer-events: auto;
+}
+
+.game-end-overlay.hidden {
+  display: none;
+}
+
+.game-end-card {
+  width: min(100%, 22rem);
+  padding: 1.35rem 1.25rem;
+  border-radius: 12px;
+  text-align: center;
+  background: var(--bg-panel, #242b3d);
+  color: var(--text, #e8ecf4);
+  border: 1px solid var(--line, #3d4660);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.game-end-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.game-end-summary {
+  margin: 0 0 1rem;
+}
+
+.game-end-summary:empty {
+  display: none;
+}
+
+.game-end-card .btn {
+  width: 100%;
 }
 
 /* Layer 0 chrome hidden while a game is active in the room (layer 1 playing). */
@@ -254,6 +301,15 @@ html.has-shell-nav body:has(.app-room #panel-playing:not(.hidden)) {
 
 .invite-card .share-actions {
   margin-top: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.invite-card .share-actions .btn {
+  flex: 1;
+  min-width: 7rem;
 }
 
 .invite-card canvas {

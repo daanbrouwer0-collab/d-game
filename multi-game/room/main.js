@@ -12,8 +12,6 @@ import { getPlayerId, playerLabel } from "../js/core/storage.js";
 import { saveRoom, clearRoom, loadActiveRoom } from "../js/p2p/room-memory.js";
 import { mountShellNav, guardRoomNavigation } from "../js/shell/nav.js";
 import { showHostInviteCard } from "../js/shell/p2p-invite-ui.js";
-import { parseP2pInvite } from "../js/shell/p2p-invite.js";
-import { openQrScanner } from "../js/shell/qr-scanner.js";
 import { mountRoomChat } from "../js/shell/room-chat.js";
 import {
   renderRoomRoster,
@@ -25,6 +23,7 @@ import {
   readRoomFromUrl,
   buildRoomShareUrl,
   mountEmbeddedGameFrame,
+  navigateInShell,
   writeRoomCodeToUrl,
 } from "../js/shell/site-url.js";
 import { TransportType } from "../js/p2p/protocol.js";
@@ -72,9 +71,12 @@ const btnGoToGame = document.getElementById("btn-go-to-game");
 const gameSessionBanner = document.getElementById("game-session-banner");
 const gameSessionTitle = document.getElementById("game-session-title");
 const gameSessionHint = document.getElementById("game-session-hint");
-const joinInput = /** @type {HTMLInputElement} */ (
-  document.getElementById("join-code")
-);
+const gameEndOverlay = document.getElementById("game-end-overlay");
+const gameEndTitle = document.getElementById("game-end-title");
+const gameEndSummary = document.getElementById("game-end-summary");
+
+/** @type {{ reason?: string, winnerName?: string|null, summary?: string|null } | null} */
+let gameEndResult = null;
 
 /** @type {ReturnType<typeof createRoomSession> | null} */
 let session = null;
@@ -121,6 +123,10 @@ function showPanel(name) {
   panelLobby.classList.toggle("hidden", name !== "lobby");
   panelPlaying.classList.toggle("hidden", name !== "playing");
   roomChrome?.classList.toggle("hidden", name === "idle");
+}
+
+function goToRooms() {
+  navigateInShell("lobby/");
 }
 
 function roomState() {
@@ -568,6 +574,7 @@ function signalPlayerOutGame() {
 }
 
 function pauseLocalGame() {
+  hideGameEndScreen();
   if (gameBridge) {
     gameBridge.destroy();
     gameBridge = null;
@@ -611,6 +618,7 @@ function goToGame() {
 }
 
 function returnToVoting() {
+  hideGameEndScreen();
   if (gameBridge) {
     gameBridge.destroy();
     gameBridge = null;
@@ -624,6 +632,50 @@ function returnToVoting() {
   syncChatMode();
   syncGameSessionBanner();
   persistRoomDesk();
+}
+
+/**
+ * @param {{
+ *   reason?: string,
+ *   winnerName?: string | null,
+ *   summary?: string | null,
+ * }} [payload]
+ */
+function showGameEndScreen(payload = {}) {
+  gameEndResult = payload;
+  const reason = String(payload.reason || "finished");
+  const winnerName = String(payload.winnerName || "").trim();
+  let title = "Spel afgelopen";
+  if (reason === "draw") title = "Gelijkspel";
+  else if (winnerName) title = `${winnerName} wint`;
+  if (gameEndTitle) gameEndTitle.textContent = title;
+  if (gameEndSummary) {
+    const summary = String(payload.summary || "").trim();
+    const showSummary =
+      summary &&
+      summary.toLowerCase() !== title.toLowerCase() &&
+      !(winnerName && summary.toLowerCase() === `${winnerName} wint`.toLowerCase());
+    gameEndSummary.textContent = showSummary ? summary : "";
+  }
+  gameEndOverlay?.classList.remove("hidden");
+  showPanel("playing");
+}
+
+function hideGameEndScreen() {
+  gameEndResult = null;
+  gameEndOverlay?.classList.add("hidden");
+  if (gameEndTitle) gameEndTitle.textContent = "Spel afgelopen";
+  if (gameEndSummary) gameEndSummary.textContent = "";
+}
+
+function dismissGameEndScreen() {
+  const reason = String(gameEndResult?.reason || "finished");
+  hideGameEndScreen();
+  if (session?.role === "host") {
+    endGame(reason);
+  } else {
+    pauseLocalGame();
+  }
 }
 
 function adoptRoomPacket(packet) {
@@ -713,9 +765,9 @@ function bindSession(s) {
     if (status === "hosting" || status === "connected") {
       showPanel(activeSession ? "playing" : "lobby");
     }
-    // Alleen naar idle als sessie echt weg is — niet bij kortstondige disconnect.
+    // Alleen terug naar Rooms als sessie echt weg is — niet bij kortstondige disconnect.
     if (status === "idle" && !session) {
-      showPanel("idle");
+      goToRooms();
     }
   };
 
@@ -865,11 +917,18 @@ function relayGameOut(msg) {
   if (!activeSession) return;
 
   if (gameType === "__session_ended__") {
-    const reason = String(
-      /** @type {{ reason?: string }} */ (payload || {}).reason || "finished",
-    );
+    const p = /** @type {{
+      reason?: string,
+      winnerName?: string | null,
+      summary?: string | null,
+    }} */ (payload || {});
+    const reason = String(p.reason || "finished");
     if (session.role === "guest" && reason === "left") {
       pauseLocalGame();
+      return;
+    }
+    if (reason === "finished" || reason === "draw") {
+      showGameEndScreen(p);
       return;
     }
     endGame(reason);
@@ -1163,7 +1222,7 @@ async function startHost() {
     shareUrl = null;
     await s.destroy();
     session = null;
-    showPanel("idle");
+    goToRooms();
   } finally {
     hostStartInFlight = false;
   }
@@ -1228,7 +1287,7 @@ async function joinRoom(code) {
     await s.destroy();
     session = null;
     roomLog = null;
-    showPanel("idle");
+    goToRooms();
   } finally {
     joinInFlight = false;
   }
@@ -1246,43 +1305,25 @@ async function leaveRoom() {
   roomLog = null;
   shareUrl = null;
   clearRoom();
-  showPanel("idle");
-  setStatus("Niet verbonden");
+  goToRooms();
 }
 
-document.getElementById("btn-start-room")?.addEventListener("click", startHost);
-document.getElementById("btn-join-room")?.addEventListener("click", () => {
-  joinRoom(joinInput.value);
-});
-joinInput?.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") joinRoom(joinInput.value);
-});
-document.getElementById("btn-scan-qr")?.addEventListener("click", () => {
-  setError("");
-  openQrScanner({
-    hint: "Richt op de QR van de host",
-    onScan: async (raw) => {
-      const invite = parseP2pInvite(raw);
-      if (!invite) {
-        setError("Geen geldige room-uitnodiging in deze QR.");
-        return;
-      }
-      if (joinInput) joinInput.value = invite.code;
-      await joinRoom(invite.code);
-    },
-    onError: () => setError("Camera kon niet starten."),
-  });
-});
 btnStartVoted?.addEventListener("click", startVotedGame);
 btnLeaveGame?.addEventListener("click", () => pauseLocalGame());
 btnEndSession?.addEventListener("click", () => endGame("host_abort"));
 btnGoToGame?.addEventListener("click", () => goToGame());
 document.getElementById("btn-leave-room")?.addEventListener("click", leaveRoom);
+document.getElementById("btn-dismiss-end")?.addEventListener("click", dismissGameEndScreen);
+
+function inviteShareUrl() {
+  return (
+    shareUrl ||
+    (session?.roomCode ? buildRoomShareUrl(session.roomCode) : "")
+  );
+}
 
 document.getElementById("btn-copy-invite")?.addEventListener("click", async () => {
-  const url =
-    shareUrl ||
-    (session?.roomCode ? buildRoomShareUrl(session.roomCode) : "");
+  const url = inviteShareUrl();
   if (!url) return;
   try {
     await navigator.clipboard.writeText(url);
@@ -1300,14 +1341,50 @@ document.getElementById("btn-copy-invite")?.addEventListener("click", async () =
   }
 });
 
+document.getElementById("btn-share-invite")?.addEventListener("click", async () => {
+  const url = inviteShareUrl();
+  if (!url) return;
+  const code = session?.roomCode || "";
+  const data = {
+    title: "D-Game room",
+    text: code ? `Join mijn D-Game room (${code})` : "Join mijn D-Game room",
+    url,
+  };
+  try {
+    if (typeof navigator.share === "function") {
+      await navigator.share(data);
+      setError("");
+      return;
+    }
+    await navigator.clipboard.writeText(url);
+    setError("");
+    const btn = document.getElementById("btn-share-invite");
+    if (btn) {
+      const prev = btn.textContent;
+      btn.textContent = "Link gekopieerd";
+      setTimeout(() => {
+        btn.textContent = prev;
+      }, 2000);
+    }
+  } catch (err) {
+    if (err && /** @type {Error} */ (err).name === "AbortError") return;
+    setError("Delen mislukt — gebruik Kopieer link.");
+  }
+});
+
 guardRoomNavigation({
   isConnected: () => sessionConnected,
 });
 
 const urlRoom = readRoomFromUrl();
-if (!hostStartInFlight && !joinInFlight) {
-  // Share/QR links never include as=host — always join as guest.
-  // Explicit ?as=host: resume that room as host, or create a new room.
-  if (readHostIntentFromUrl()) startHost();
-  else if (urlRoom) joinRoom(urlRoom);
+if (readHostIntentFromUrl()) {
+  showPanel("lobby");
+  setStatus("Room starten…");
+  startHost();
+} else if (urlRoom) {
+  showPanel("lobby");
+  setStatus("Verbinden…");
+  joinRoom(urlRoom);
+} else {
+  goToRooms();
 }

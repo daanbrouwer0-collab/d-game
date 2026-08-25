@@ -1,4 +1,7 @@
-import { runEmbeddedGame } from "../js/bridge/embedded-bootstrap.js";
+import {
+  runEmbeddedGame,
+  watchSessionEnd,
+} from "../js/bridge/embedded-bootstrap.js";
 import {
   hideEmbeddedLeaveButtons,
   stripEmbeddedChrome,
@@ -16,6 +19,24 @@ let transport = null;
 let isSpectator = false;
 /** @type {Set<string>} */
 let readyPlayers = new Set();
+
+const maybeEnd = watchSessionEnd(
+  () => !!room && room.state.phase === "finished",
+  () => {
+    if (!room) return { reason: "finished", summary: "Spel afgelopen" };
+    const winner = room.state.players.find((p) => p.id === room.state.winnerId);
+    const name = String(winner?.name || "").trim();
+    if (name) {
+      return {
+        reason: "finished",
+        winnerName: name,
+        winnerId: winner?.id || null,
+        summary: `${name} wint`,
+      };
+    }
+    return { reason: "finished", summary: "Spel afgelopen" };
+  },
+);
 
 /**
  * @param {{ inGame?: string[] }} payload
@@ -40,7 +61,12 @@ function syncView() {
     connected: true,
     isHost: transport.role === "host",
   });
+  // Room shell owns the end screen — keep in-game rematch/lobby actions hidden.
+  ui.winActions?.classList.add("hidden");
+  ui.btnRematch?.classList.add("hidden");
+  ui.btnToLobby?.classList.add("hidden");
   syncTurnTimer();
+  maybeEnd();
 }
 
 function syncTurnTimer() {
@@ -116,6 +142,9 @@ runEmbeddedGame({
     ui.setup?.classList.add("hidden");
     ui.lobby?.classList.add("hidden");
     hideEmbeddedLeaveButtons("#btn-leave, #btn-leave-game, #btn-to-lobby");
+    ui.winActions?.classList.add("hidden");
+    ui.btnRematch?.classList.add("hidden");
+    ui.btnToLobby?.classList.add("hidden");
   },
   start(ctx) {
     isSpectator = ctx.participation === "spectator";
@@ -137,6 +166,9 @@ runEmbeddedGame({
     });
     ui.setError("");
     hideEmbeddedLeaveButtons("#btn-leave, #btn-leave-game, #btn-to-lobby");
+    ui.winActions?.classList.add("hidden");
+    ui.btnRematch?.classList.add("hidden");
+    ui.btnToLobby?.classList.add("hidden");
     syncView();
   },
 });
