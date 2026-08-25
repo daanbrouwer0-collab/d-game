@@ -2,18 +2,29 @@ import { BridgeMsg } from "./bridge-protocol.js";
 
 /**
  * Room shell: bridge to embedded game iframe.
+ * SESSION_INIT is deferred until the game posts READY (modules load after iframe onload).
  * @param {HTMLIFrameElement} iframe
  */
 export function mountGameBridge(iframe) {
   /** @type {((msg: { gameType: string, payload: unknown }) => void) | null} */
   let onGameOut = null;
+  /** @type {Record<string, unknown> | null} */
+  let pendingInit = null;
+  let gameReady = false;
+  let alive = true;
 
-  window.addEventListener("message", (event) => {
+  /**
+   * @param {MessageEvent} event
+   */
+  function onMessage(event) {
+    if (!alive) return;
     if (event.source !== iframe.contentWindow) return;
     const data = event.data;
     if (!data || typeof data !== "object") return;
 
     if (data.type === BridgeMsg.READY) {
+      gameReady = true;
+      flushSessionInit();
       return;
     }
 
@@ -28,7 +39,18 @@ export function mountGameBridge(iframe) {
     if (data.type === BridgeMsg.SESSION_ENDED) {
       onGameOut?.({ gameType: "__session_ended__", payload: data.payload });
     }
-  });
+  }
+
+  function flushSessionInit() {
+    if (!gameReady || !pendingInit) return;
+    const init = pendingInit;
+    iframe.contentWindow?.postMessage(
+      { type: BridgeMsg.SESSION_INIT, ...init },
+      "*",
+    );
+  }
+
+  window.addEventListener("message", onMessage);
 
   return {
     /**
@@ -38,13 +60,18 @@ export function mountGameBridge(iframe) {
       onGameOut = handler;
     },
     /**
+     * Call before navigating the iframe to a new game document.
+     */
+    resetHandshake() {
+      gameReady = false;
+    },
+    /**
+     * Queue session init; delivered when the game iframe posts READY.
      * @param {Record<string, unknown>} init
      */
     sendSessionInit(init) {
-      iframe.contentWindow?.postMessage(
-        { type: BridgeMsg.SESSION_INIT, ...init },
-        "*",
-      );
+      pendingInit = init;
+      flushSessionInit();
     },
     /**
      * @param {string} gameType
@@ -58,7 +85,11 @@ export function mountGameBridge(iframe) {
       );
     },
     destroy() {
+      alive = false;
       onGameOut = null;
+      pendingInit = null;
+      gameReady = false;
+      window.removeEventListener("message", onMessage);
       iframe.src = "about:blank";
     },
   };

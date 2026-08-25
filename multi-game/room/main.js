@@ -769,12 +769,13 @@ async function mountActiveGame(gameId, sessionId, sessionLogPacket) {
   gameBridge.onGameOut(relayGameOut);
 
   clearGameFrame();
+  gameBridge.resetHandshake();
 
-  gameFrame.onload = () => {
+  const initPayload = () => {
     const log =
       sessionHost?.log ||
       loadSessionLog(session.roomCode, sessionId, gameId);
-    gameBridge?.sendSessionInit({
+    return {
       role: session.role,
       roomCode: session.roomCode,
       sessionId,
@@ -786,7 +787,16 @@ async function mountActiveGame(gameId, sessionId, sessionLogPacket) {
         name: m.name,
       })),
       log: sessionLogPacket || encodeSyncPacket(log, 0),
-    });
+    };
+  };
+
+  // Queue init; bridge delivers when the game posts READY
+  // (iframe onload races ahead of deferred module scripts).
+  gameBridge.sendSessionInit(initPayload());
+
+  gameFrame.onload = () => {
+    gameBridge?.resetHandshake();
+    gameBridge?.sendSessionInit(initPayload());
   };
 
   try {
