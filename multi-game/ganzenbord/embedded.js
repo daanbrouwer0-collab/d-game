@@ -14,6 +14,17 @@ let room = null;
 /** @type {import('../js/bridge/bridge-transport.js').BridgeTransport | null} */
 let transport = null;
 let isSpectator = false;
+/** @type {Set<string>} */
+let readyPlayers = new Set();
+
+/**
+ * @param {{ inGame?: string[] }} payload
+ */
+function applyPresence(payload) {
+  const list = Array.isArray(payload?.inGame) ? payload.inGame : [];
+  readyPlayers = new Set(list.map(String).filter(Boolean));
+  syncTurnTimer();
+}
 
 function syncView() {
   if (!room || !transport) return;
@@ -42,10 +53,21 @@ function syncTurnTimer() {
     ui.clearTurnTimer();
     return;
   }
+  const ready = readyPlayers.has(current.id);
   const posKey = room.state.players
     .map((p) => `${p.id}:${room.state.positions[p.id] ?? 0}`)
     .join("|");
-  const key = `${room.state.turnIndex}:${current.id}:${posKey}`;
+  const key = `${room.state.turnIndex}:${current.id}:${posKey}:${ready ? "go" : "wait"}`;
+  if (!ready) {
+    ui.syncTurnTimer({
+      key,
+      seconds: TURN_SECONDS,
+      active: true,
+      waiting: true,
+      canExpire: false,
+    });
+    return;
+  }
   ui.syncTurnTimer({
     key,
     seconds: TURN_SECONDS,
@@ -98,7 +120,9 @@ runEmbeddedGame({
   start(ctx) {
     isSpectator = ctx.participation === "spectator";
     applySpectatorMode(isSpectator);
+    readyPlayers = new Set();
     transport = ctx.transport;
+    transport.setPresenceHandler(applyPresence);
     transport.onStatus = (status) => {
       ui.setConnectionStatus(status === "connected" ? "connected" : status);
     };

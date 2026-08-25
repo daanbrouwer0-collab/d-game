@@ -17,12 +17,23 @@ const ui = new UI();
 /** @type {GameEngine | null} */
 let engine = null;
 let isSpectator = false;
+/** @type {Set<string>} */
+let readyPlayers = new Set();
 const maybeEnd = watchSessionEnd(
   () =>
     !!engine &&
     (engine.state.status === "won" || engine.state.status === "draw"),
   "finished",
 );
+
+/**
+ * @param {{ inGame?: string[] }} payload
+ */
+function applyPresence(payload) {
+  const list = Array.isArray(payload?.inGame) ? payload.inGame : [];
+  readyPlayers = new Set(list.map(String).filter(Boolean));
+  syncTurnTimer();
+}
 
 function syncBoard() {
   if (!engine) return;
@@ -40,10 +51,23 @@ function syncTurnTimer() {
     ui.clearTurnTimer();
     return;
   }
+  const seats = seatsFromLog(engine.log);
+  const currentId = seats[engine.state.turn]?.playerId || "";
+  const ready = Boolean(currentId && readyPlayers.has(currentId));
   const boardKey = engine.state.board
     .map((c, i) => (engine.state.blocked.includes(i) ? "#" : c || "."))
     .join("");
-  const key = `${engine.state.turn}:${boardKey}`;
+  const key = `${engine.state.turn}:${boardKey}:${ready ? "go" : "wait"}`;
+  if (!ready) {
+    ui.syncTurnTimer({
+      key,
+      seconds: TURN_SECONDS,
+      active: true,
+      waiting: true,
+      canExpire: false,
+    });
+    return;
+  }
   ui.syncTurnTimer({
     key,
     seconds: TURN_SECONDS,
@@ -87,6 +111,8 @@ runEmbeddedGame({
   start(ctx) {
     isSpectator = ctx.participation === "spectator";
     applySpectatorMode(isSpectator);
+    readyPlayers = new Set();
+    ctx.transport.setPresenceHandler(applyPresence);
     engine = new GameEngine(ctx.transport);
     wireEngine();
     engine.bootstrapEmbedded({

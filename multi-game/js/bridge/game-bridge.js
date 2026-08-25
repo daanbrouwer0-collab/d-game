@@ -8,6 +8,8 @@ import { BridgeMsg } from "./bridge-protocol.js";
 export function mountGameBridge(iframe) {
   /** @type {((msg: { gameType: string, payload: unknown }) => void) | null} */
   let onGameOut = null;
+  /** @type {(() => void) | null} */
+  let onHandshakeReady = null;
   /** @type {Record<string, unknown> | null} */
   let pendingInit = null;
   let gameReady = false;
@@ -53,6 +55,7 @@ export function mountGameBridge(iframe) {
       { type: BridgeMsg.SESSION_INIT, ...init },
       "*",
     );
+    onHandshakeReady?.();
   }
 
   window.addEventListener("message", onMessage);
@@ -63,6 +66,13 @@ export function mountGameBridge(iframe) {
      */
     onGameOut(handler) {
       onGameOut = handler;
+    },
+    /**
+     * Fired after READY + SESSION_INIT were delivered to the iframe.
+     * @param {() => void} handler
+     */
+    onHandshakeReady(handler) {
+      onHandshakeReady = handler;
     },
     /**
      * Call before navigating the iframe to a new game document.
@@ -92,6 +102,7 @@ export function mountGameBridge(iframe) {
     destroy() {
       alive = false;
       onGameOut = null;
+      onHandshakeReady = null;
       pendingInit = null;
       gameReady = false;
       window.removeEventListener("message", onMessage);

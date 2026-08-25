@@ -196,6 +196,7 @@ export class UI {
    *   seconds: number,
    *   active: boolean,
    *   canExpire: boolean,
+   *   waiting?: boolean,
    *   onExpire?: () => void,
    * }} opts
    */
@@ -204,6 +205,28 @@ export class UI {
       this.clearTurnTimer();
       return;
     }
+
+    if (opts.waiting) {
+      if (this._timerInterval != null) {
+        clearTimeout(this._timerInterval);
+        this._timerInterval = null;
+      }
+      this._timerDeadline = 0;
+      this._onTimerExpire = null;
+      if (
+        opts.key === this._timerKey &&
+        this.timerEl &&
+        !this.timerEl.classList.contains("hidden")
+      ) {
+        return;
+      }
+      this._timerKey = opts.key;
+      this.timerEl?.classList.remove("hidden", "is-urgent");
+      if (this.timerFill) this.timerFill.style.width = "100%";
+      if (this.timerLabel) this.timerLabel.textContent = "…";
+      return;
+    }
+
     this.timerEl?.classList.remove("hidden");
     this._onTimerExpire = opts.canExpire ? opts.onExpire || null : null;
 

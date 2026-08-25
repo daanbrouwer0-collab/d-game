@@ -492,6 +492,10 @@ function commitPlayerInGame(pid) {
   if (!session || session.role !== "host" || !roomLog || !roomHost) return;
   const sid = roomState().activeSession?.sessionId;
   if (!sid) return;
+  if (roomState().inGamePlayers.has(pid)) {
+    pushPresenceToGame();
+    return;
+  }
   const updated = roomHost.setPlayerInGame(roomLog, {
     sessionId: sid,
     playerId: pid,
@@ -500,6 +504,7 @@ function commitPlayerInGame(pid) {
   roomLog = updated.log;
   saveRoomLogByCode(session.roomCode, roomLog);
   broadcastRoomLog(tipSeq(roomLog) - 1);
+  pushPresenceToGame();
 }
 
 function commitPlayerOutGame(pid) {
@@ -514,7 +519,16 @@ function commitPlayerOutGame(pid) {
   roomLog = updated.log;
   saveRoomLogByCode(session.roomCode, roomLog);
   broadcastRoomLog(tipSeq(roomLog) - 1);
+  pushPresenceToGame();
   checkAllLeftAndEnd();
+}
+
+/** Tell the embedded game which players have finished bridge handshake. */
+function pushPresenceToGame() {
+  if (!gameBridge || !activeSession) return;
+  gameBridge.sendGameIn("__presence__", {
+    inGame: [...roomState().inGamePlayers],
+  });
 }
 
 function checkAllLeftAndEnd() {
@@ -529,6 +543,10 @@ function checkAllLeftAndEnd() {
 
 function signalPlayerInGame() {
   if (!session) return;
+  if (roomState().inGamePlayers.has(playerId)) {
+    pushPresenceToGame();
+    return;
+  }
   if (session.role === "host") commitPlayerInGame(playerId);
   else {
     session.send(RoomMsg.ROOM_INTENT, {
@@ -618,12 +636,18 @@ function adoptRoomPacket(packet) {
 
   const state = roomState();
 
-  if (!state.activeSession && prevSession) {
+  if (state.activeSession && !prevSession) {
+    const roster = getSessionStartRoster(roomLog, state.activeSession.sessionId);
+    if (roster.includes(playerId)) {
+      goToGame();
+    }
+  } else if (!state.activeSession && prevSession) {
     returnToVoting();
   }
 
   renderRoster();
   syncGameSessionBanner();
+  pushPresenceToGame();
   persistRoomDesk();
 }
 
@@ -977,6 +1001,10 @@ async function mountActiveGame(gameId, sessionId, sessionLogPacket) {
   if (gameBridge) gameBridge.destroy();
   gameBridge = mountGameBridge(gameFrame);
   gameBridge.onGameOut(relayGameOut);
+  gameBridge.onHandshakeReady(() => {
+    signalPlayerInGame();
+    pushPresenceToGame();
+  });
 
   clearGameFrame();
   gameBridge.resetHandshake();
@@ -1001,10 +1029,9 @@ async function mountActiveGame(gameId, sessionId, sessionLogPacket) {
     };
   };
 
-  signalPlayerInGame();
-
   // Queue init; bridge delivers when the game posts READY
   // (iframe onload races ahead of deferred module scripts).
+  // Presence is signaled only after READY + SESSION_INIT (onHandshakeReady).
   gameBridge.sendSessionInit(initPayload());
 
   gameFrame.onload = () => {

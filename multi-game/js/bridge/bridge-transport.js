@@ -19,7 +19,27 @@ export class BridgeTransport {
     this.onMessage = null;
     /** @type {((err: Error) => void) | null} */
     this.onError = null;
+    /** @type {((payload: { inGame?: string[] }) => void) | null} */
+    this.onPresence = null;
+    /** @type {{ inGame?: string[] } | null} */
+    this._lastPresence = null;
     this._ready = false;
+  }
+
+  /**
+   * @param {((payload: { inGame?: string[] }) => void) | null} handler
+   */
+  setPresenceHandler(handler) {
+    this.onPresence = handler;
+    if (handler && this._lastPresence) handler(this._lastPresence);
+  }
+
+  /**
+   * @param {{ inGame?: string[] }} payload
+   */
+  deliverPresence(payload) {
+    this._lastPresence = payload;
+    this.onPresence?.(payload);
   }
 
   guestCount() {
@@ -108,6 +128,14 @@ export function connectGameBridge(transport, onInit) {
     }
 
     if (data.type === BridgeMsg.GAME_IN) {
+      if (String(data.gameType || "") === "__presence__") {
+        const payload =
+          data.payload && typeof data.payload === "object"
+            ? /** @type {{ inGame?: string[] }} */ (data.payload)
+            : {};
+        transport.deliverPresence(payload);
+        return;
+      }
       transport.deliver({
         type: String(data.gameType || ""),
         payload: data.payload,
