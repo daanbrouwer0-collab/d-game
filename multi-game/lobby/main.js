@@ -49,6 +49,10 @@ document.getElementById("btn-toggle-join")?.addEventListener("click", () => {
   }
 });
 
+document.getElementById("btn-create-room")?.addEventListener("click", () => {
+  navigateInShell(ROOM_PATH, { as: "host" });
+});
+
 document.getElementById("btn-join-room")?.addEventListener("click", () => {
   goJoin(joinInput?.value);
 });
