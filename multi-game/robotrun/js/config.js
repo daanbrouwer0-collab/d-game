@@ -139,7 +139,8 @@ const CONFIG = {
     { type: 'backup', label: 'BACK UP', icon: '⬇', priorityBase: 430 },
     { type: 'turnR', label: 'TURN RIGHT', icon: '↻', priorityBase: 80 },
     { type: 'turnL', label: 'TURN LEFT', icon: '↺', priorityBase: 70 },
-    { type: 'uturn', label: 'U-TURN', icon: '🔄', priorityBase: 10 }
+    { type: 'uturn', label: 'U-TURN', icon: '🔄', priorityBase: 10 },
+    { type: 'wait', label: 'STIL', icon: '⏸', priorityBase: 50 }
   ],
 
   /** Extra kaarten die alleen in de hand komen met een upgrade. */
@@ -151,9 +152,45 @@ const CONFIG = {
       { type: 'strafeL', label: 'KRAB L', icon: '⬅', priorityBase: 410 },
       { type: 'strafeR', label: 'KRAB R', icon: '➡', priorityBase: 420 }
     ],
+    jumpJets: [
+      { type: 'jump', label: 'JUMP', icon: '⤴', priorityBase: 640 }
+    ],
     reverseThruster: [
       { type: 'backup2', label: 'BACK 2', icon: '⏬', priorityBase: 460 }
     ]
+  },
+
+  /**
+   * Merge/combo recipes. Match = multiset of types (order ignored).
+   * Optional requiresUpgrade gates the recipe.
+   */
+  MERGE_RECIPES: [
+    { inputs: ['move1', 'move1', 'move1'], output: 'move2' },
+    { inputs: ['move2', 'move2', 'move2'], output: 'move3' },
+    { inputs: ['backup', 'backup', 'backup'], output: 'backup2' },
+    { inputs: ['turnL', 'turnL', 'turnL'], output: 'uturn' },
+    { inputs: ['turnR', 'turnR', 'turnR'], output: 'uturn' },
+    { inputs: ['uturn', 'uturn', 'uturn'], output: 'wait' },
+    { inputs: ['move1', 'turnL'], output: 'strafeL', requiresUpgrade: 'crabWalk' },
+    { inputs: ['move1', 'turnR'], output: 'strafeR', requiresUpgrade: 'crabWalk' },
+    { inputs: ['move3', 'move1'], output: 'move4', requiresUpgrade: 'fourthGear' },
+    { inputs: ['move2', 'move2'], output: 'move4', requiresUpgrade: 'fourthGear' },
+    { inputs: ['move1', 'move1', 'move2'], output: 'move4', requiresUpgrade: 'fourthGear' },
+    { inputs: ['move3', 'move2'], output: 'move4', requiresUpgrade: 'fourthGear' },
+    { inputs: ['move2', 'uturn'], output: 'jump', requiresUpgrade: 'jumpJets' },
+    { inputs: ['move1', 'move1', 'uturn'], output: 'jump', requiresUpgrade: 'jumpJets' },
+    { inputs: ['move2', 'turnL', 'turnR'], output: 'jump', requiresUpgrade: 'jumpJets' }
+  ],
+
+  getCardTypeDef(type) {
+    const fromBase = (this.CARD_TYPES || []).find((c) => c.type === type);
+    if (fromBase) return fromBase;
+    const upgrades = this.UPGRADE_CARD_TYPES || {};
+    for (const list of Object.values(upgrades)) {
+      const hit = (list || []).find((c) => c.type === type);
+      if (hit) return hit;
+    }
+    return null;
   },
 
   UPGRADES: [
@@ -242,7 +279,14 @@ const CONFIG = {
       id: 'crabWalk',
       label: 'Crab Walk',
       short: 'Krab Move',
-      desc: 'Kans op zijwaarts links/rechts bewegen zonder te draaien.',
+      desc: 'Kans op zijwaarts links/rechts bewegen zonder te draaien. Unlockt merge-recepten voor KRAB.',
+      cost: 1
+    },
+    {
+      id: 'jumpJets',
+      label: 'Jump Jets',
+      short: 'Jump',
+      desc: 'Kans op JUMP: 2 stappen vooruit, tussenvak overslaan (muur/pit). Landing op een robot: duw + 1 schade. Unlockt JUMP-merge-recepten.',
       cost: 1
     },
     {

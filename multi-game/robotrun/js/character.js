@@ -251,7 +251,7 @@ const CharacterManager = {
     if (this.nameInput) this.nameInput.value = player.name;
     if (this.colorInput) this.colorInput.value = color;
     if (this.frontHint) {
-      this.frontHint.textContent = `${player.name} · de witte pijl wijst naar de voorkant`;
+      this.frontHint.textContent = `${player.name} · de gekleurde pijl wijst naar de voorkant`;
     }
     this.updateSummary();
   },

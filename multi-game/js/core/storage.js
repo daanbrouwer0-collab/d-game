@@ -25,10 +25,54 @@ const RECENT_KEY = "dgame.rooms.recent";
 const PLAYER_ID_KEY = "dgame.playerId";
 
 /** @returns {string} */
-function randomGrayHex() {
-  const g = 48 + Math.floor(Math.random() * 160); // #30–#AF
-  const hex = g.toString(16).padStart(2, "0");
-  return `#${hex}${hex}${hex}`;
+function toHex2(n) {
+  return Math.max(0, Math.min(255, Math.round(n)))
+    .toString(16)
+    .padStart(2, "0");
+}
+
+/**
+ * Half gray / half color: random hue at ~50% saturation, varied lightness.
+ * Same hue family for pijl / lichaam / ogen so the set still looks like one character.
+ */
+function randomMutedCharacterColors() {
+  const baseHue = Math.random() * 360;
+  const mk = (lightnessBias, hueShift = 0) => {
+    const h = (baseHue + hueShift + 360) % 360;
+    const s = 0.42 + Math.random() * 0.16; // ~42–58% sat
+    const l = 0.28 + lightnessBias * 0.4 + (Math.random() * 0.06 - 0.03);
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = l - c / 2;
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    if (h < 60) {
+      r = c;
+      g = x;
+    } else if (h < 120) {
+      r = x;
+      g = c;
+    } else if (h < 180) {
+      g = c;
+      b = x;
+    } else if (h < 240) {
+      g = x;
+      b = c;
+    } else if (h < 300) {
+      r = x;
+      b = c;
+    } else {
+      r = c;
+      b = x;
+    }
+    return `#${toHex2((r + m) * 255)}${toHex2((g + m) * 255)}${toHex2((b + m) * 255)}`;
+  };
+  return {
+    head: mk(0.72, 0),
+    body: mk(0.48, 8 + Math.random() * 16),
+    legs: mk(0.28, -10 - Math.random() * 14),
+  };
 }
 
 /** @returns {string} */
@@ -38,7 +82,7 @@ function randomPlayerName() {
 }
 
 /**
- * First visit: assign Speler + number and grayscale character colors.
+ * First visit: assign Speler + number and muted (half gray / half color) character.
  * Idempotent — keeps existing profile.
  */
 export function ensureLocalProfile() {
@@ -46,11 +90,7 @@ export function ensureLocalProfile() {
     setDisplayName(randomPlayerName());
   }
   if (!getCharacter()) {
-    setCharacter({
-      head: randomGrayHex(),
-      body: randomGrayHex(),
-      legs: randomGrayHex(),
-    });
+    setCharacter(randomMutedCharacterColors());
   }
 }
 

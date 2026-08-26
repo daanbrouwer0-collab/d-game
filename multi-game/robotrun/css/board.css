@@ -118,6 +118,9 @@
 
 .rr-leave-bar {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
   justify-content: center;
   padding: 10px 14px calc(12px + var(--safe-bottom));
   background: rgba(4, 8, 18, 0.96);
@@ -129,6 +132,92 @@
 .rr-leave-btn {
   width: 100%;
   max-width: 28rem;
+}
+
+.rules-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(2, 6, 14, 0.72);
+  padding: 12px;
+}
+
+.rules-overlay.hidden {
+  display: none !important;
+}
+
+.rules-sheet {
+  width: min(42rem, 100%);
+  max-height: min(88vh, 900px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px 18px 12px 12px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(4, 8, 18, 0.98));
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.rules-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.rules-sheet-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.rules-sheet-body {
+  overflow: auto;
+  padding: 14px 16px 20px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.rules-section {
+  margin-bottom: 1.25rem;
+}
+
+.rules-section h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  color: #7dd3fc;
+}
+
+.rules-section p,
+.rules-section li {
+  color: #cbd5e1;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.rules-section ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.rules-upgrade,
+.rules-recipe {
+  margin: 0 0 0.65rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.rules-upgrade-icon {
+  display: inline-block;
+  width: 1.1rem;
+  height: 1.1rem;
+  vertical-align: -0.15rem;
+  color: #7dd3fc;
 }
 
 #game-wrap.privacy-locked #programming-panel,
@@ -563,6 +652,60 @@
   display: flex;
   gap: 6px;
   justify-content: space-between;
+}
+
+.slot-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.slot-tab {
+  flex: 1;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: var(--radius-sm);
+  background: rgba(15, 23, 42, 0.85);
+  color: var(--text-secondary, #94a3b8);
+  padding: 8px 10px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.slot-tab.active {
+  border-color: rgba(56, 189, 248, 0.85);
+  color: #e2e8f0;
+  background: linear-gradient(180deg, rgba(8, 47, 73, 0.7), rgba(15, 23, 42, 0.95));
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.2);
+}
+
+.merge-row {
+  align-items: center;
+  gap: 6px;
+}
+
+.merge-row .register-slot {
+  width: calc(22% - 8px);
+  flex: 1 1 0;
+}
+
+.merge-arrow {
+  flex: 0 0 auto;
+  opacity: 0.7;
+  font-weight: 700;
+  color: #94a3b8;
+  padding: 0 2px;
+}
+
+.merge-output-slot {
+  outline: 1px dashed rgba(56, 189, 248, 0.55);
+  cursor: default;
+}
+
+.merge-output-slot.is-ready {
+  outline: 2px solid rgba(74, 222, 128, 0.75);
+  border-color: rgba(74, 222, 128, 0.65);
+  cursor: pointer;
 }
 
 .register-slot {

@@ -1,8 +1,28 @@
 const StorageManager = {
-  /** One player color → used for robot, highlight and name swatch. */
+  /** One player color → used when only a single swatch is available. */
   makeColors(hex, fallbackHex = '#00ffff') {
     const value = this.normalizeHex(hex) || this.normalizeHex(fallbackHex) || '#00ffff';
     return { head: value, body: value, legs: value };
+  },
+
+  /**
+   * Preserve Me-tab triple (head/body/legs). Missing channels fall back in order.
+   * @param {object|string|null|undefined} input
+   * @param {string} [fallbackHex]
+   */
+  normalizeColors(input, fallbackHex = '#00ffff') {
+    if (typeof input === 'string') {
+      return this.makeColors(input, fallbackHex);
+    }
+    const fb = this.normalizeHex(fallbackHex)
+      || this.normalizeHex(input?.head)
+      || this.normalizeHex(input?.body)
+      || this.normalizeHex(input?.legs)
+      || '#00ffff';
+    const head = this.normalizeHex(input?.head) || fb;
+    const body = this.normalizeHex(input?.body) || head;
+    const legs = this.normalizeHex(input?.legs) || body;
+    return { head, body, legs };
   },
 
   normalizeHex(value) {
@@ -21,19 +41,21 @@ const StorageManager = {
     return this.normalizeHex(colors.head)
       || this.normalizeHex(colors.body)
       || this.normalizeHex(colors.legs)
+      || this.normalizeHex(playerOrColors?.color)
       || '#00ffff';
   },
 
   normalizePlayer(raw, fallback) {
     const base = fallback || CONFIG.DEFAULT_PLAYERS[0];
     const rawColors = (raw && raw.colors) || {};
-    // Prefer explicit single color; otherwise migrate old 3-color setups via body/head.
-    const chosen = this.normalizeHex(raw && raw.color)
-      || this.normalizeHex(rawColors.head)
-      || this.normalizeHex(rawColors.body)
-      || this.normalizeHex(rawColors.legs)
-      || this.getPlayerColor(base);
-    const colors = this.makeColors(chosen);
+    const hasTriple = !!(rawColors.head || rawColors.body || rawColors.legs);
+    // Keep distinct Me colors; only collapse when a lone `color` was provided.
+    const colors = hasTriple
+      ? this.normalizeColors(rawColors, raw?.color || this.getPlayerColor(base))
+      : this.makeColors(
+        this.normalizeHex(raw && raw.color) || this.getPlayerColor(base),
+        this.getPlayerColor(base)
+      );
     const styleIds = CONFIG.ROBOT_STYLES.map(style => style.id);
     const style = styleIds.includes(raw && raw.style) ? raw.style : (base.style || 'scout');
     return {

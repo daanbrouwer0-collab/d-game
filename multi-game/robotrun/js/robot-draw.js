@@ -1,4 +1,6 @@
-/** Shared cute robot drawing. Local +Y is toward the bottom; front faces local -Y (up on screen when angle=0). */
+/** Shared cute robot drawing. Local +Y is toward the bottom; front faces local -Y (up on screen when angle=0).
+ * Me-tab colors map to visible parts: head → pijl, body → lichaam, legs → ogen.
+ */
 const RobotDraw = {
   draw(ctx, {
     size = 40,
@@ -14,7 +16,7 @@ const RobotDraw = {
 
     ctx.save();
     if (glow) {
-      ctx.shadowColor = head;
+      ctx.shadowColor = body;
       ctx.shadowBlur = Math.max(16, s * 0.48);
     }
 
@@ -36,7 +38,8 @@ const RobotDraw = {
         break;
     }
 
-    this.drawFace(ctx, s, head, style);
+    // Eyes use Me "benen"/legs so all three profile colors stay visible.
+    this.drawFace(ctx, s, legs, style);
     if (showFrontMarker) this.drawFrontMarker(ctx, s, head);
 
     ctx.restore();
@@ -54,11 +57,14 @@ const RobotDraw = {
   },
 
   drawScout(ctx, s, head, body, legs) {
-    ctx.fillStyle = legs;
+    // Side supports use a darkened body tone so "benen" stays free for eyes.
+    ctx.fillStyle = body;
+    ctx.globalAlpha = 0.72;
     this.roundRect(ctx, -s * 0.42, -s * 0.18, s * 0.16, s * 0.52, s * 0.06);
     ctx.fill();
     this.roundRect(ctx, s * 0.26, -s * 0.18, s * 0.16, s * 0.52, s * 0.06);
     ctx.fill();
+    ctx.globalAlpha = 1;
 
     ctx.fillStyle = body;
     this.roundRect(ctx, -s * 0.34, -s * 0.22, s * 0.68, s * 0.58, s * 0.12);
@@ -72,27 +78,18 @@ const RobotDraw = {
     ctx.beginPath();
     ctx.arc(0, s * 0.02, s * 0.1, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = head;
+    ctx.fillStyle = legs;
     ctx.beginPath();
     ctx.arc(0, s * 0.02, s * 0.05, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = head;
-    ctx.lineWidth = Math.max(2, s * 0.05);
-    ctx.beginPath();
-    ctx.moveTo(0, -s * 0.48);
-    ctx.lineTo(0, -s * 0.68);
-    ctx.stroke();
-    ctx.fillStyle = '#fef08a';
-    ctx.beginPath();
-    ctx.arc(0, -s * 0.72, s * 0.07, 0, Math.PI * 2);
     ctx.fill();
   },
 
   drawTank(ctx, s, head, body, legs) {
-    ctx.fillStyle = legs;
+    ctx.fillStyle = body;
+    ctx.globalAlpha = 0.75;
     this.roundRect(ctx, -s * 0.46, s * 0.08, s * 0.92, s * 0.28, s * 0.08);
     ctx.fill();
+    ctx.globalAlpha = 1;
 
     ctx.fillStyle = body;
     this.roundRect(ctx, -s * 0.4, -s * 0.28, s * 0.8, s * 0.56, s * 0.1);
@@ -111,7 +108,8 @@ const RobotDraw = {
   },
 
   drawSpider(ctx, s, head, body, legs) {
-    ctx.strokeStyle = legs;
+    ctx.strokeStyle = body;
+    ctx.globalAlpha = 0.8;
     ctx.lineWidth = Math.max(3, s * 0.08);
     ctx.lineCap = 'round';
     [
@@ -125,6 +123,7 @@ const RobotDraw = {
       ctx.lineTo(s * x2, s * y2);
       ctx.stroke();
     });
+    ctx.globalAlpha = 1;
 
     ctx.fillStyle = body;
     ctx.beginPath();
@@ -136,18 +135,20 @@ const RobotDraw = {
   },
 
   drawBee(ctx, s, head, body, legs) {
-    ctx.fillStyle = legs;
+    ctx.fillStyle = body;
+    ctx.globalAlpha = 0.75;
     this.roundRect(ctx, -s * 0.38, s * 0.1, s * 0.16, s * 0.28, s * 0.05);
     ctx.fill();
     this.roundRect(ctx, s * 0.22, s * 0.1, s * 0.16, s * 0.28, s * 0.05);
     ctx.fill();
+    ctx.globalAlpha = 1;
 
     ctx.fillStyle = body;
     ctx.beginPath();
     ctx.ellipse(0, 0, s * 0.34, s * 0.4, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = legs;
+    ctx.strokeStyle = head;
     ctx.lineWidth = Math.max(2, s * 0.06);
     [-0.12, 0.02, 0.16].forEach(y => {
       ctx.beginPath();
@@ -164,9 +165,11 @@ const RobotDraw = {
   },
 
   drawRoller(ctx, s, head, body, legs) {
-    ctx.fillStyle = legs;
+    ctx.fillStyle = body;
+    ctx.globalAlpha = 0.75;
     this.roundRect(ctx, -s * 0.48, -s * 0.08, s * 0.96, s * 0.42, s * 0.12);
     ctx.fill();
+    ctx.globalAlpha = 1;
     ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
     for (let i = -3; i <= 3; i++) {
       ctx.fillRect(s * i * 0.12 - s * 0.02, -s * 0.02, s * 0.04, s * 0.3);
@@ -181,7 +184,7 @@ const RobotDraw = {
     ctx.stroke();
   },
 
-  drawFace(ctx, s, head, style) {
+  drawFace(ctx, s, eyeColor, style) {
     const faceY = style === 'roller' ? -s * 0.2 : -s * 0.34;
     const faceW = style === 'tank' ? s * 0.46 : s * 0.4;
     const faceH = s * 0.22;
@@ -190,30 +193,30 @@ const RobotDraw = {
     this.roundRect(ctx, -faceW / 2, faceY, faceW, faceH, s * 0.06);
     ctx.fill();
 
-    ctx.fillStyle = head;
-    ctx.globalAlpha = 0.95;
-    this.roundRect(ctx, -faceW / 2 + 2, faceY + 2, faceW - 4, faceH - 4, s * 0.05);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-
-    // Eyes
-    ctx.fillStyle = '#0f172a';
-    const eyeY = faceY + faceH * 0.42;
-    const eyeR = Math.max(2.5, s * 0.055);
+    // Eyes = Me "benen" color (third profile color).
+    const eyeY = faceY + faceH * 0.5;
+    const eyeR = Math.max(3.2, s * 0.08);
+    ctx.fillStyle = eyeColor;
     ctx.beginPath();
     ctx.arc(-faceW * 0.22, eyeY, eyeR, 0, Math.PI * 2);
     ctx.arc(faceW * 0.22, eyeY, eyeR, 0, Math.PI * 2);
     ctx.fill();
 
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath();
+    ctx.arc(-faceW * 0.22, eyeY, eyeR * 0.42, 0, Math.PI * 2);
+    ctx.arc(faceW * 0.22, eyeY, eyeR * 0.42, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.fillStyle = '#f8fafc';
     ctx.beginPath();
-    ctx.arc(-faceW * 0.22 + eyeR * 0.35, eyeY - eyeR * 0.3, eyeR * 0.35, 0, Math.PI * 2);
-    ctx.arc(faceW * 0.22 + eyeR * 0.35, eyeY - eyeR * 0.3, eyeR * 0.35, 0, Math.PI * 2);
+    ctx.arc(-faceW * 0.22 + eyeR * 0.28, eyeY - eyeR * 0.28, eyeR * 0.28, 0, Math.PI * 2);
+    ctx.arc(faceW * 0.22 + eyeR * 0.28, eyeY - eyeR * 0.28, eyeR * 0.28, 0, Math.PI * 2);
     ctx.fill();
   },
 
   drawFrontMarker(ctx, s, head) {
-    // Large high-contrast arrow on the front (-Y), readable on any board color.
+    // Full arrow in Me "hoofd" color so the first profile color is obvious.
     const tipY = -s * 0.98;
     const baseY = -s * 0.58;
     const midY = -s * 0.72;
@@ -221,11 +224,9 @@ const RobotDraw = {
 
     ctx.save();
 
-    // Soft halo so the arrow pops against busy tiles
     ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
     ctx.shadowBlur = Math.max(4, s * 0.12);
 
-    // Outer dark outline
     ctx.fillStyle = '#0b1220';
     ctx.beginPath();
     ctx.moveTo(0, tipY - s * 0.04);
@@ -238,8 +239,7 @@ const RobotDraw = {
 
     ctx.shadowBlur = 0;
 
-    // Bright white arrow body
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = head;
     ctx.strokeStyle = '#0b1220';
     ctx.lineWidth = Math.max(2, s * 0.055);
     ctx.lineJoin = 'round';
@@ -253,20 +253,16 @@ const RobotDraw = {
     ctx.fill();
     ctx.stroke();
 
-    // Colored accent tip (player color) for a clear "forward" cue
-    ctx.fillStyle = head;
-    ctx.beginPath();
-    ctx.moveTo(0, tipY + s * 0.02);
-    ctx.lineTo(s * 0.11, midY - s * 0.02);
-    ctx.lineTo(-(s * 0.11), midY - s * 0.02);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = '#ffffff';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
     ctx.lineWidth = Math.max(1.2, s * 0.03);
+    ctx.beginPath();
+    ctx.moveTo(0, tipY + s * 0.06);
+    ctx.lineTo(halfW * 0.55, baseY - s * 0.02);
+    ctx.lineTo(-(halfW * 0.55), baseY - s * 0.02);
+    ctx.closePath();
     ctx.stroke();
 
-    // Short stem connecting arrow to the robot
-    ctx.strokeStyle = '#ffffff';
+    ctx.strokeStyle = head;
     ctx.lineWidth = Math.max(2.5, s * 0.07);
     ctx.lineCap = 'round';
     ctx.beginPath();

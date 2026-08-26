@@ -48,7 +48,12 @@
             </div>
             <span id="program-timer-label" class="program-timer-label">60s</span>
           </div>
-          <div class="registers-row">
+          <div id="slot-tabs" class="slot-tabs" role="tablist">
+            <button type="button" class="slot-tab active" data-slot-tab="program" role="tab">Program</button>
+            <button type="button" class="slot-tab" data-slot-tab="merge" role="tab">Merge</button>
+          </div>
+
+          <div id="registers-row-program" class="registers-row" data-slot-panel="program">
             <div class="register-slot" data-index="0"><span class="register-num">1</span></div>
             <div class="register-slot" data-index="1"><span class="register-num">2</span></div>
             <div class="register-slot" data-index="2"><span class="register-num">3</span></div>
@@ -56,10 +61,19 @@
             <div class="register-slot" data-index="4"><span class="register-num">5</span></div>
           </div>
 
+          <div id="registers-row-merge" class="registers-row merge-row hidden" data-slot-panel="merge">
+            <div class="merge-input-slot register-slot" data-merge-index="0"><span class="register-num">A</span></div>
+            <div class="merge-input-slot register-slot" data-merge-index="1"><span class="register-num">B</span></div>
+            <div class="merge-input-slot register-slot" data-merge-index="2"><span class="register-num">C</span></div>
+            <div class="merge-arrow" aria-hidden="true">→</div>
+            <div class="merge-output-slot register-slot" id="merge-output-slot"><span class="register-num">OUT</span></div>
+          </div>
+
           <div id="program-board" class="program-board"></div>
 
           <div id="cards-hand" class="cards-hand-wrap"></div>
 
+          <button id="btn-merge-cards" class="btn success below-cards-action hidden" type="button">Merge</button>
           <button id="btn-confirm-program" class="btn success below-cards-action hidden" type="button">Bevestig Programma</button>
           <button id="btn-power-down" class="btn alt below-cards-action" type="button">Power Down Volgende Ronde</button>
           <button id="btn-board-replay" class="btn success below-cards-action hidden" type="button">Replay</button>
@@ -76,7 +90,18 @@
         </div>
 
         <div class="rr-leave-bar">
+          <button id="btn-rr-rules" class="btn alt rr-leave-btn" type="button">Spelregels</button>
           <button id="btn-rr-leave-game" class="btn alt rr-leave-btn" type="button">Verlaat game</button>
+        </div>
+
+        <div id="rules-overlay" class="rules-overlay hidden" aria-hidden="true">
+          <div class="rules-sheet" role="dialog" aria-labelledby="rules-title">
+            <div class="rules-sheet-head">
+              <h2 id="rules-title">Spelregels</h2>
+              <button type="button" id="btn-rules-close" class="btn alt">Sluiten</button>
+            </div>
+            <div id="rules-body" class="rules-sheet-body"></div>
+          </div>
         </div>
 
         <!-- Game Over / Win Overlay -->
@@ -132,7 +157,7 @@
 
           <div class="character-preview-wrap">
             <canvas id="character-preview" width="240" height="200" aria-label="Robot preview"></canvas>
-            <p id="character-front-hint" class="character-front-hint">Speler 1 · de witte pijl wijst naar de voorkant</p>
+            <p id="character-front-hint" class="character-front-hint">Speler 1 · de gekleurde pijl wijst naar de voorkant</p>
           </div>
 
           <div class="menu-label" style="margin-top:14px;">Robot-stijl</div>
@@ -199,6 +224,7 @@
               <li><strong>U-TURN</strong> — 180° draaien</li>
             </ul>
             <p>Sommige upgrades voegen speciale kaarten toe (MOVE 4, BACK 2, zijwaarts).</p>
+            <p><strong>Merge-tab:</strong> combineer 2–3 handkaarten tot één sterkere of speciale kaart (bijv. 3× MOVE 1 → MOVE 2). Sommige recepten unlocken met upgrades (Crab Walk, Fourth Gear, Jump). Zie ook de knop <strong>Spelregels</strong>.</p>
           </article>
 
           <article class="glass-card help-card">
@@ -400,6 +426,7 @@
   <script src="js/robot-draw.js"></script>
   <script src="js/nav.js"></script>
   <script src="js/intent-bind.js"></script>
+  <script src="js/merge-recipes.js"></script>
   <script src="js/p2p-session.js"></script>
   <script src="js/menu.js"></script>
   <script src="js/app-menu.js"></script>

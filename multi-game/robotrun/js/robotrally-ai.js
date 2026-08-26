@@ -6,9 +6,11 @@ const RobotRallyAI = {
     const previous = (bot.registers || []).map(card => (card ? { ...card } : null));
     const chosenRegisters = [null, null, null, null, null];
 
-    // Vastgezette registers behouden
+    // Vastgezette registers behouden (laatste move blijft tot genoeg HP)
     for (let i = unlocked; i < 5; i++) {
-      chosenRegisters[i] = previous[i];
+      chosenRegisters[i] = engine.getCardForLockedRegister
+        ? engine.getCardForLockedRegister(bot, i)
+        : previous[i];
     }
 
     if (unlocked <= 0 || !bot.hand || bot.hand.length === 0) {

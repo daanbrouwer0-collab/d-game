@@ -197,7 +197,10 @@ window.RobotRallyApp = {
       const profile = rosterIndex >= 0 ? roster[rosterIndex] : null;
       if (!profile) return;
       robot.name = profile.name;
-      robot.colors = StorageManager.makeColors(StorageManager.getPlayerColor(profile));
+      robot.colors = StorageManager.normalizeColors(
+        profile.colors || profile.color,
+        profile.color || StorageManager.getPlayerColor(profile)
+      );
       robot.color = robot.colors.head;
       robot.style = profile.style || robot.style;
     });

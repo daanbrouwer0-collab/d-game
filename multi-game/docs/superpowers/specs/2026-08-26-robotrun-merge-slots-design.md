@@ -1,7 +1,7 @@
 # RobotRun slot-tabs + Merge/Combo — design
 
 Datum: 2026-08-26  
-Status: **approved for planning**  
+Status: **geïmplementeerd**  
 Scope: `multi-game/robotrun` (UI + engine + P2P intent)  
 Aanpak: **tabs + receptentabel in config**
 

@@ -5,7 +5,10 @@ class RobotRallyUI {
     this.engine = engine;
     this.tileSize = 48;
     this.selectedRegisters = [null, null, null, null, null];
+    this.mergeInputs = [null, null, null];
+    this.slotTab = 'program';
     this.programmingRegistersRobotId = null;
+    this.programmingRegistersKey = null;
     this.autoStepTimer = null;
     this.robotAnimStates = {};
     this.effectBursts = [];
@@ -66,6 +69,14 @@ class RobotRallyUI {
     this.activePlayerStatus = document.getElementById('active-player-status');
     this.boardFrame = document.getElementById('board-frame');
     this.btnBoardReplay = document.getElementById('btn-board-replay');
+    this.btnMergeCards = document.getElementById('btn-merge-cards');
+    this.btnRules = document.getElementById('btn-rr-rules');
+    this.rulesOverlay = document.getElementById('rules-overlay');
+    this.rulesBody = document.getElementById('rules-body');
+    this.slotTabsEl = document.getElementById('slot-tabs');
+    this.programSlotsRow = document.getElementById('registers-row-program');
+    this.mergeSlotsRow = document.getElementById('registers-row-merge');
+    this.mergeOutputSlot = document.getElementById('merge-output-slot');
     this.playbackOverlay = document.getElementById('playback-overlay');
     this.playbackStatusCard = this.playbackOverlay?.querySelector('.playback-status-card') || null;
     this.playbackTitle = document.getElementById('playback-title');
@@ -99,6 +110,11 @@ class RobotRallyUI {
     document.getElementById('btn-rr-leave-game')?.addEventListener('click', () => {
       this.leaveGame();
     });
+    this.btnRules?.addEventListener('click', () => this.openRulesOverlay());
+    document.getElementById('btn-rules-close')?.addEventListener('click', () => this.closeRulesOverlay());
+    this.rulesOverlay?.addEventListener('click', (event) => {
+      if (event.target === this.rulesOverlay) this.closeRulesOverlay();
+    });
     this.btnBoardReplay?.addEventListener('click', (event) => {
       event.stopPropagation();
       this.startBoardReplay();
@@ -109,9 +125,18 @@ class RobotRallyUI {
       this.engine.togglePowerDown(robot.id);
     });
 
-    document.querySelectorAll('.register-slot').forEach((slot, index) => {
+    this.slotTabsEl?.querySelectorAll('.slot-tab').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.setSlotTab(btn.dataset.slotTab);
+        this.updateCardsUI();
+      });
+    });
+
+    this.programSlotsRow?.querySelectorAll('.register-slot[data-index]').forEach((slot) => {
       slot.addEventListener('click', () => {
         if (this.engine.phase !== 'programming') return;
+        if (this.slotTab !== 'program') return;
+        const index = Number(slot.dataset.index);
         const robot = this.getProgrammingRobot();
         if (!robot || this.engine.isRegisterLocked(robot, index)) return;
         if (this.selectedRegisters[index]) {
@@ -119,6 +144,23 @@ class RobotRallyUI {
           this.updateCardsUI();
         }
       });
+    });
+
+    this.mergeSlotsRow?.querySelectorAll('.merge-input-slot').forEach((slot) => {
+      slot.addEventListener('click', () => {
+        if (this.engine.phase !== 'programming') return;
+        if (this.slotTab !== 'merge') return;
+        const index = Number(slot.dataset.mergeIndex);
+        if (this.mergeInputs[index]) {
+          this.mergeInputs[index] = null;
+          this.updateCardsUI();
+        }
+      });
+    });
+
+    this.btnMergeCards?.addEventListener('click', () => this.confirmMerge());
+    this.mergeOutputSlot?.addEventListener('click', () => {
+      if (this.mergeOutputSlot?.classList.contains('is-ready')) this.confirmMerge();
     });
 
     document.getElementById('btn-go-restart')?.addEventListener('click', () => {
@@ -245,6 +287,7 @@ class RobotRallyUI {
     this.updatePanelTitle(currentRobot);
     this.renderHand(currentRobot);
     this.renderRegisterSlots();
+    this.renderMergeSlots();
     this.renderHud();
     this.renderProgramBoard();
     this.renderUpgradeShop(currentRobot);
@@ -411,7 +454,8 @@ class RobotRallyUI {
     }
 
     currentRobot.hand.forEach(card => {
-      const isUsed = this.selectedRegisters.some(entry => entry && entry.id === card.id);
+      const isUsed = this.selectedRegisters.some(entry => entry && entry.id === card.id)
+        || this.mergeInputs.some(entry => entry && entry.id === card.id);
       const cardEl = document.createElement('div');
       cardEl.className = `card-item ${isUsed ? 'selected' : ''}`;
       cardEl.setAttribute('data-type', card.type);
@@ -423,6 +467,14 @@ class RobotRallyUI {
 
       if (!isUsed) {
         cardEl.addEventListener('click', () => {
+          if (this.slotTab === 'merge') {
+            const emptyMerge = this.mergeInputs.findIndex((entry) => entry === null);
+            if (emptyMerge !== -1) {
+              this.mergeInputs[emptyMerge] = card;
+              this.updateCardsUI();
+            }
+            return;
+          }
           const emptySlot = this.selectedRegisters.findIndex((entry, index) => (
             entry === null && !this.engine.isRegisterLocked(currentRobot, index)
           ));
@@ -437,12 +489,25 @@ class RobotRallyUI {
     });
   }
 
+  setSlotTab(tab) {
+    this.slotTab = tab === 'merge' ? 'merge' : 'program';
+    this.slotTabsEl?.querySelectorAll('.slot-tab').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.slotTab === this.slotTab);
+    });
+    this.programSlotsRow?.classList.toggle('hidden', this.slotTab !== 'program');
+    this.mergeSlotsRow?.classList.toggle('hidden', this.slotTab !== 'merge');
+    // Avoid recursive updateCardsUI when called from within it — callers refresh.
+  }
+
+  clearMergeInputs() {
+    this.mergeInputs = [null, null, null];
+  }
+
   /** Startprogrammering: open slots leeg, vastgezette slots met vorige kaart. */
   buildInitialSelectedRegisters(robot) {
-    const registers = (robot && robot.registers) || [null, null, null, null, null];
-    return [0, 1, 2, 3, 4].map(i => {
+    return [0, 1, 2, 3, 4].map((i) => {
       if (robot && this.engine.isRegisterLocked(robot, i)) {
-        return registers[i] ? { ...registers[i] } : null;
+        return this.engine.getCardForLockedRegister(robot, i);
       }
       return null;
     });
@@ -450,9 +515,112 @@ class RobotRallyUI {
 
   ensureProgrammingRegisters(robot) {
     if (!robot || this.engine.phase !== 'programming') return;
-    if (this.programmingRegistersRobotId === robot.id) return;
+    const roundKey = `${this.engine.roundNumber}:${robot.id}`;
+    if (this.programmingRegistersKey === roundKey) return;
+    this.programmingRegistersKey = roundKey;
     this.programmingRegistersRobotId = robot.id;
     this.selectedRegisters = this.buildInitialSelectedRegisters(robot);
+    this.clearMergeInputs();
+  }
+
+  paintSlotEl(slot, card, { locked = false, isActive = false, emptyTitle = '' } = {}) {
+    slot.classList.toggle('filled', !!card);
+    slot.classList.toggle('locked-register', locked);
+    slot.classList.toggle('active-register', isActive);
+    slot.title = locked ? 'Vastgezet door schade' : emptyTitle;
+    if (card) {
+      slot.innerHTML = `
+        <span class="register-num">${slot.dataset.index != null ? Number(slot.dataset.index) + 1 : (slot.dataset.mergeIndex != null ? ['A', 'B', 'C'][Number(slot.dataset.mergeIndex)] : 'OUT')}</span>
+        ${locked ? '<span class="register-lock">vast</span>' : ''}
+        <div class="card-icon">${card.icon}</div>
+        <div class="card-label register-card-label">${card.label}</div>
+      `;
+    } else {
+      const num = slot.dataset.index != null
+        ? Number(slot.dataset.index) + 1
+        : (slot.dataset.mergeIndex != null ? ['A', 'B', 'C'][Number(slot.dataset.mergeIndex)] : 'OUT');
+      slot.innerHTML = `
+        <span class="register-num">${num}</span>
+        ${locked ? '<span class="register-lock">vast</span>' : ''}
+      `;
+    }
+  }
+
+  renderMergeSlots() {
+    const robot = this.getProgrammingRobot();
+    const canMerge = this.engine.phase === 'programming'
+      && this.isProgrammingUnlocked(robot)
+      && !(this.isP2pMode() && robot && this.engine.isRobotCommitted?.(robot.id));
+
+    this.mergeSlotsRow?.querySelectorAll('.merge-input-slot').forEach((slot) => {
+      const index = Number(slot.dataset.mergeIndex);
+      const card = this.mergeInputs[index];
+      this.paintSlotEl(slot, card, { emptyTitle: 'Merge-input' });
+      slot.style.pointerEvents = canMerge ? '' : 'none';
+    });
+
+    const recipe = canMerge ? this.engine.resolveMergeRecipe(this.mergeInputs, robot) : null;
+    const preview = recipe && CONFIG.getCardTypeDef
+      ? CONFIG.getCardTypeDef(recipe.output)
+      : null;
+    if (this.mergeOutputSlot) {
+      this.mergeOutputSlot.classList.toggle('is-ready', !!preview);
+      if (preview) {
+        this.mergeOutputSlot.innerHTML = `
+          <span class="register-num">OUT</span>
+          <div class="card-icon">${preview.icon}</div>
+          <div class="card-label register-card-label">${preview.label}</div>
+        `;
+        this.mergeOutputSlot.title = 'Tik om te mergen';
+      } else {
+        this.mergeOutputSlot.innerHTML = '<span class="register-num">OUT</span>';
+        this.mergeOutputSlot.title = 'Geen geldig recept';
+        this.mergeOutputSlot.classList.remove('filled');
+      }
+      this.mergeOutputSlot.classList.toggle('filled', !!preview);
+    }
+
+    const showMergeBtn = this.slotTab === 'merge' && !!preview && canMerge;
+    this.btnMergeCards?.classList.toggle('hidden', !showMergeBtn);
+    if (this.btnMergeCards) this.btnMergeCards.disabled = !showMergeBtn;
+  }
+
+  confirmMerge() {
+    if (this.engine.phase !== 'programming') return;
+    const robot = this.getProgrammingRobot();
+    if (!robot) return;
+    if (this.isP2pMode() && this.engine.isRobotCommitted?.(robot.id)) {
+      Toast.show('Je programma staat al klaar.');
+      return;
+    }
+    const ids = this.mergeInputs.filter(Boolean).map((c) => c.id);
+    if (ids.length < 2) {
+      Toast.show('Kies 2 of 3 kaarten om te mergen.');
+      return;
+    }
+
+    if (this.isP2pMode() && P2pSessionController?.isActive?.()) {
+      P2pSessionController.sendMerge(ids)
+        .then(() => {
+          this.clearMergeInputs();
+          this.selectedRegisters = this.selectedRegisters.map((card) => (
+            card && ids.includes(card.id) ? null : card
+          ));
+          this.updateCardsUI();
+        })
+        .catch((err) => Toast.show(err?.message || 'Merge mislukt'));
+      return;
+    }
+
+    if (!this.engine.mergeHandCards(robot.id, ids)) {
+      Toast.show('Geen geldige merge');
+      return;
+    }
+    this.clearMergeInputs();
+    this.selectedRegisters = this.selectedRegisters.map((card) => (
+      card && ids.includes(card.id) ? null : card
+    ));
+    this.updateCardsUI();
   }
 
   renderRegisterSlots() {
@@ -463,7 +631,8 @@ class RobotRallyUI {
 
     let displayCards = [null, null, null, null, null];
     if (hideCommittedCards) {
-      displayCards = [null, null, null, null, null];
+      // Open slots verbergen na bevestigen; vastgezette schade-locks blijven zichtbaar.
+      displayCards = this.buildInitialSelectedRegisters(currentRobot);
     } else if (this.engine.phase === 'programming' && currentRobot) {
       if (this.isProgrammingUnlocked(currentRobot)) {
         this.ensureProgrammingRegisters(currentRobot);
@@ -476,7 +645,11 @@ class RobotRallyUI {
       displayCards = (currentRobot && currentRobot.registers) || [null, null, null, null, null];
     }
 
-    document.querySelectorAll('.register-slot').forEach((slot, index) => {
+    const slots = this.programSlotsRow
+      ? this.programSlotsRow.querySelectorAll('.register-slot[data-index]')
+      : document.querySelectorAll('#registers-row-program .register-slot[data-index]');
+    slots.forEach((slot) => {
+      const index = Number(slot.dataset.index);
       const card = displayCards[index];
       const locked = !!(currentRobot && this.engine.phase === 'programming'
         && this.engine.isRegisterLocked(currentRobot, index));
@@ -484,8 +657,8 @@ class RobotRallyUI {
       slot.classList.toggle('filled', !!card);
       slot.classList.toggle('locked-register', locked);
       slot.classList.toggle('active-register', isActive);
-      slot.classList.toggle('committed-empty', hideCommittedCards);
-      slot.title = hideCommittedCards
+      slot.classList.toggle('committed-empty', hideCommittedCards && !locked);
+      slot.title = hideCommittedCards && !card
         ? 'Programma bevestigd'
         : (locked ? 'Vastgezet door schade' : '');
 
@@ -730,15 +903,18 @@ class RobotRallyUI {
           <span class="program-robot-meta">CP ${Math.min(robot.checkpoint, this.engine.board.checkpointsCount)} • HP ${robot.hp}/${robot.maxHp} • DMG ${robot.damage}</span>
         </div>
         <div class="program-register-strip">
-          ${robot.registers.map((card, index) => {
+          ${[0, 1, 2, 3, 4].map((index) => {
             const active = this.engine.phase === 'executing' && this.engine.registerIndex === index;
             const locked = this.engine.phase === 'programming' && this.engine.isRegisterLocked(robot, index);
+            const card = locked
+              ? this.engine.getCardForLockedRegister(robot, index)
+              : (robot.registers && robot.registers[index]);
             const classes = ['program-register-card'];
             if (card) classes.push('filled');
             if (active) classes.push('current');
             if (locked) classes.push('locked');
             return `
-              <div class="${classes.join(' ')}" title="${locked ? 'Vastgezet door schade' : ''}">
+              <div class="${classes.join(' ')}" title="${locked ? 'Vastgezet door schade — laatste move blijft' : ''}">
                 <span class="program-register-num">${index + 1}</span>
                 <span class="program-register-icon">${card ? card.icon : '·'}</span>
                 <span class="program-register-text">${card ? card.label : (locked ? 'VAST' : 'LEEG')}</span>
@@ -828,7 +1004,10 @@ class RobotRallyUI {
       P2pSessionController.sendCommit(this.selectedRegisters)
         .then(() => {
           this.selectedRegisters = [null, null, null, null, null];
+          this.clearMergeInputs();
+          this.setSlotTab('program');
           this.programmingRegistersRobotId = null;
+          this.programmingRegistersKey = null;
           this._programTimerExpiring = false;
           this.clearProgrammingTimer();
           this.updateCardsUI();
@@ -843,7 +1022,10 @@ class RobotRallyUI {
 
     this.engine.commitCurrentPlayerRegisters(this.selectedRegisters);
     this.selectedRegisters = [null, null, null, null, null];
+    this.clearMergeInputs();
+    this.setSlotTab('program');
     this.programmingRegistersRobotId = null;
+    this.programmingRegistersKey = null;
     this._programTimerExpiring = false;
     this.clearProgrammingTimer();
     this.updateCardsUI();
@@ -860,6 +1042,69 @@ class RobotRallyUI {
       return;
     }
     Toast.show('Terug naar menu');
+  }
+
+  openRulesOverlay() {
+    if (!this.rulesOverlay || !this.rulesBody) return;
+    this.rulesBody.innerHTML = this.buildRulesHtml();
+    this.rulesOverlay.classList.remove('hidden');
+    this.rulesOverlay.setAttribute('aria-hidden', 'false');
+  }
+
+  closeRulesOverlay() {
+    this.rulesOverlay?.classList.add('hidden');
+    this.rulesOverlay?.setAttribute('aria-hidden', 'true');
+  }
+
+  formatCardTypeLabel(type) {
+    const def = CONFIG.getCardTypeDef?.(type);
+    return def ? def.label : String(type).toUpperCase();
+  }
+
+  buildRulesHtml() {
+    const upgrades = (CONFIG.UPGRADES || []).map((upgrade) => {
+      const icon = typeof UpgradeIcons !== 'undefined' ? UpgradeIcons.get(upgrade.id) : '';
+      return `
+        <div class="rules-upgrade">
+          <strong>${icon ? `<span class="rules-upgrade-icon">${icon}</span> ` : ''}${upgrade.short || upgrade.label}</strong>
+          <div>${upgrade.desc || ''}</div>
+        </div>
+      `;
+    }).join('');
+
+    const recipes = (CONFIG.MERGE_RECIPES || []).map((recipe) => {
+      const inputs = (recipe.inputs || []).map((t) => this.formatCardTypeLabel(t)).join(' + ');
+      const output = this.formatCardTypeLabel(recipe.output);
+      const gate = recipe.requiresUpgrade
+        ? ` · unlock: ${(CONFIG.UPGRADES || []).find((u) => u.id === recipe.requiresUpgrade)?.short || recipe.requiresUpgrade}`
+        : ' · standaard';
+      return `
+        <div class="rules-recipe">
+          <strong>${inputs} → ${output}</strong>
+          <div>${gate}</div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <section class="rules-section">
+        <h3>Kern</h3>
+        <ul>
+          <li>Programmeer tot 5 registers, hoogste priority beweegt eerst.</li>
+          <li>Daarna banden/draaischijven, dan lasers.</li>
+          <li>Schade verkleint je hand; te veel schade lockt de laatste registers met de vorige move.</li>
+          <li><strong>Merge-tab:</strong> combineer 2–3 handkaarten tot één nieuwe kaart.</li>
+        </ul>
+      </section>
+      <section class="rules-section">
+        <h3>Upgrades</h3>
+        ${upgrades || '<p>Geen upgrades geladen.</p>'}
+      </section>
+      <section class="rules-section">
+        <h3>Merge-recepten</h3>
+        ${recipes || '<p>Geen recepten geladen.</p>'}
+      </section>
+    `;
   }
 
   canOfferBoardReplay() {
@@ -901,7 +1146,9 @@ class RobotRallyUI {
     const robot = this.getProgrammingRobot();
     if (!robot) return;
     this.selectedRegisters = this.selectedRegisters.map((card, index) => (
-      this.engine.isRegisterLocked(robot, index) ? card : null
+      this.engine.isRegisterLocked(robot, index)
+        ? (this.engine.getCardForLockedRegister(robot, index) || card)
+        : null
     ));
     this.updateCardsUI();
   }
@@ -1481,9 +1728,12 @@ class RobotRallyUI {
   }
 
   getVividRobotColors(robot) {
-    const neon = this.neonHex(this.getRobotColor(robot));
-    // Één pure neonkleur voor heel de robot — maximale helderheid op het grijze bord
-    return { head: neon, body: neon, legs: neon };
+    // Keep Me-tab triple: head → pijl, body → lichaam, legs → ogen.
+    const raw = robot?.colors || {};
+    const head = raw.head || robot?.color || '#00ffff';
+    const body = raw.body || head;
+    const legs = raw.legs || body;
+    return { head, body, legs };
   }
 
   neonHex(hex) {
@@ -1540,29 +1790,31 @@ class RobotRallyUI {
 
   drawLaserEffects(ctx, ts) {
     const now = performance.now();
-    this.effectBursts = this.effectBursts.filter(burst => now - burst.startedAt < 850);
+    this.effectBursts = this.effectBursts.filter(burst => now - burst.startedAt < 1100);
     this.effectBursts.forEach(burst => {
       const age = now - burst.startedAt;
-      const alpha = Math.max(0, 1 - age / 850);
-      const sx = burst.startX * ts + ts / 2;
-      const sy = burst.startY * ts + ts / 2;
-      const ex = burst.endX * ts + ts / 2;
-      const ey = burst.endY * ts + ts / 2;
+      const alpha = Math.max(0, 1 - age / 1100);
+      const ox = (burst.offsetX || 0) * ts;
+      const oy = (burst.offsetY || 0) * ts;
+      const sx = burst.startX * ts + ts / 2 + ox;
+      const sy = burst.startY * ts + ts / 2 + oy;
+      const ex = burst.endX * ts + ts / 2 + ox;
+      const ey = burst.endY * ts + ts / 2 + oy;
 
       ctx.save();
       ctx.strokeStyle = burst.reason === 'robotlaser'
-        ? `rgba(244, 114, 182, ${0.9 * alpha})`
-        : `rgba(248, 113, 113, ${0.82 * alpha})`;
-      ctx.lineWidth = Math.max(4, ts * 0.12);
+        ? `rgba(244, 114, 182, ${0.95 * alpha})`
+        : `rgba(248, 113, 113, ${0.9 * alpha})`;
+      ctx.lineWidth = Math.max(3, ts * 0.1);
       ctx.shadowColor = burst.reason === 'robotlaser' ? '#f472b6' : '#f87171';
-      ctx.shadowBlur = 20 * alpha;
+      ctx.shadowBlur = 22 * alpha;
       ctx.beginPath();
       ctx.moveTo(sx, sy);
       ctx.lineTo(ex, ey);
       ctx.stroke();
 
       if (burst.hit) {
-        ctx.fillStyle = `rgba(255, 255, 255, ${0.75 * alpha})`;
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.8 * alpha})`;
         ctx.beginPath();
         ctx.arc(ex, ey, Math.max(5, ts * 0.14), 0, Math.PI * 2);
         ctx.fill();
@@ -1645,14 +1897,14 @@ class RobotRallyUI {
       if (!this.autoStepTimer) {
         this.autoStepTimer = setInterval(() => {
           if (this.engine.phase === 'executing') {
-            this.engine.executeNextRegister();
+            this.engine.advanceExecutionStep();
           } else {
             clearInterval(this.autoStepTimer);
             this.autoStepTimer = null;
             this.selectedRegisters = [null, null, null, null, null];
             this.updateCardsUI();
           }
-        }, 1450);
+        }, 950);
       }
       return;
     }
@@ -2095,7 +2347,7 @@ class RobotRallyUI {
 
   captureLaserEffects() {
     const bursts = this.engine.lastLaserBursts || [];
-    const signature = `${this.engine.phase}|${this.engine.registerIndex}|${JSON.stringify(bursts)}`;
+    const signature = `${this.engine.phase}|${this.engine.registerIndex}|${this.engine.execPhase}|${JSON.stringify(bursts)}`;
     if (signature === this.lastLaserSignature) return;
     this.lastLaserSignature = signature;
     if (bursts.length) {
@@ -2105,9 +2357,9 @@ class RobotRallyUI {
   }
 
   getExecutionHeadline() {
+    if (this.engine.execHeadline) return this.engine.execHeadline;
     const items = this.engine.activeRegisterCards || [];
     if (!items.length) return 'Wachten op actie';
-    // Already sorted highest priority first by the engine.
     return items
       .map(item => `${this.getDisplayPlayerNameById(item.robotId)} ${item.cardLabel} (${item.priority})`)
       .join(' → ');
@@ -2133,6 +2385,7 @@ class RobotRallyUI {
       this.lastProgrammingRobotId = null;
       this.programmingUnlockedRobotId = null;
       this.programmingRegistersRobotId = null;
+      this.programmingRegistersKey = null;
       return;
     }
 
@@ -2141,6 +2394,7 @@ class RobotRallyUI {
       this.lastProgrammingRobotId = currentRobot.id;
       this.programmingUnlockedRobotId = null;
       this.programmingRegistersRobotId = null;
+      this.programmingRegistersKey = null;
       CharacterManager?.refreshForCurrentTurn?.();
     }
   }

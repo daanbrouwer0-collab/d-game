@@ -258,13 +258,10 @@ const P2pSessionController = {
   },
 
   makeSeat(userId, index, profile, robotId) {
-    const colors = profile?.colors
-      ? {
-          head: StorageManager.normalizeHex(profile.colors.head) || StorageManager.getPlayerColor(profile),
-          body: StorageManager.normalizeHex(profile.colors.body) || StorageManager.getPlayerColor(profile),
-          legs: StorageManager.normalizeHex(profile.colors.legs) || StorageManager.getPlayerColor(profile),
-        }
-      : StorageManager.makeColors(StorageManager.getPlayerColor(profile));
+    const colors = StorageManager.normalizeColors(
+      profile?.colors || profile?.color,
+      StorageManager.getPlayerColor(profile)
+    );
     const color = colors.head;
     return {
       userId,
@@ -348,12 +345,32 @@ const P2pSessionController = {
       ...gameState,
       robots: gameState.robots.map((robot) => {
         if (robot.id === localRobotId) return robot;
+        const damage = Number(robot.damage) || 0;
+        const memoryBonus = Array.isArray(robot.upgrades)
+          ? robot.upgrades.filter((id) => id === "memoryBank").length
+          : 0;
+        const handSize = Math.max(
+          CONFIG.MIN_HAND_SIZE || 0,
+          (CONFIG.DEFAULT_HAND_SIZE || 9) - damage + memoryBonus,
+        );
+        const unlocked = Math.min(5, handSize);
+        const memory = Array.isArray(robot.lockedRegisterMemory)
+          ? robot.lockedRegisterMemory
+          : [];
         return {
           ...robot,
           hand: [],
-          registers: hideSecrets
-            ? (robot.registers || []).map(() => null)
-            : robot.registers,
+          // Vastgezette schade-registers zijn publiek (die voer je toch uit).
+          registers: [0, 1, 2, 3, 4].map((i) => {
+            if (i < unlocked) return null;
+            const card = (robot.registers && robot.registers[i]) || memory[i] || null;
+            return card ? { ...card } : null;
+          }),
+          lockedRegisterMemory: [0, 1, 2, 3, 4].map((i) => {
+            if (i < unlocked) return null;
+            const card = memory[i] || (robot.registers && robot.registers[i]) || null;
+            return card ? { ...card } : null;
+          }),
         };
       }),
     };
@@ -600,9 +617,13 @@ const P2pSessionController = {
     Object.assign(seat, {
       name: profile.name || seat.name,
       color: StorageManager.getPlayerColor(profile),
-      colors: StorageManager.makeColors(StorageManager.getPlayerColor(profile)),
+      colors: StorageManager.normalizeColors(
+        profile.colors || profile.color,
+        profile.color || StorageManager.getPlayerColor(profile)
+      ),
       style: profile.style || seat.style,
     });
+    seat.color = seat.colors.head;
     if (this.isHost()) {
       this.lobby.updatedAt = Date.now();
       this.appendDesk("seat", {
@@ -830,7 +851,11 @@ const P2pSessionController = {
           if (robot.id === localId) return;
           if (app.engine.phase === "programming" || app.engine.phase === "ready") {
             robot.hand = [];
-            robot.registers = [null, null, null, null, null];
+            robot.registers = [0, 1, 2, 3, 4].map((i) => (
+              app.engine.isRegisterLocked(robot, i)
+                ? app.engine.getCardForLockedRegister(robot, i)
+                : null
+            ));
           }
         });
       }
@@ -844,8 +869,15 @@ const P2pSessionController = {
           app.ui.programmingUnlockedRobotId = localId;
           const committed = app.engine.isRobotCommitted?.(localId);
           if (!committed && prevSelected && prevRobotId === localId) {
-            app.ui.selectedRegisters = prevSelected;
+            const localRobot = app.engine.robots.find((r) => r.id === localId);
+            const lockedInit = app.ui.buildInitialSelectedRegisters(localRobot);
+            app.ui.selectedRegisters = prevSelected.map((card, i) => (
+              localRobot && app.engine.isRegisterLocked(localRobot, i)
+                ? (lockedInit[i] || card)
+                : card
+            ));
             app.ui.programmingRegistersRobotId = localId;
+            app.ui.programmingRegistersKey = `${app.engine.roundNumber}:${localId}`;
           }
         }
         app.ui.resizeCanvas();
@@ -900,6 +932,23 @@ const P2pSessionController = {
       robotId,
       userId: this.playerId,
       registers: (registers || []).map((card) => (card ? { ...card } : null)),
+    });
+  },
+
+  async sendMerge(cardIds) {
+    const robotId = this.localRobotId();
+    if (!robotId) throw new Error("Geen robot gekoppeld.");
+    const ids = (cardIds || []).filter(Boolean);
+    if (this.isHost()) {
+      const ok = window.RobotRallyApp.engine.mergeHandCards(robotId, ids);
+      if (!ok) throw new Error("Merge mislukt");
+      await this.publishSnapshot();
+      return;
+    }
+    this.send("rr_intent_merge", {
+      robotId,
+      userId: this.playerId,
+      cardIds: ids,
     });
   },
 
@@ -1056,6 +1105,20 @@ const P2pSessionController = {
       this.publishSnapshot()
         .then(() => this.maybeAutoStartExecution())
         .catch(() => {});
+      return;
+    }
+
+    if (type === "rr_intent_merge") {
+      const bound = window.RobotRunIntentBind?.resolveSeatAction?.(
+        this.lobby,
+        payload,
+        msg.fromPeerId,
+        this.peerToPlayer || {},
+      );
+      if (!bound) return;
+      if (bound.userId === this.playerId) return;
+      window.RobotRallyApp.engine.mergeHandCards(bound.robotId, payload.cardIds);
+      this.publishSnapshot().catch(() => {});
       return;
     }
 

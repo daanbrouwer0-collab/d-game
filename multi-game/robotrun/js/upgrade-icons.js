@@ -27,6 +27,8 @@ const UpgradeIcons = {
         return `<svg ${common} stroke-width="2.2"><path d="M2 12 H16"/><path d="M12 7 L18 12 L12 17"/><path d="M2 8 V16" opacity="0.45"/><path d="M5 8 V16" opacity="0.45"/><path d="M8 8 V16" opacity="0.45"/></svg>`;
       case 'crabWalk':
         return `<svg ${common} stroke-width="2"><path d="M12 7 V17"/><path d="M4 12 H9 M6.5 9.5 L4 12 L6.5 14.5"/><path d="M15 12 H20 M17.5 9.5 L20 12 L17.5 14.5"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/></svg>`;
+      case 'jumpJets':
+        return `<svg ${common} stroke-width="2"><path d="M6 18 C8 12 10 8 12 6 C14 8 16 12 18 18"/><path d="M9 14 H15"/><path d="M10 18 L12 21 L14 18"/></svg>`;
       case 'reverseThruster':
         return `<svg ${common} stroke-width="2"><path d="M12 3 V13"/><path d="M8 9 L12 14 L16 9"/><path d="M8 14 L12 19 L16 14"/></svg>`;
       case 'ghost':

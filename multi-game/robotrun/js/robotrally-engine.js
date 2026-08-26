@@ -19,6 +19,12 @@ class RobotRallyEngine {
     this.committedRobotIds = [];
     this.matchReadyRobotIds = [];
     this.matchCountdownEndsAt = null;
+    /** @type {'moves'|'board'|'lasers'|null} */
+    this.execPhase = null;
+    this.execMoveIndex = 0;
+    /** @type {Array<{ robotId: string, card: object }>} */
+    this.execMoveQueue = [];
+    this.execHeadline = '';
     this.rngSeed = null;
     this._rngState = null;
     this.onStateChange = null;
@@ -380,8 +386,11 @@ class RobotRallyEngine {
   }
 
   createRobot(base) {
-    const colors = typeof StorageManager !== 'undefined' && StorageManager.makeColors
-      ? StorageManager.makeColors(StorageManager.getPlayerColor(base))
+    const colors = typeof StorageManager !== 'undefined' && StorageManager.normalizeColors
+      ? StorageManager.normalizeColors(
+        base.colors || base.color,
+        base.color || StorageManager.getPlayerColor(base)
+      )
       : (base.colors || { head: '#00ffff', body: '#00ffff', legs: '#00ffff' });
     return {
       id: base.id,
@@ -402,6 +411,7 @@ class RobotRallyEngine {
       energy: CONFIG.STARTING_ENERGY,
       hand: [],
       registers: [null, null, null, null, null],
+      lockedRegisterMemory: [null, null, null, null, null],
       upgrades: [],
       pendingPowerDown: false,
       shutdownActive: false,
@@ -1264,6 +1274,15 @@ class RobotRallyEngine {
       phase: this.phase,
       roundNumber: this.roundNumber,
       registerIndex: this.registerIndex,
+      execPhase: this.execPhase,
+      execMoveIndex: this.execMoveIndex,
+      execMoveQueue: (this.execMoveQueue || []).map((entry) => ({
+        robotId: entry.robotId,
+        card: entry.card ? { ...entry.card } : null,
+      })),
+      execHeadline: this.execHeadline || '',
+      lastLaserBursts: (this.lastLaserBursts || []).map((burst) => ({ ...burst })),
+      activeRegisterCards: (this.activeRegisterCards || []).map((entry) => ({ ...entry })),
       programmingPlayerIndex: this.programmingPlayerIndex,
       winnerId: this.winner ? this.winner.id : null,
       actionLog: [...(this.actionLog || [])],
@@ -1313,6 +1332,7 @@ class RobotRallyEngine {
         energy: robot.energy,
         hand: (robot.hand || []).map(card => ({ ...card })),
         registers: (robot.registers || []).map(card => (card ? { ...card } : null)),
+        lockedRegisterMemory: (robot.lockedRegisterMemory || []).map(card => (card ? { ...card } : null)),
         upgrades: (robot.upgrades || []).map(upgrade => upgrade.id),
         pendingPowerDown: !!robot.pendingPowerDown,
         shutdownActive: !!robot.shutdownActive,
@@ -1333,8 +1353,23 @@ class RobotRallyEngine {
     this.registerIndex = state.registerIndex || 0;
     this.programmingPlayerIndex = state.programmingPlayerIndex || 0;
     this.actionLog = Array.isArray(state.actionLog) ? state.actionLog : [];
-    this.activeRegisterCards = [];
-    this.lastLaserBursts = [];
+    this.activeRegisterCards = Array.isArray(state.activeRegisterCards)
+      ? state.activeRegisterCards.map((entry) => ({ ...entry }))
+      : [];
+    this.lastLaserBursts = Array.isArray(state.lastLaserBursts)
+      ? state.lastLaserBursts.map((burst) => ({ ...burst }))
+      : [];
+    this.execPhase = state.execPhase === 'moves' || state.execPhase === 'board' || state.execPhase === 'lasers'
+      ? state.execPhase
+      : null;
+    this.execMoveIndex = Math.max(0, Number(state.execMoveIndex) || 0);
+    this.execMoveQueue = Array.isArray(state.execMoveQueue)
+      ? state.execMoveQueue.map((entry) => ({
+          robotId: entry.robotId,
+          card: entry.card ? { ...entry.card } : null,
+        }))
+      : [];
+    this.execHeadline = state.execHeadline != null ? String(state.execHeadline) : '';
     this.committedRobotIds = Array.isArray(state.committedRobotIds) ? [...state.committedRobotIds] : [];
     this.matchReadyRobotIds = Array.isArray(state.matchReadyRobotIds) ? [...state.matchReadyRobotIds] : [];
     this.matchCountdownEndsAt = state.matchCountdownEndsAt != null
@@ -1388,6 +1423,11 @@ class RobotRallyEngine {
       robot.registers = Array.isArray(raw.registers)
         ? raw.registers.map(card => (card ? { ...card } : null))
         : [null, null, null, null, null];
+      robot.lockedRegisterMemory = Array.isArray(raw.lockedRegisterMemory)
+        ? raw.lockedRegisterMemory.map(card => (card ? { ...card } : null))
+        : [null, null, null, null, null];
+      while (robot.lockedRegisterMemory.length < 5) robot.lockedRegisterMemory.push(null);
+      robot.lockedRegisterMemory = robot.lockedRegisterMemory.slice(0, 5);
       robot.upgrades = (raw.upgrades || [])
         .map(id => CONFIG.UPGRADES.find(upgrade => upgrade.id === id))
         .filter(Boolean);
@@ -1439,6 +1479,10 @@ class RobotRallyEngine {
     this.committedRobotIds = [];
     this.matchReadyRobotIds = [];
     this.matchCountdownEndsAt = null;
+    this.execPhase = null;
+    this.execMoveIndex = 0;
+    this.execMoveQueue = [];
+    this.execHeadline = '';
     if (options.rngSeed != null) this.setRngSeed(options.rngSeed);
     else if (this.isP2pMode()) this.setRngSeed(Date.now());
 
@@ -1480,7 +1524,7 @@ class RobotRallyEngine {
       const robot = this.createRobot({
         id: profile.robotId || `player_${i + 1}`,
         name: profile.name || `Speler ${i + 1}`,
-        colors: StorageManager.makeColors(StorageManager.getPlayerColor(profile)),
+        colors: profile.colors || profile.color,
         style: profile.style || 'scout',
         x: start.x,
         y: start.y,
@@ -1535,6 +1579,7 @@ class RobotRallyEngine {
     this.robots.forEach((robot) => {
       robot.hand = [];
       robot.registers = [null, null, null, null, null];
+      robot.lockedRegisterMemory = [null, null, null, null, null];
     });
     this.pushLog('Iedereen klaar? Druk op Ready om te starten.');
     this.emitStateChange();
@@ -1627,8 +1672,99 @@ class RobotRallyEngine {
     return index >= this.getUnlockedRegisterCount(robot);
   }
 
+  ensureLockedRegisterMemory(robot) {
+    if (!robot) return;
+    if (!Array.isArray(robot.lockedRegisterMemory) || robot.lockedRegisterMemory.length !== 5) {
+      const prev = Array.isArray(robot.lockedRegisterMemory) ? robot.lockedRegisterMemory : [];
+      robot.lockedRegisterMemory = [0, 1, 2, 3, 4].map((i) => (
+        prev[i] ? { ...prev[i] } : null
+      ));
+    }
+  }
+
+  /**
+   * Damage-locked slots keep the last card that was programmed there
+   * until HP/hand size unlocks them again.
+   */
+  syncLockedRegisters(robot) {
+    if (!robot) return;
+    this.ensureLockedRegisterMemory(robot);
+    if (!Array.isArray(robot.registers) || robot.registers.length !== 5) {
+      robot.registers = [null, null, null, null, null];
+    }
+    const unlocked = this.getUnlockedRegisterCount(robot);
+    for (let i = 0; i < 5; i++) {
+      if (i >= unlocked) {
+        if (robot.registers[i]) {
+          robot.lockedRegisterMemory[i] = { ...robot.registers[i] };
+        }
+        const kept = robot.lockedRegisterMemory[i];
+        robot.registers[i] = kept ? { ...kept } : null;
+      } else {
+        robot.lockedRegisterMemory[i] = null;
+      }
+    }
+  }
+
+  getCardForLockedRegister(robot, index) {
+    if (!robot || !this.isRegisterLocked(robot, index)) return null;
+    this.ensureLockedRegisterMemory(robot);
+    const fromReg = robot.registers && robot.registers[index];
+    if (fromReg) return { ...fromReg };
+    const fromMem = robot.lockedRegisterMemory[index];
+    return fromMem ? { ...fromMem } : null;
+  }
+
+  resolveMergeRecipe(cards, robot) {
+    const api = typeof MergeRecipes !== 'undefined' ? MergeRecipes : null;
+    if (!api) return null;
+    return api.resolveMergeRecipe(cards, robot);
+  }
+
+  /**
+   * Consume 2–3 hand cards and return one merged card into the hand.
+   * @param {string} robotId
+   * @param {string[]} cardIds
+   */
+  mergeHandCards(robotId, cardIds) {
+    if (this.phase !== 'programming') return false;
+    const robot = this.robots.find((r) => r.id === robotId);
+    if (!robot || !this.isRobotInGame(robot) || robot.shutdownActive) return false;
+
+    const ids = (cardIds || []).filter(Boolean);
+    if (ids.length < 2 || ids.length > 3) return false;
+    if (new Set(ids).size !== ids.length) return false;
+
+    const registerIds = new Set(
+      (robot.registers || []).filter(Boolean).map((c) => c.id),
+    );
+    const cards = [];
+    for (const id of ids) {
+      if (registerIds.has(id)) return false;
+      const card = (robot.hand || []).find((c) => c.id === id);
+      if (!card) return false;
+      cards.push(card);
+    }
+
+    const recipe = this.resolveMergeRecipe(cards, robot);
+    if (!recipe) return false;
+
+    const api = typeof MergeRecipes !== 'undefined' ? MergeRecipes : null;
+    if (!api) return false;
+    const rng = this.isP2pMode() ? () => this.rng() : Math.random;
+    const merged = api.buildMergedCard(cards, recipe.output, rng);
+    if (!merged) return false;
+
+    robot.hand = robot.hand.filter((c) => !ids.includes(c.id));
+    robot.hand.push(merged);
+    robot.hand.sort((a, b) => b.priority - a.priority);
+    this.pushLog(`${robot.name} merged → ${merged.label}.`);
+    this.emitStateChange();
+    return true;
+  }
+
   getCardPoolForRobot(robot) {
-    const pool = [...CONFIG.CARD_TYPES];
+    const pool = (CONFIG.CARD_TYPES || []).filter((c) => c.type !== 'wait');
     const bonus = CONFIG.UPGRADE_CARD_TYPES || {};
     Object.keys(bonus).forEach(upgradeId => {
       if (!this.hasUpgrade(robot, upgradeId)) return;
@@ -1638,7 +1774,9 @@ class RobotRallyEngine {
   }
 
   generateProgramCard(robot = null) {
-    const pool = robot ? this.getCardPoolForRobot(robot) : CONFIG.CARD_TYPES;
+    const pool = robot
+      ? this.getCardPoolForRobot(robot)
+      : (CONFIG.CARD_TYPES || []).filter((c) => c.type !== 'wait');
     const roll = this.isP2pMode() ? this.rng() : Math.random();
     const cardType = pool[Math.floor(roll * pool.length)];
     const idRoll = this.isP2pMode() ? this.rng() : Math.random();
@@ -1669,6 +1807,10 @@ class RobotRallyEngine {
     this.pendingUpgradeQueue = [];
     this.currentUpgradeChoice = null;
     this.committedRobotIds = [];
+    this.execPhase = null;
+    this.execMoveIndex = 0;
+    this.execMoveQueue = [];
+    this.execHeadline = '';
 
     // Respawn na dood pas aan het begin van de volgende ronde (met 2 schade).
     this.respawnPendingRobots();
@@ -1685,6 +1827,7 @@ class RobotRallyEngine {
       if (robot.shutdownActive) {
         robot.damage = 0;
         robot.registers = [null, null, null, null, null];
+        robot.lockedRegisterMemory = [null, null, null, null, null];
         this.refreshRobotStats(robot);
         this.pushLog(`${robot.name} gaat in power down en herstelt volledig.`);
         return;
@@ -1698,10 +1841,18 @@ class RobotRallyEngine {
       }
 
       // RoboRally: te veel schade → laatste registers blijven vast met vorige kaart
+      this.ensureLockedRegisterMemory(robot);
       const unlocked = this.getUnlockedRegisterCount(robot);
-      robot.registers = [0, 1, 2, 3, 4].map(i => (
-        i >= unlocked ? previousRegisters[i] : null
-      ));
+      robot.registers = [0, 1, 2, 3, 4].map((i) => {
+        if (i >= unlocked) {
+          const kept = previousRegisters[i] || robot.lockedRegisterMemory[i];
+          if (kept) robot.lockedRegisterMemory[i] = { ...kept };
+          return kept ? { ...kept } : null;
+        }
+        robot.lockedRegisterMemory[i] = null;
+        return null;
+      });
+      this.syncLockedRegisters(robot);
       if (unlocked < 5) {
         const lockedNums = [0, 1, 2, 3, 4]
           .filter(i => i >= unlocked)
@@ -1786,13 +1937,18 @@ class RobotRallyEngine {
     if (this.phase !== 'programming') return false;
 
     const unlocked = this.getUnlockedRegisterCount(robot);
+    this.ensureLockedRegisterMemory(robot);
     robot.registers = [0, 1, 2, 3, 4].map(i => {
       if (i >= unlocked) {
-        return robot.registers[i] ? { ...robot.registers[i] } : null;
+        const kept = this.getCardForLockedRegister(robot, i);
+        if (kept) robot.lockedRegisterMemory[i] = { ...kept };
+        return kept;
       }
+      robot.lockedRegisterMemory[i] = null;
       const card = registers && registers[i];
       return card ? { ...card } : null;
     });
+    this.syncLockedRegisters(robot);
 
     if (!this.committedRobotIds.includes(robot.id)) {
       this.committedRobotIds.push(robot.id);
@@ -1874,9 +2030,124 @@ class RobotRallyEngine {
     this.lastLaserBursts = [];
     this.currentUpgradeChoice = null;
     this.currentRoundReplayFrames = [];
+    this.execPhase = 'moves';
+    this.execMoveIndex = 0;
+    this.execMoveQueue = [];
+    this.execHeadline = 'Registers starten…';
+    this.prepareRegisterMoves(0);
     this.captureReplayFrame(0);
-    this.pushLog('Registers worden nu uitgevoerd.');
+    this.pushLog('Registers worden stap voor stap uitgevoerd (moves → banden → lasers).');
     this.emitStateChange();
+  }
+
+  /** Build priority-sorted move queue for the current register slot. */
+  prepareRegisterMoves(regIdx) {
+    const actions = this.robots
+      .filter((robot) => this.isRobotOnBoard(robot) && !robot.shutdownActive && robot.registers[regIdx])
+      .map((robot) => ({ robotId: robot.id, card: { ...robot.registers[regIdx] } }))
+      .sort((a, b) => {
+        const priorityDiff = (b.card.priority || 0) - (a.card.priority || 0);
+        if (priorityDiff !== 0) return priorityDiff;
+        return String(a.robotId).localeCompare(String(b.robotId));
+      });
+
+    this.execMoveQueue = actions;
+    this.execMoveIndex = 0;
+    this.execPhase = 'moves';
+    this.activeRegisterCards = actions.map((action) => {
+      const robot = this.robots.find((r) => r.id === action.robotId);
+      return {
+        robotId: action.robotId,
+        robotName: robot?.name || action.robotId,
+        cardLabel: action.card.label,
+        priority: action.card.priority,
+      };
+    });
+
+    const orderText = actions.length
+      ? actions.map((action) => {
+          const robot = this.robots.find((r) => r.id === action.robotId);
+          return `${robot?.name || action.robotId} (${action.card.priority})`;
+        }).join(' → ')
+      : 'geen actieve kaarten';
+    this.pushLog(`Register ${regIdx + 1}: volgorde ${orderText}`);
+    this.execHeadline = actions.length
+      ? `R${regIdx + 1} · moves`
+      : `R${regIdx + 1} · geen moves`;
+  }
+
+  /**
+   * One visible execution micro-step (host timer / Play).
+   * Order per register: moves (priority) → board (conveyors/gears) → lasers.
+   */
+  advanceExecutionStep() {
+    if (this.phase !== 'executing') return;
+
+    if (this.registerIndex >= 5) {
+      this.execPhase = null;
+      this.execHeadline = '';
+      this.checkRoundEnd();
+      return;
+    }
+
+    if (!this.execPhase) {
+      this.prepareRegisterMoves(this.registerIndex);
+    }
+
+    if (this.execPhase === 'moves') {
+      if (this.execMoveIndex < this.execMoveQueue.length) {
+        const entry = this.execMoveQueue[this.execMoveIndex];
+        const robot = this.robots.find((r) => r.id === entry.robotId);
+        const card = entry.card;
+        this.execMoveIndex += 1;
+        if (robot && card && this.isRobotOnBoard(robot) && !robot.shutdownActive) {
+          this.execHeadline = `R${this.registerIndex + 1} · ${robot.name}: ${card.label} (${card.priority})`;
+          this.executeCardAction(robot, card);
+        }
+        this.captureReplayFrame(this.registerIndex);
+        this.emitStateChange();
+        return;
+      }
+      this.execPhase = 'board';
+      this.execHeadline = `R${this.registerIndex + 1} · banden & draaischijven`;
+      this.activateBoardElements();
+      this.captureReplayFrame(this.registerIndex);
+      this.emitStateChange();
+      return;
+    }
+
+    if (this.execPhase === 'board') {
+      this.execPhase = 'lasers';
+      this.execHeadline = `R${this.registerIndex + 1} · lasers`;
+      this.lastLaserBursts = [];
+      this.activateBoardLasers();
+      this.activateRobotLasers();
+      this.captureReplayFrame(this.registerIndex);
+      this.emitStateChange();
+      return;
+    }
+
+    // After lasers: next register (or end).
+    this.registerIndex += 1;
+    this.lastLaserBursts = [];
+    if (this.registerIndex >= 5) {
+      this.execPhase = null;
+      this.execMoveQueue = [];
+      this.execHeadline = 'Ronde afronden…';
+      this.captureReplayFrame(this.registerIndex);
+      this.emitStateChange();
+      this.checkRoundEnd();
+      return;
+    }
+
+    this.prepareRegisterMoves(this.registerIndex);
+    this.captureReplayFrame(this.registerIndex);
+    this.emitStateChange();
+  }
+
+  /** @deprecated Prefer advanceExecutionStep for stepped play. */
+  executeNextRegister() {
+    this.advanceExecutionStep();
   }
 
   captureReplayFrame(registerIndex = this.registerIndex) {
@@ -1935,6 +2206,7 @@ class RobotRallyEngine {
         case 'softLanding': return robot.lives <= 2 ? 8 : 5;
         case 'fourthGear': return 8;
         case 'crabWalk': return 7;
+        case 'jumpJets': return 8;
         case 'reverseThruster': return 6;
         case 'ghost': return 9;
         default: return 3;
@@ -2035,54 +2307,6 @@ class RobotRallyEngine {
     return true;
   }
 
-  executeNextRegister() {
-    if (this.phase !== 'executing') return;
-
-    if (this.registerIndex >= 5) {
-      this.checkRoundEnd();
-      return;
-    }
-
-    const regIdx = this.registerIndex;
-    this.lastLaserBursts = [];
-
-    // Highest priority number acts first — critical for who pushes whom.
-    const actions = this.robots
-      .filter(robot => this.isRobotOnBoard(robot) && !robot.shutdownActive && robot.registers[regIdx])
-      .map(robot => ({ robot, card: robot.registers[regIdx] }))
-      .sort((a, b) => {
-        const priorityDiff = (b.card.priority || 0) - (a.card.priority || 0);
-        if (priorityDiff !== 0) return priorityDiff;
-        return String(a.robot.id).localeCompare(String(b.robot.id));
-      });
-
-    this.activeRegisterCards = actions.map(action => ({
-      robotId: action.robot.id,
-      robotName: action.robot.name,
-      cardLabel: action.card.label,
-      priority: action.card.priority
-    }));
-
-    const orderText = actions.length
-      ? actions.map(action => `${action.robot.name} (${action.card.priority})`).join(' → ')
-      : 'geen actieve kaarten';
-    this.pushLog(`Register ${regIdx + 1}: hoogste nummer eerst — ${orderText}`);
-
-    actions.forEach(action => {
-      if (this.isRobotOnBoard(action.robot) && !action.robot.shutdownActive) {
-        this.executeCardAction(action.robot, action.card);
-      }
-    });
-
-    this.activateBoardElements();
-    this.activateRobotLasers();
-    // Checkpoints tellen pas aan het einde van de ronde (na 5 registers).
-
-    this.registerIndex += 1;
-    this.captureReplayFrame(this.registerIndex);
-    this.emitStateChange();
-  }
-
   executeCardAction(robot, card) {
     this.pushLog(`${robot.name} speelt ${card.label} [${card.priority}].`);
 
@@ -2111,6 +2335,9 @@ class RobotRallyEngine {
       case 'strafeR':
         this.moveRobot(robot, (robot.dir + 1) % 4, 1, 'kaart');
         break;
+      case 'jump':
+        this.jumpRobot(robot, robot.dir, 'kaart');
+        break;
       case 'turnR':
         robot.dir = (robot.dir + 1) % 4;
         break;
@@ -2119,6 +2346,9 @@ class RobotRallyEngine {
         break;
       case 'uturn':
         robot.dir = (robot.dir + 2) % 4;
+        break;
+      case 'wait':
+        this.pushLog(`${robot.name} blijft stil.`);
         break;
       default:
         break;
@@ -2201,6 +2431,56 @@ class RobotRallyEngine {
     }
 
     return movedAny;
+  }
+
+  /**
+   * JUMP: 2 steps forward, skip the intermediate tile (walls/pits there ignored).
+   * Landing on a robot: deal 1 damage, then push like a normal move.
+   */
+  jumpRobot(robot, moveDir, reason = 'kaart') {
+    if (!this.isRobotOnBoard(robot)) return false;
+
+    const dx = [0, 1, 0, -1][moveDir];
+    const dy = [-1, 0, 1, 0][moveDir];
+    const landX = robot.x + dx * 2;
+    const landY = robot.y + dy * 2;
+
+    if (!this.isInsideBoard(landX, landY)) {
+      this.pushLog(`${robot.name} kan niet springen: landing buiten het bord.`);
+      return false;
+    }
+
+    const occupant = this.getRobotAt(landX, landY, robot.id);
+    if (occupant) {
+      const chain = this.collectPushChain(landX, landY, moveDir, robot.id);
+      if (chain === null) {
+        this.pushLog(`${robot.name} kan niet springen: landing geblokkeerd.`);
+        return false;
+      }
+      this.damageRobot(occupant, 1, 'jump');
+      if (chain.length) {
+        this.pushLog(`${robot.name} springt en duwt ${chain.map((entry) => entry.name).join(' + ')}.`);
+        for (let i = chain.length - 1; i >= 0; i--) {
+          if (!this.isRobotOnBoard(chain[i])) continue;
+          this.displaceRobot(chain[i], moveDir, 'een duw');
+        }
+      }
+      if (this.getRobotAt(landX, landY, robot.id)) {
+        this.pushLog(`${robot.name} kan niet landen; het vak blijft bezet.`);
+        return false;
+      }
+    } else {
+      this.pushLog(`${robot.name} springt over het tussenvak.`);
+    }
+
+    robot.x = landX;
+    robot.y = landY;
+    const tile = this.board.grid[landY] && this.board.grid[landY][landX];
+    if (tile && tile.type === CONFIG.TILE_TYPES.PIT) {
+      this.destroyRobot(robot, reason === 'een duw' ? 'werd in een pit geduwd' : 'viel in een pit');
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -2312,7 +2592,9 @@ class RobotRallyEngine {
         this.pushLog(`${robot.name} draait tegen de klok in.`);
       }
     });
+  }
 
+  activateBoardLasers() {
     for (let y = 0; y < this.board.height; y++) {
       for (let x = 0; x < this.board.width; x++) {
         const tile = this.board.grid[y][x];
@@ -2332,6 +2614,7 @@ class RobotRallyEngine {
       if (tile.type === CONFIG.TILE_TYPES.REPAIR && robot.damage > 0) {
         robot.damage -= 1;
         this.refreshRobotStats(robot);
+        this.syncLockedRegisters(robot);
         this.pushLog(`${robot.name} heelt 1 schade op een repair-vak.`);
       }
 
@@ -2344,11 +2627,13 @@ class RobotRallyEngine {
     this.validateCheckpoints();
   }
 
-  fireLaserFrom(startX, startY, dir, damage, reason) {
+  fireLaserFrom(startX, startY, dir, damage, reason, visualOffset = null) {
     const dx = [0, 1, 0, -1][dir];
     const dy = [-1, 0, 1, 0][dir];
     let cx = startX;
     let cy = startY;
+    const ox = visualOffset?.x || 0;
+    const oy = visualOffset?.y || 0;
     const burst = {
       startX,
       startY,
@@ -2357,7 +2642,9 @@ class RobotRallyEngine {
       dir,
       reason,
       hit: false,
-      hitRobotId: null
+      hitRobotId: null,
+      offsetX: ox,
+      offsetY: oy,
     };
 
     while (true) {
@@ -2392,14 +2679,38 @@ class RobotRallyEngine {
     }
   }
 
+  /** Perpendicular offset in tile units for parallel double-laser beams. */
+  laserBeamOffsets(dir) {
+    // dirs: 0 N, 1 E, 2 S, 3 W — perpendicular is E/W for N/S, etc.
+    const spread = 0.22;
+    if (dir === 0 || dir === 2) {
+      return [
+        { x: -spread, y: 0 },
+        { x: spread, y: 0 },
+      ];
+    }
+    return [
+      { x: 0, y: -spread },
+      { x: 0, y: spread },
+    ];
+  }
+
   activateRobotLasers() {
-    this.robots.forEach(robot => {
+    this.robots.forEach((robot) => {
       if (!this.isRobotOnBoard(robot) || robot.shutdownActive) return;
-      const laserDamage = this.hasUpgrade(robot, 'doubleLaser') ? 2 : 1;
-      this.fireLaserFrom(robot.x, robot.y, robot.dir, laserDamage, 'robotlaser');
+      const dirs = [robot.dir];
       if (this.hasUpgrade(robot, 'rearLaser')) {
-        this.fireLaserFrom(robot.x, robot.y, (robot.dir + 2) % 4, laserDamage, 'robotlaser');
+        dirs.push((robot.dir + 2) % 4);
       }
+      dirs.forEach((dir) => {
+        if (this.hasUpgrade(robot, 'doubleLaser')) {
+          this.laserBeamOffsets(dir).forEach((offset) => {
+            this.fireLaserFrom(robot.x, robot.y, dir, 1, 'robotlaser', offset);
+          });
+        } else {
+          this.fireLaserFrom(robot.x, robot.y, dir, 1, 'robotlaser');
+        }
+      });
     });
   }
 
@@ -2418,6 +2729,7 @@ class RobotRallyEngine {
 
     robot.damage += amount;
     this.refreshRobotStats(robot);
+    this.syncLockedRegisters(robot);
     this.pushLog(`${robot.name} verliest ${amount} integrity door ${reason}.`);
 
     if (robot.hp <= 0) {
@@ -2451,6 +2763,7 @@ class RobotRallyEngine {
     robot.shutdownActive = false;
     robot.pendingPowerDown = false;
     robot.registers = [null, null, null, null, null];
+    robot.lockedRegisterMemory = [null, null, null, null, null];
 
     if (robot.lives > 0) {
       robot.lives -= 1;
