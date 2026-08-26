@@ -36,7 +36,7 @@ Gebruik alleen `createRoom({ gameId, transport, maxGuests })` en de Room API (`s
 | Model | Wanneer | Eis |
 |-------|---------|-----|
 | **A. Event-log + replay** | Beurten, dobbel, kleine state (TTT, GB) | Host appendt; gasten replayen; STATE alleen als cache |
-| **B. Snapshot + intents** | Zware state (RobotRun-achtig) | Host is enige snapshot-bron; gasten sturen intents; desk-log optioneel voor resume |
+| **B. Snapshot + intents** | Zware state (RobotRun-achtig) | Host is enige snapshot-bron via tip-CHECKPOINT; gasten sturen intents; desk-log optioneel voor resume |
 
 **Verboden:** half log, half “gast stuurt volledige state die host overneemt”.
 
@@ -66,7 +66,7 @@ Game-types: kort en duidelijk (`move`, `roll`, `timeout`, …) of geprefixed (`r
 - Catalog: `embedded: { syncProfile, roomReady, entry }` — zie [embedded-games-standard-design.md](./superpowers/specs/2026-08-24-embedded-games-standard-design.md) en [game-integration-guide.md](./superpowers/specs/2026-08-24-game-integration-guide.md) (checklist).
 - Entry: `{game}/embedded.js` via `runEmbeddedGame(adapter)` uit `js/bridge/embedded-bootstrap.js`.
 - `roomReady: false` → niet startbaar in room (stemkaart disabled).
-- Profiel `event-log` → `SyncMsg.LOG` / `INTENT`; profiel `snapshot` → host snapshots + intents.
+- Profiel `event-log` → `SyncMsg.LOG` / `INTENT`; profiel `snapshot` → tip-CHECKPOINT + intents (RobotRun: zie [tip-CHECKPOINT sync](./superpowers/specs/2026-08-26-robotrun-tip-checkpoint-sync-design.md)).
 - Einde: `notifySessionEnded()` — room keert terug naar stemmen.
 
 ---

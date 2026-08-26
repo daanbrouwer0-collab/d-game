@@ -134,10 +134,11 @@ Room-events **nooit** in session log. Game-events **nooit** in room log.
 | Model | Spellen | Canon |
 |-------|---------|-------|
 | Event-log + replay | Tic-tac-toe, ganzenbord | Append-only keten; `replay(log)` |
-| Snapshot + intents | RobotRun | Host snapshots in session log; gasten sturen intents |
+| Tip-CHECKPOINT + intents | RobotRun (room) | Live: `SyncMsg.CHECKPOINT` / `SESSION_CHECKPOINT` met tip-bewijs; desk-log `start`/`snap` apart; gasten sturen intents |
 
-**Doel (log-only canon):** na host-commit alleen **LOG** broadcasten; gast adopt via `adoptHostPacket`.  
-**Huidige code:** sommige spellen sturen nog **STATE** als backup; zie [p2p-kritisch-rapport.md](./p2p-kritisch-rapport.md).
+**Doel (log-only canon, beurtspellen):** na host-commit alleen **LOG** broadcasten; gast adopt via `adoptHostPacket`.  
+**RobotRun room:** live waarheid = tip-CHECKPOINT (geen incrementele snap-LOG). Spec: [2026-08-26-robotrun-tip-checkpoint-sync-design.md](./superpowers/specs/2026-08-26-robotrun-tip-checkpoint-sync-design.md).  
+**Huidige code:** sommige beurtspellen sturen nog **STATE** als backup; zie [p2p-kritisch-rapport.md](./p2p-kritisch-rapport.md).
 
 ### Event-keten (`event-log.js`)
 
@@ -165,7 +166,7 @@ Room-events **nooit** in session log. Game-events **nooit** in room log.
 3. Host: game picker → room.session_start { sessionId, gameId, roster }
 4. iframe: ?embedded=1&room=&session=
 5. Bridge: SESSION_INIT → spel bootstrapEmbedded / bridge transport
-6. Spel: intent ↑ shell ↑ P2P → host iframe → LOG ↓ gasten
+6. Spel: intent ↑ shell ↑ P2P → host iframe → LOG (beurtspellen) of CHECKPOINT (RobotRun) ↓ gasten
 7. Einde: room.session_end → terug naar picker (P2P blijft open)
 ```
 
@@ -177,7 +178,7 @@ Room-events **nooit** in session log. Game-events **nooit** in room log.
 | Ganzenbord | Ja (`embedded.js`) | Ja |
 | RobotRun | Ja (`embedded.js`) | Ja |
 
-Wire types room shell: `js/sync/room-msg.js` (`room_log`, `session_intent`, `session_log`, …).
+Wire types room shell: `js/sync/room-msg.js` (`room_log`, `session_intent`, `session_log`, `session_checkpoint`, …).
 
 Spec: [2026-08-24-game-agnostic-rooms-design.md](./superpowers/specs/2026-08-24-game-agnostic-rooms-design.md)
 
@@ -231,7 +232,7 @@ Zie §8–10 in eerdere versies — ongewijzigde game-regels:
 
 - **TTT:** 1v1, `seat`/`move`/`restart`/`timeout`, timer 20s → random zet
 - **Ganzenbord:** 2–6, `roll` host-rolled, timeout = skip
-- **RobotRun:** snapshots, gelijktijdige programming, host simuleert
+- **RobotRun:** tip-CHECKPOINT + intents, gelijktijdige programming, lokale Play + host eind-waarheid
 
 ---
 
@@ -251,8 +252,8 @@ Zie [p2p-kritisch-rapport.md](./p2p-kritisch-rapport.md) voor P0–P3. Samenvatt
 
 1. **Host single point of failure** — inherent P2P zonder server
 2. **P0 nog open:** TTT host accepteert soms peer-LOG; peer↔seat bind niet overal; ACK/timer
-3. **Room shell:** GB/RR embedded nog stubs; legacy dubbele P2P-paden
-4. **Matrix** — stub
+3. **Room shell:** TTT/GB/RR embedded speelbaar; legacy dubbele P2P-paden blijven parallel
+4. **RobotRun:** geen intent-ACK; mid-`executing` geen heartbeat (dubbele start-CHECKPOINT mitigatie) — zie tip-CHECKPOINT spec
 5. **Gossip / mesh** — niet geïmplementeerd (historische spec)
 
 ---

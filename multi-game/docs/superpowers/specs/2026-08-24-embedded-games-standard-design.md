@@ -115,10 +115,12 @@ Session log = `appendEvent` keten; `replay(log)` = state.
 
 | Richting | Wire |
 |----------|------|
-| Host → allen | Snapshots als events in session log **of** `SyncMsg.LOG` met snap-payload |
+| Host → allen | Tip-proven `SyncMsg.CHECKPOINT` (room: `SESSION_CHECKPOINT`); desk `start`/`snap` optioneel, niet live-merge |
 | Gast → host | Intents via `SyncMsg.INTENT` (wrap `{ wireType: 'rr_…', … }`) |
 
-Host blijft enige snapshot-bron. Geen volledige state van gast accepteren.
+Host blijft enige snapshot-bron. Geen volledige state van gast accepteren. Live pad is **zelfstandige tip-CHECKPOINT**, niet incrementele snap-LOG.
+
+**Referentie:** [2026-08-26-robotrun-tip-checkpoint-sync-design.md](./2026-08-26-robotrun-tip-checkpoint-sync-design.md).
 
 **Migratie RR:** bestaande `rr_*` handlers hergebruiken; transport = bridge i.p.v. PeerJS.
 
@@ -168,4 +170,4 @@ runEmbeddedGame({
 |------|---------|-----------|
 | Tic-tac-toe | event-log | ja |
 | Ganzenbord | event-log | ja (`embedded.js`) |
-| RobotRun | snapshot | nee (stub) |
+| RobotRun | snapshot (tip-CHECKPOINT) | ja |

@@ -45,21 +45,22 @@ Embedded spellen: **geen eigen PeerJS** — sync loopt via bridge → room shell
    kleine events   fase-machine      in room nodig
         │               │               │
         ▼               ▼               ▼
-   event-log        snapshot        local-only*
+   event-log        snapshot*       local-only*
    (TTT, GB)        (RobotRun)      (optioneel later)
 
+* snapshot in room = tip-CHECKPOINT live (niet snap-LOG-merge).
 * local-only: nog geen room-embedded; wel catalog + standalone.
 ```
 
 | Profiel | Wanneer | Host sync | Gast sync | Voorbeeld |
 |---------|---------|-----------|-----------|-----------|
 | **event-log** | Discrete zetten, replay = state | `appendEvent` → `SyncMsg.LOG` | `SyncMsg.INTENT` → host commit | Tic-tac-toe, Ganzenbord |
-| **snapshot** | Grote state, engine-driven | Snapshot + monotoon `stateRev` | Intents (`wireType: rr_*`) | RobotRun |
+| **snapshot** | Grote state, engine-driven | Tip-CHECKPOINT (`SyncMsg.CHECKPOINT`) + optionele desk-snaps | Intents (`wireType: rr_*`) | RobotRun |
 | **local-only** | Geen multiplayer in room | — | — | Puzzels (toekomst) |
 
 **Regel:** kies één profiel per spel ([R3](../../multiplayer-bouwregels.md)). Geen half log + half gast-state.
 
-**Twijfel?** Begin met event-log. Migreer naar snapshot als replay te zwaar of te omslachtig wordt.
+**Twijfel?** Begin met event-log. Migreer naar snapshot als replay te zwaar of te omslachtig wordt. Voor snapshot in room: **zelfstandige tip-CHECKPOINT**, niet incrementele snap-LOG-merge (zie [tip-CHECKPOINT sync](./2026-08-26-robotrun-tip-checkpoint-sync-design.md)).
 
 ---
 
@@ -115,7 +116,7 @@ runEmbeddedGame({
 | Profiel | Bestand |
 |---------|---------|
 | event-log | `tic-tac-toe/embedded.js`, `ganzenbord/embedded.js` |
-| snapshot (stub) | `robotrun/js/embedded.js` |
+| snapshot (room) | `robotrun/js/room-embedded.js`, `robotrun/js/embedded.js` |
 
 ---
 
@@ -131,10 +132,13 @@ runEmbeddedGame({
 
 ### snapshot
 
-1. Host: enige snapshot-bron na elke fase/commit.
+1. Host: enige waarheid na elke fase/commit — via **tip-CHECKPOINT** (`SyncMsg.CHECKPOINT` → room `SESSION_CHECKPOINT`), niet via fragiele incremental snap-LOG.
 2. Gast: intents met `wireType` (bijv. `rr_intent_commit`); nooit volledige state pushen.
-3. Snapshot in session log of als LOG-payload met `stateRev`.
-4. Hergebruik bestaande engine-handlers; vervang alleen transport (PeerJS → `BridgeTransport`).
+3. Desk/session log mag `start`/`snap` voor resume houden (`wire: false`); live peers krijgen CHECKPOINT.
+4. Heartbeat / dubbele tip op kritieke overgangen zonder heartbeat-fase (bijv. Play→executing).
+5. Hergebruik bestaande engine-handlers; vervang alleen transport (PeerJS → `BridgeTransport`).
+
+Referentie: [2026-08-26-robotrun-tip-checkpoint-sync-design.md](./2026-08-26-robotrun-tip-checkpoint-sync-design.md).
 
 ---
 
@@ -218,4 +222,4 @@ Expliciet kiezen per spel:
 |------|---------|-----------|
 | Tic-tac-toe | event-log | ja |
 | Ganzenbord | event-log | ja |
-| RobotRun | snapshot | nee (stub) |
+| RobotRun | snapshot (tip-CHECKPOINT live) | ja |

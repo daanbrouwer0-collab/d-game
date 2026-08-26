@@ -2052,7 +2052,7 @@ class RobotRallyUI {
             return;
           }
           this.engine.advanceExecutionStep({ allowFinalize });
-          // Guest finished local playback — stop timer and wait for host snap.
+          // Guest finished local playback — stop timer and wait for host tip checkpoint.
           if (
             !allowFinalize
             && this.engine.phase === 'executing'
@@ -2061,9 +2061,6 @@ class RobotRallyUI {
             clearInterval(this.autoStepTimer);
             this.autoStepTimer = null;
             this.updateCardsUI();
-            // If the end-snap was dropped, ask host for a full log dump.
-            P2pSessionController?.requestLogResync?.();
-            this.scheduleWaitHostResync();
             return;
           }
           if (this.engine.phase !== 'executing') {
@@ -2080,31 +2077,6 @@ class RobotRallyUI {
     if (this.autoStepTimer) {
       clearInterval(this.autoStepTimer);
       this.autoStepTimer = null;
-    }
-    if (this.engine.phase !== 'executing') {
-      this.clearWaitHostResync();
-    }
-  }
-
-  scheduleWaitHostResync() {
-    this.clearWaitHostResync();
-    if (!(this.isP2pMode() && !this.isP2pHost())) return;
-    this._waitHostResyncTimer = setInterval(() => {
-      if (
-        this.engine.phase === 'executing'
-        && this.engine.execHeadline === 'Wachten op host…'
-      ) {
-        P2pSessionController?.requestLogResync?.();
-        return;
-      }
-      this.clearWaitHostResync();
-    }, 2000);
-  }
-
-  clearWaitHostResync() {
-    if (this._waitHostResyncTimer != null) {
-      clearInterval(this._waitHostResyncTimer);
-      this._waitHostResyncTimer = null;
     }
   }
 
@@ -2338,7 +2310,9 @@ class RobotRallyUI {
           ? Math.max(0, Math.ceil((endsAt - Date.now()) / 1000))
           : (CONFIG.MATCH_COUNTDOWN_SECONDS || 10);
         if (this.playbackTitle) this.playbackTitle.textContent = 'Iedereen is klaar';
-        if (this.playbackText) this.playbackText.textContent = String(leftSec);
+        if (this.playbackText) {
+          this.playbackText.textContent = leftSec > 0 ? String(leftSec) : 'Start laden…';
+        }
       } else if (iAmReady) {
         if (this.playbackTitle) this.playbackTitle.textContent = 'Upgrade gekozen';
         if (this.playbackText) {

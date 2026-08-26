@@ -247,6 +247,12 @@ const P2pSessionController = {
     if (this._phaseHeartbeatTimer) clearInterval(this._phaseHeartbeatTimer);
     this._phaseHeartbeatTimer = null;
     this._phaseHeartbeatPhase = "";
+    if (this._truthWatchdogTimer) clearInterval(this._truthWatchdogTimer);
+    this._truthWatchdogTimer = null;
+    if (this._playStartRetipTimer) clearTimeout(this._playStartRetipTimer);
+    this._playStartRetipTimer = null;
+    if (this._countdownEndRetipTimer) clearTimeout(this._countdownEndRetipTimer);
+    this._countdownEndRetipTimer = null;
     if (this.session) {
       this.session.destroy().catch(() => {});
     }
@@ -975,8 +981,15 @@ const P2pSessionController = {
     if (!this.isHost()) throw new Error("Alleen de host mag Play drukken.");
     if (window.RobotRallyApp?.engine?.phase !== "ready") return;
     window.RobotRallyApp.engine.startExecution();
-    // Full wire so late/gapped guests still enter executing.
-    await this.publishSnapshot({ fullWire: true });
+    await this.publishSnapshot({ persist: true });
+    // No heartbeat during executing — rebroadcast start tip once so a
+    // single dropped CHECKPOINT does not leave guests stuck on ready.
+    clearTimeout(this._playStartRetipTimer);
+    this._playStartRetipTimer = setTimeout(() => {
+      if (!this.isActive() || !this.isHost()) return;
+      if (window.RobotRallyApp?.engine?.phase !== "executing") return;
+      this.publishSnapshot({ persist: false }).catch(() => {});
+    }, 400);
   },
 
   async sendMatchReady() {
@@ -984,7 +997,7 @@ const P2pSessionController = {
     if (!robotId) throw new Error("Geen robot gekoppeld.");
     if (this.isHost()) {
       window.RobotRallyApp.engine.setMatchReady(robotId);
-      await this.publishSnapshot();
+      await this.publishSnapshot({ persist: true });
       return;
     }
     this.send("rr_intent_match_ready", {
@@ -1000,7 +1013,13 @@ const P2pSessionController = {
     const endsAt = engine.matchCountdownEndsAt;
     if (endsAt != null && Date.now() < endsAt) return;
     engine.startMatchFromCountdown();
-    await this.publishSnapshot();
+    await this.publishSnapshot({ persist: true });
+    clearTimeout(this._countdownEndRetipTimer);
+    this._countdownEndRetipTimer = setTimeout(() => {
+      if (!this.isActive() || !this.isHost()) return;
+      if (window.RobotRallyApp?.engine?.phase !== "programming") return;
+      this.publishSnapshot({ persist: false }).catch(() => {});
+    }, 400);
   },
 
   async sendUpgrade(upgradeId) {
@@ -1014,7 +1033,7 @@ const P2pSessionController = {
       } else {
         engine.chooseUpgrade(upgradeId);
       }
-      await this.publishSnapshot({ fullWire: true });
+      await this.publishSnapshot({ persist: true });
       return;
     }
     const sent = this.send("rr_intent_upgrade", {
@@ -1023,24 +1042,6 @@ const P2pSessionController = {
       upgradeId,
     });
     if (sent === false) throw new Error("Verbinding kwijt — upgrade niet verstuurd.");
-
-    // Optimistic UI: leave the start-upgrade sheet while waiting for host truth.
-    // If the host rejects / snap is stale, the next heartbeat restores offers.
-    const engine = window.RobotRallyApp?.engine;
-    const ui = window.RobotRallyApp?.ui;
-    if (engine?.phase === "match_ready" && engine.matchUpgradeOffers) {
-      delete engine.matchUpgradeOffers[robotId];
-      if (!engine.matchReadyRobotIds.includes(robotId)) {
-        engine.matchReadyRobotIds = [...(engine.matchReadyRobotIds || []), robotId];
-      }
-      ui?.updateCardsUI?.();
-    }
-    // Heal missed host snaps that leave the joiner on the upgrade sheet.
-    setTimeout(() => {
-      if (engine?.phase !== "match_ready") return;
-      if (engine.isRobotMatchReady?.(robotId) && !engine.getMatchUpgradeOffer?.(robotId)?.length) return;
-      this.requestLogResync?.();
-    }, 1800);
   },
 
   handleMessage(msg) {
@@ -1186,13 +1187,8 @@ const P2pSessionController = {
       if (bound.userId === this.playerId) return;
       const engine = window.RobotRallyApp.engine;
       if (engine.phase === "match_ready") {
-        const ok = engine.confirmMatchUpgrade(bound.robotId, payload.upgradeId);
-        if (ok) {
-          this.publishSnapshot({ fullWire: true }).catch(() => {});
-        } else {
-          // Replay truth so the guest leaves a stale upgrade sheet.
-          this.publishSnapshot({ fullWire: true }).catch(() => {});
-        }
+        engine.confirmMatchUpgrade(bound.robotId, payload.upgradeId);
+        this.publishSnapshot({ persist: true }).catch(() => {});
         return;
       }
       const choice = engine.currentUpgradeChoice;
@@ -1216,7 +1212,9 @@ const P2pSessionController = {
     const app = window.RobotRallyApp;
     if (!app?.engine) return;
     const syncPhaseHeartbeat = (phase) => {
-      const shouldBeat = phase === "match_ready" || phase === "match_countdown";
+      // Every playing phase — including executing — rebroadcasts frozen last tip.
+      // Mid-Play must NOT re-export live engine state (would reset guest animation).
+      const shouldBeat = phase && phase !== "finished";
       if (!shouldBeat) {
         if (this._phaseHeartbeatTimer) clearInterval(this._phaseHeartbeatTimer);
         this._phaseHeartbeatTimer = null;
@@ -1226,20 +1224,20 @@ const P2pSessionController = {
       if (this._phaseHeartbeatTimer && this._phaseHeartbeatPhase === phase) return;
       if (this._phaseHeartbeatTimer) clearInterval(this._phaseHeartbeatTimer);
       this._phaseHeartbeatPhase = phase;
-      // Reliability hedge: late joiners / delayed peers still receive phase sync.
       this._phaseHeartbeatTimer = setInterval(() => {
         if (!this.isActive() || !this.isHost() || this.applyingSnapshot) return;
         if (this.lobby?.status !== "playing") return;
         const livePhase = app.engine.phase;
-        if (livePhase !== "match_ready" && livePhase !== "match_countdown") {
+        if (!livePhase || livePhase === "finished") {
           clearInterval(this._phaseHeartbeatTimer);
           this._phaseHeartbeatTimer = null;
           this._phaseHeartbeatPhase = "";
           return;
         }
-        // Periodic full wire heals joiners stuck on the start-upgrade sheet.
-        const beat = (this._phaseHeartbeatCount = (this._phaseHeartbeatCount || 0) + 1);
-        this.publishSnapshot({ fullWire: beat % 3 === 0 }).catch(() => {});
+        if (typeof this.rebroadcastLastTruth === "function") {
+          if (this.rebroadcastLastTruth()) return;
+        }
+        this.publishSnapshot({ persist: false }).catch(() => {});
       }, 1000);
     };
     const previous = app.engine.onStateChange;
@@ -1253,17 +1251,24 @@ const P2pSessionController = {
       this._lastEnginePhase = phase;
       // Local Play: do not flood peers with micro-step snapshots.
       if (phase === "executing") return;
-      // Leaving Play (or finished): push host truth + full wire so guests unstick.
-      if (prevPhase === "executing" || phase === "finished") {
+      // Critical phase exits → persist + tip checkpoint.
+      if (
+        prevPhase === "executing"
+        || prevPhase === "match_countdown"
+        || phase === "finished"
+      ) {
         clearTimeout(this._snapTimer);
-        this.publishSnapshot({ fullWire: true }).catch(() => {});
+        this.publishSnapshot({ persist: true }).catch(() => {});
         return;
       }
       clearTimeout(this._snapTimer);
       this._snapTimer = setTimeout(() => {
-        this.publishSnapshot().catch(() => {});
+        this.publishSnapshot({ persist: true }).catch(() => {});
       }, 200);
     };
+    // Start heartbeat for the phase already in effect (race boot, etc.).
+    this._lastEnginePhase = app.engine.phase;
+    syncPhaseHeartbeat(app.engine.phase);
   },
 };
 

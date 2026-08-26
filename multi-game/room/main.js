@@ -850,6 +850,10 @@ function bindSession(s) {
       handleSessionLog(msg.payload, msg.fromPeerId);
       return;
     }
+    if (msg.type === RoomMsg.SESSION_CHECKPOINT) {
+      handleSessionCheckpoint(msg.payload, msg.fromPeerId);
+      return;
+    }
     if (msg.type === RoomMsg.SESSION_INTENT) {
       if (s.role === "host") {
         const p = /** @type {{ wireType?: string }} */ (msg.payload || {});
@@ -954,6 +958,27 @@ function handleSessionLog(payload, fromPeerId) {
   }
 }
 
+/**
+ * RobotRun (and similar) tip-proven truth. Never gated on incremental LOG merge —
+ * a missed prior packet must not block the latest host state.
+ * @param {unknown} payload
+ * @param {string|null|undefined} fromPeerId
+ */
+function handleSessionCheckpoint(payload, fromPeerId) {
+  const p = /** @type {{
+    sessionId?: string,
+    gameId?: string,
+    tipSeq?: number,
+    tipEventId?: string|null,
+    boardData?: unknown,
+    gameState?: unknown,
+  }} */ (payload || {});
+  if (!p.sessionId || !p.gameId || !p.boardData || !p.gameState) return;
+  if (activeSession?.sessionId !== p.sessionId) return;
+  if (session?.role === "host" && fromPeerId) return;
+  gameBridge?.sendGameIn(SyncMsg.CHECKPOINT, p);
+}
+
 function relayGameOut(msg) {
   if (!session) return;
   const { gameType, payload } = msg;
@@ -981,6 +1006,18 @@ function relayGameOut(msg) {
       return;
     }
     endGame(reason);
+    return;
+  }
+
+  if (gameType === SyncMsg.CHECKPOINT) {
+    if (session.role === "host") {
+      // Fan-out host truth without merge gating (unlike SESSION_LOG).
+      session.broadcast(RoomMsg.SESSION_CHECKPOINT, {
+        sessionId: activeSession.sessionId,
+        gameId: activeSession.gameId,
+        ...(typeof payload === "object" && payload !== null ? payload : {}),
+      });
+    }
     return;
   }
 

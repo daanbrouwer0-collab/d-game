@@ -10,10 +10,11 @@ Lees eerst [docs/README.md](../../README.md) voor de actieve documentatieset.
 
 | Spec | Onderwerp |
 |------|-----------|
+| [2026-08-26-robotrun-tip-checkpoint-sync-design.md](./2026-08-26-robotrun-tip-checkpoint-sync-design.md) | **RobotRun live sync:** tip-CHECKPOINT + kritieke overgangen |
 | [2026-08-26-robotrun-merge-slots-design.md](./2026-08-26-robotrun-merge-slots-design.md) | Slot-tabs + Merge/Combo recepten |
-| [2026-08-26-robotrun-local-play-host-truth-design.md](./2026-08-26-robotrun-local-play-host-truth-design.md) | Lokale Play + host eind-snapshot |
+| [2026-08-26-robotrun-local-play-host-truth-design.md](./2026-08-26-robotrun-local-play-host-truth-design.md) | Lokale Play + host eind-waarheid (via CHECKPOINT) |
 | [2026-08-26-robotrun-stepped-execution-design.md](./2026-08-26-robotrun-stepped-execution-design.md) | Stepped play + lasers |
-| [2026-08-25-robotrun-room-playable-design.md](./2026-08-25-robotrun-room-playable-design.md) | RobotRun room: boot-fix + snapshot ronde-flow speelbaar |
+| [2026-08-25-robotrun-room-playable-design.md](./2026-08-25-robotrun-room-playable-design.md) | RobotRun room: boot-fix + ronde-flow speelbaar |
 | [2026-08-25-game-end-screen-design.md](./2026-08-25-game-end-screen-design.md) | Room game end-screen overlay |
 | [2026-08-25-home-nav-rename-design.md](./2026-08-25-home-nav-rename-design.md) | Home / nav rename |
 | [2026-08-24-game-agnostic-rooms-design.md](./2026-08-24-game-agnostic-rooms-design.md) | Room ≠ game, twee log-lagen, room shell |

@@ -321,6 +321,6 @@ Alles wat die invariant breekt is een defect — geen “edge case voor fallback
 - Canonieke waarheid = event-log (`seq` / `prevId`).
 - State/beurt = altijd `replay(log)` (of checkpoint bewezen tot `tipSeq`).
 - Geen STATE als tweede ongecontroleerde waarheid.
-- RobotRun blijft voorlopig snapshot-model (B); migratie is apart traject.
+- RobotRun blijft snapshot-model (**B**): live = tip-proven CHECKPOINT, niet incremental snap-LOG. Spec: [2026-08-26-robotrun-tip-checkpoint-sync-design.md](./superpowers/specs/2026-08-26-robotrun-tip-checkpoint-sync-design.md).
 
 Zie ontwerp: [2026-08-24-p2p-log-only-canon-design.md](./superpowers/specs/2026-08-24-p2p-log-only-canon-design.md).

@@ -1,8 +1,10 @@
 # RobotRun room-playable (snapshot P2P) — design
 
-Datum: 2026-08-25  
-Status: approved for planning  
+Datum: 2026-08-25 · **sync-update 2026-08-26**  
+Status: **geïmplementeerd** (boot + ronde-flow); live wire = tip-CHECKPOINT  
 Context: `multi-game/robotrun` + room shell; inspiratie `D_games/D-robotrally`
+
+**Live sync:** zie [2026-08-26-robotrun-tip-checkpoint-sync-design.md](./2026-08-26-robotrun-tip-checkpoint-sync-design.md) en [2026-08-26-robotrun-local-play-host-truth-design.md](./2026-08-26-robotrun-local-play-host-truth-design.md). Incremental snap-LOG is **niet** meer het live guest-pad.
 
 ---
 
@@ -18,7 +20,7 @@ Context: `multi-game/robotrun` + room shell; inspiratie `D_games/D-robotrally`
 4. Als iedereen klaar is → host Play
 5. Registers 1→5 uitvoeren → door tot winnaar → room krijgt `session_end`
 
-**Keuze:** bestaande RoboRally-regels behouden; geen versimpelde ruleset. Focus = room boot + betrouwbare snapshot-ronde-flow.
+**Keuze:** bestaande RoboRally-regels behouden; geen versimpelde ruleset. Focus = room boot + betrouwbare host-truth ronde-flow.
 
 **Buiten v1:**
 
@@ -38,35 +40,39 @@ Bij `?embedded=1` moet de volledige app geladen zijn vóór room-bootstrap:
 2. `RobotRallyApp.init({ embedded: true })` — geen standalone `SessionMenu`-flow
 3. Daarna `bootstrapRoomEmbedded(ctx)`
 
-Host start de race (board + seed + seats); gasten nemen de eerste snapshot / `start`-event over.
+Host start de race (board + seed + seats); gasten nemen de eerste tip-CHECKPOINT / desk-`start` over.
 
-### Sync-model: snapshot (ongewijzigd catalog-profiel)
+### Sync-model: tip-CHECKPOINT + intents (catalog: `snapshot`)
 
 | Rol | Gedrag |
 |-----|--------|
-| Host | Canonieke engine-state; past intents toe; schrijft `start` / `snap` in session log; pusht LOG via bridge |
-| Gast | Stuurt intents (`rr_intent_commit`, `rr_intent_upgrade`); adopteert host-LOG; mag geen canonieke state schrijven |
+| Host | Canonieke engine-state; past intents toe; desk `start`/`snap` (`wire: false`); live = `pushTruthCheckpoint` → `SESSION_CHECKPOINT` |
+| Gast | Stuurt intents (`rr_intent_commit`, `rr_intent_upgrade`); adopteert tip-CHECKPOINT; mag geen canonieke state schrijven |
 | Spectator | Alleen kijken; geen intents (bestaande embedded chrome) |
 
-Tijdens `programming` / `ready` strippen gasten (en host-sanitize voor broadcast-view waar van toepassing) **andermans** `hand` en `registers` in de lokale weergave. Eigen hand blijft zichtbaar.
+Heartbeat (~1s, `persist: false`) in `match_ready` / `match_countdown` / `programming` / `ready` / `upgrade_choice`. Geen mid-`executing` micro-sync.
 
-Bestaande touchpoints: `robotrun/js/room-embedded.js`, `robotrun/js/p2p-session.js`, `robotrun/js/embedded.js`, `robotrun/index.html`.
+Tijdens `programming` / `ready` strippen gasten **andermans** `hand` en `registers` in de lokale weergave. Eigen hand blijft zichtbaar.
+
+Bestaande touchpoints: `robotrun/js/room-embedded.js`, `robotrun/js/p2p-session.js`, `robotrun/js/embedded.js`, `robotrun/index.html`, `room/main.js`.
 
 ---
 
 ## 3. Ronde-flow (spelerervaring)
 
 ```
-programming → ready → executing → (upgrade_choice?) → programming → … → finished
+match_ready → match_countdown → programming → ready → executing → (upgrade_choice?) → programming → … → finished
 ```
 
 Dit wijkt bewust af van beurt-spellen (TTT / ganzenbord): **iedereen is tegelijk aan de beurt** tijdens programming; Play start pas als alle programmeerbare humans gecommit hebben.
 
 | Fase | Wat de speler ziet | Actie |
 |------|-------------------|--------|
+| **match_ready** | Start-upgrade keuze | Upgrade bevestigen |
+| **match_countdown** | Aftellen | Wachten |
 | **programming** | Bord + eigen 5 registers + hand. Anderen: bezig/klaar-badge, geen kaarten | Kaarten leggen → **Bevestig** |
 | **ready** | Overlay: iedereen klaar | Alleen **host** ziet/gebruikt **Play ▶** |
-| **executing** | Bord animeert registers 1→5 (prioriteit per register) | Geen programmeren |
+| **executing** | Bord animeert registers 1→5 (prioriteit per register); lokaal op host én gast | Geen programmeren; gast wacht host-eind-CHECKPOINT |
 | **upgrade_choice** | Alleen de speler die mag kiezen (intent → host) | Upgrade kiezen |
 | **finished** | Win-overlay → `SESSION_ENDED` naar room | Terug naar room picker |
 
@@ -92,27 +98,29 @@ Dit wijkt bewust af van beurt-spellen (TTT / ganzenbord): **iedereen is tegelijk
 ### Randen (v1)
 
 - Minder dan 2 seats bij start → toast, geen race
-- Snapshot zonder `boardData` / `gameState` → niet toepassen; host blijft bron
+- Checkpoint zonder `boardData` / `gameState` → niet toepassen; host blijft bron
 - Gast mid-programming: lokale register-selectie bewaren over inkomende snapshots (bestaand patroon in `applyGameSnapshot`)
-- Tab-refresh mid-race: best-effort via session log; geen aparte reconnect-spec
+- Tab-refresh mid-race: best-effort via desk-log; live heal via host CHECKPOINT
+- Dropped Play-start: dubbele tip-CHECKPOINT (~400ms); geen heartbeat mid-executing
 
 ### Docs na oplevering
 
-- `multi-game/README.md` en `docs/p2p-multiplayer.md`: RobotRun room embedded = **Ja** (niet Stub), zodra speelbaar
-- Catalog `roomReady: true` + `syncProfile: "snapshot"` blijft
+- `multi-game/README.md` en `docs/p2p-multiplayer.md`: RobotRun room embedded = **Ja**
+- Catalog `roomReady: true` + `syncProfile: "snapshot"` (live = tip-CHECKPOINT)
 
 ### Handmatige testchecklist
 
 1. Room 2 spelers → RobotRun → beide zien bord + eigen hand (geen zwart)
-2. Beide bevestigen → host Play → moves lopen
-3. 3+ spelers: klaar-tellers kloppen; gast ziet geen Play
-4. Hand van ander blijft leeg tijdens programming
-5. Finish → room krijgt session end
+2. Start-upgrade + countdown → beide in programming
+3. Beide bevestigen → host Play → moves lopen op beide devices
+4. 3+ spelers: klaar-tellers kloppen; gast ziet geen Play
+5. Hand van ander blijft leeg tijdens programming
+6. Finish → room krijgt session end
 
 ---
 
 ## 5. Aanpak (gekozen)
 
-**Room boot repareren + bestaande snapshot-flow afmaken** — geen ruleset-snip, geen log-only migratie, geen tweede room-UI.
+**Room boot repareren + host-truth ronde-flow** — geen ruleset-snip, geen log-only migratie, geen tweede room-UI. Live sync via tip-CHECKPOINT i.p.v. fragiele snap-LOG-merge.
 
-Succes = speelbare race van room-start tot `session_end` voor 2–5 spelers.
+Succes = speelbare race van room-start tot `session_end` voor 2–5 spelers zonder freeze op kritieke overgangen.

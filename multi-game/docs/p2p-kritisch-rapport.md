@@ -100,7 +100,7 @@ Voor `maxGuests > 1` telt status `hosting|connected` als connected, **ook zonder
 
 ### 7. Hoog — Live state ≠ log ≠ disk
 
-STATE-snapshot als UI-fix terwijl LOG-merge faalt → bord klopt, replay later niet. Desk-log heeft meerdere writers (tabs). RobotRun: live = snapshots, desk-log = best-effort — resume mid-race is zwakker.
+STATE-snapshot als UI-fix terwijl LOG-merge faalt → bord klopt, replay later niet. Desk-log heeft meerdere writers (tabs). **RobotRun room (2026-08-26):** live = tip-CHECKPOINT; desk-log = best-effort resume — mid-race refresh is zwakker dan beurtspelen.
 
 ---
 
@@ -201,4 +201,4 @@ Zonder P0 is “goede documentatie” cosmetisch: de code spreekt die regels teg
 | [docs/README.md](./README.md) | Index |
 | [superpowers/specs/README.md](./superpowers/specs/README.md) | Actueel vs historische specs |
 
-**Room shell (2026-08-24):** `room/` + twee log-lagen zijn gebouwd; TTT embedded werkt; ganzenbord/RobotRun embedded zijn stubs. Legacy per-spel P2P blijft parallel — vergroot het oppervlak voor dezelfde P0-bugs tot legacy is uitgefaseerd.
+**Room shell (2026-08-26):** `room/` + twee log-lagen; TTT/GB/RR embedded speelbaar. RobotRun live sync = tip-CHECKPOINT (niet incremental snap-LOG). Legacy per-spel P2P blijft parallel — vergroot het oppervlak voor dezelfde P0-bugs tot legacy is uitgefaseerd.

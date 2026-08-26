@@ -159,9 +159,9 @@ Games blijven verantwoordelijk voor hun eigen seat-model — room levert alleen 
 |------|------------|-------------------|------------|
 | Tic-tac-toe | Event-log + replay | `seat`, `move`, `restart`, `timeout` | Embedded bridge; standalone P2P deprecated |
 | Ganzenbord | Event-log + replay | `seat`, `start`, `roll`, `timeout`, `to_lobby` | Idem |
-| RobotRun | Snapshot + intents | `seat`, `start`, `snap`, … | Bridge i.p.v. eigen `P2pSessionController` P2P |
+| RobotRun | Tip-CHECKPOINT + intents | Desk: `seat`, `start`, `snap`, …; live: `SESSION_CHECKPOINT` | Bridge; zie tip-CHECKPOINT sync-spec |
 
-**RobotRun:** session log blijft het model; geen verplichting om naar pure replay te migreren. Wel: snapshots alleen in session log, nooit in room log.
+**RobotRun:** live waarheid = tip-proven CHECKPOINT; desk-log voor resume. Geen verplichting naar pure replay. Snapshots/checkpoints nooit in room log.
 
 ---
 
@@ -176,6 +176,7 @@ export const RoomMsg = Object.freeze({
   ROOM_ACK: "room_ack",
   ROOM_REJECT: "room_reject",
   SESSION_LOG: "session_log",   // wraps SyncMsg.LOG with sessionId
+  SESSION_CHECKPOINT: "session_checkpoint", // tip-proven host truth (RobotRun)
   SESSION_INTENT: "session_intent",
   SESSION_ACK: "session_ack",
   SESSION_REJECT: "session_reject",

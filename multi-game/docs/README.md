@@ -1,6 +1,6 @@
 # D-Game — documentatie
 
-**Laatst bijgewerkt:** 2026-08-24
+**Laatst bijgewerkt:** 2026-08-26
 
 ---
 
@@ -27,6 +27,7 @@ p2p-multiplayer.md        → beschrijvend: transport, log, spellen, room shell
 multiplayer-bouwregels.md → normatief: R1–R24
 p2p-kritisch-rapport.md   → wat nog niet waterdicht is (P0–P3)
 p2p-fundamenten.md        → waarom log-only, geen dubbele waarheid
+tip-CHECKPOINT sync       → RobotRun live: 2026-08-26-robotrun-tip-checkpoint-sync-design.md
 ```
 
 ---

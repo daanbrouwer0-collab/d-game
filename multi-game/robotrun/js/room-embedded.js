@@ -1,5 +1,9 @@
 /**
- * RobotRun embedded in room shell — snapshot sync via bridge (SyncMsg.LOG + rr_* intents).
+ * RobotRun embedded in room shell — tip-proven CHECKPOINT truth + intent bridge.
+ *
+ * Live guest sync does NOT depend on incremental LOG merge (that permanently
+ * gaps joiners). Host publishes self-contained checkpoints; guests apply them
+ * directly. The event log is kept for boot/restore only.
  */
 import { notifySessionEnded, watchSessionEnd } from "../../js/bridge/embedded-bootstrap.js";
 import { SyncMsg } from "../../js/sync/sync-msg.js";
@@ -29,6 +33,10 @@ export function bootstrapRoomEmbedded(ctx) {
   ctrl.playerId = String(ctx.playerId || "");
   ctrl._bridgeTransport = ctx.transport;
   ctrl._wireFromSeq = 0;
+  ctrl._truthTipSeq = 0;
+  ctrl._truthTipEventId = null;
+  ctrl._lastTruth = null;
+  ctrl._lastTruthAdoptAt = Date.now();
   ctrl.session = {
     role: ctx.role,
     transport: "bridge",
@@ -77,10 +85,12 @@ export function bootstrapRoomEmbedded(ctx) {
       ctrl.syncFromEmbeddedLog({ enterPlay: true });
       ctrl.wireHostAutosnapshots();
     }
-    pushLogWire(ctrl);
+    // Boot catch-up for peers already in the room.
+    ctrl.publishSnapshot?.({ persist: false }).catch(() => {});
   } else {
     ctrl.syncFromEmbeddedLog({ enterPlay: true });
     ctrl.sendLocalProfileUpdate?.();
+    startGuestTruthWatchdog(ctrl);
   }
 
   Nav.switchTab("play");
@@ -95,7 +105,6 @@ export function bootstrapRoomEmbedded(ctx) {
     app.ui.render?.();
     app.ui.scheduleScrollBoardToTop?.({ delay: 50 });
   }
-  // Geen "programmeer"-toast vóór match_ready; dat voelde als vastzitten op oude UI.
   if (window.RobotRallyApp?.engine?.phase === "programming") {
     Toast.show("RobotRun — programmeer tegelijk!");
   }
@@ -248,7 +257,7 @@ function startEmbeddedRace(ctrl) {
 
   Nav.switchTab("play");
   ctrl.wireHostAutosnapshots();
-  ctrl.publishSnapshot?.().catch(() => {});
+  ctrl.publishSnapshot?.({ persist: true }).catch(() => {});
 }
 
 /**
@@ -257,7 +266,8 @@ function startEmbeddedRace(ctrl) {
  */
 function normalizeIntentPayload(payload) {
   if (!payload || typeof payload !== "object") return {};
-  const { sessionId, gameId, wireType, ...rest } = /** @type {Record<string, unknown>} */ (payload);
+  const { sessionId, gameId, wireType, tipSeq: _ts, tipEventId: _te, ...rest } =
+    /** @type {Record<string, unknown>} */ (payload);
   return rest;
 }
 
@@ -266,19 +276,25 @@ function normalizeIntentPayload(payload) {
  * @param {{ type: string, payload?: unknown, fromPeerId?: string|null }} msg
  */
 function handleTransportMessage(ctrl, msg) {
+  if (msg.type === SyncMsg.CHECKPOINT) {
+    if (ctrl.isHost()) return;
+    adoptTruthCheckpoint(ctrl, msg.payload);
+    return;
+  }
+
   if (msg.type === SyncMsg.LOG) {
     if (ctrl.isHost()) return;
+    // Boot/catch-up only. Live play uses CHECKPOINT.
     adoptLogPacket(ctrl, msg.payload);
     return;
   }
 
   if (msg.type === SyncMsg.RESYNC) {
     if (!ctrl.isHost()) return;
-    // Guest missed events (often the post-Play truth snap). Republish + full dump.
-    Promise.resolve(ctrl.publishSnapshot?.({ fullWire: true }))
-      .catch(() => {
-        pushLogWire(ctrl, { full: true });
-      });
+    // Prefer frozen last tip (safe mid-executing). Else export fresh.
+    if (!rebroadcastLastTruth(ctrl)) {
+      Promise.resolve(ctrl.publishSnapshot?.({ persist: false })).catch(() => {});
+    }
     return;
   }
 
@@ -303,35 +319,167 @@ function handleTransportMessage(ctrl, msg) {
  * @param {typeof window.P2pSessionController} ctrl
  * @param {unknown} raw
  */
+function adoptTruthCheckpoint(ctrl, raw) {
+  if (!raw || typeof raw !== "object") return;
+  const payload = /** @type {{
+    tipSeq?: number,
+    tipEventId?: string|null,
+    boardData?: unknown,
+    gameState?: unknown,
+  }} */ (raw);
+  if (!payload.boardData || !payload.gameState) return;
+
+  const tip = Number(payload.tipSeq) || 0;
+  const tipId = payload.tipEventId || null;
+  // Ignore stale/out-of-order checkpoints (keep newest tip).
+  if (tip && ctrl._truthTipSeq && tip < ctrl._truthTipSeq) return;
+
+  // Same tip already applied — mark healthy, do not reset local Play/UI.
+  if (
+    tip
+    && tip === ctrl._truthTipSeq
+    && tipId
+    && tipId === ctrl._truthTipEventId
+  ) {
+    ctrl._lastTruthAdoptAt = Date.now();
+    return;
+  }
+
+  ctrl._truthTipSeq = tip || ctrl._truthTipSeq || 0;
+  ctrl._truthTipEventId = tipId;
+  ctrl._lastTruthAdoptAt = Date.now();
+
+  const hadBoard = !!window.RobotRallyApp?.engine?.board;
+  ctrl.lobby = {
+    ...(ctrl.lobby || {}),
+    boardData: payload.boardData,
+    gameState: payload.gameState,
+    status:
+      /** @type {{ phase?: string }} */ (payload.gameState).phase === "finished"
+        ? "finished"
+        : "playing",
+  };
+  ctrl.applyGameSnapshot(
+    { boardData: payload.boardData, gameState: payload.gameState },
+    { enterPlay: !hadBoard },
+  );
+}
+
+/**
+ * @param {{ boardData: unknown, gameState: unknown }} truth
+ */
+function cloneTruth(truth) {
+  try {
+    return {
+      boardData: structuredClone(truth.boardData),
+      gameState: structuredClone(truth.gameState),
+    };
+  } catch {
+    return {
+      boardData: JSON.parse(JSON.stringify(truth.boardData)),
+      gameState: JSON.parse(JSON.stringify(truth.gameState)),
+    };
+  }
+}
+
+/**
+ * Re-send frozen tip truth without re-exporting mid-Play engine state.
+ * @param {typeof window.P2pSessionController} ctrl
+ */
+function rebroadcastLastTruth(ctrl) {
+  const last = ctrl._lastTruth;
+  if (!ctrl.isHost() || !ctrl._bridgeTransport || !last) return false;
+  ctrl._bridgeTransport.send(SyncMsg.CHECKPOINT, {
+    tipSeq: last.tipSeq,
+    tipEventId: last.tipEventId,
+    boardData: last.boardData,
+    gameState: last.gameState,
+  });
+  return true;
+}
+
+/**
+ * Guest self-heal: if no tip arrived recently, ask host for last truth.
+ * @param {typeof window.P2pSessionController} ctrl
+ */
+function startGuestTruthWatchdog(ctrl) {
+  if (ctrl._truthWatchdogTimer) clearInterval(ctrl._truthWatchdogTimer);
+  ctrl._truthWatchdogTimer = setInterval(() => {
+    if (!ctrl.isActive?.() || ctrl.isHost?.()) return;
+    if (ctrl.lobby?.status !== "playing") return;
+    const phase = window.RobotRallyApp?.engine?.phase;
+    if (!phase || phase === "finished") return;
+    const age = Date.now() - (ctrl._lastTruthAdoptAt || 0);
+    if (age < 2500) return;
+    ctrl.requestLogResync?.();
+  }, 1000);
+}
+
+/**
+ * @param {typeof window.P2pSessionController} ctrl
+ * @param {unknown} raw
+ */
 function adoptLogPacket(ctrl, raw) {
   const packet = parseSyncPacket(raw);
   if (!packet) return;
-  const merged = applySyncPacket(ctrl.log, packet);
-  if (!merged.ok) {
-    // Silent gap = classic "guest stuck after Play". Ask host for a full dump.
-    requestLogResync(ctrl);
-    return;
+  // Prefer full replace when packet starts from seq 1 (welcome / catch-up).
+  const first = packet.events?.[0];
+  if (first && first.seq === 1) {
+    const replaced = replaceFromHostPacket(GAME_ID, packet);
+    if (!replaced.ok) return;
+    ctrl.log = replaced.log;
+  } else {
+    const merged = applySyncPacket(ctrl.log, packet);
+    if (!merged.ok) return;
+    ctrl.log = merged.log;
   }
-  ctrl.log = merged.log;
   const hadBoard = !!window.RobotRallyApp?.engine?.board;
   ctrl.syncFromEmbeddedLog({ enterPlay: !hadBoard });
 }
 
 /**
+ * Persist event for desk/boot; do not use as the live guest channel.
  * @param {typeof window.P2pSessionController} ctrl
+ * @param {string} type
+ * @param {unknown} payload
+ * @param {{ wire?: boolean }} [opts]
  */
-function requestLogResync(ctrl) {
-  if (!ctrl || ctrl.isHost?.() || !ctrl._bridgeTransport) return;
-  const now = Date.now();
-  if (ctrl._resyncAt && now - ctrl._resyncAt < 1600) return;
-  ctrl._resyncAt = now;
-  ctrl._bridgeTransport.send(SyncMsg.RESYNC, {
-    haveTipSeq: tipSeq(ctrl.log),
-    haveTipEventId: tipEventId(ctrl.log),
+function appendEmbeddedEventLocal(ctrl, type, payload, { wire = false } = {}) {
+  if (!ctrl.log) return;
+  const added = appendEvent(ctrl.log, type, payload);
+  if (!added.ok) return;
+  ctrl.log = added.log;
+  if (wire) pushLogWire(ctrl, { full: true });
+}
+
+/**
+ * Self-contained host truth for all peers. Safe if prior packets were dropped.
+ * @param {typeof window.P2pSessionController} ctrl
+ * @param {{ boardData: unknown, gameState: unknown }} truth
+ */
+export function pushTruthCheckpoint(ctrl, truth) {
+  if (!ctrl.isHost() || !ctrl._bridgeTransport) return;
+  const tip = tipSeq(ctrl.log);
+  const tipId = tipEventId(ctrl.log);
+  const frozen = cloneTruth(truth);
+  ctrl._truthTipSeq = tip;
+  ctrl._truthTipEventId = tipId;
+  ctrl._lastTruth = {
+    tipSeq: tip,
+    tipEventId: tipId,
+    boardData: frozen.boardData,
+    gameState: frozen.gameState,
+  };
+  ctrl._bridgeTransport.send(SyncMsg.CHECKPOINT, {
+    tipSeq: tip,
+    tipEventId: tipId,
+    boardData: frozen.boardData,
+    gameState: frozen.gameState,
   });
 }
 
 /**
+ * Optional desk catch-up (welcome / rare). Not the live sync path.
  * @param {typeof window.P2pSessionController} ctrl
  * @param {{ full?: boolean }} [opts]
  */
@@ -341,7 +489,6 @@ export function pushLogWire(ctrl, { full = false } = {}) {
   const packet = encodeSyncPacket(ctrl.log, fromSeq);
   if (!packet.events.length) return;
   const ok = ctrl._bridgeTransport.send(SyncMsg.LOG, packet);
-  // Only advance tip after a successful handoff — otherwise guests gap forever.
   if (ok !== false) ctrl._wireFromSeq = tipSeq(ctrl.log);
 }
 
@@ -378,18 +525,15 @@ export function patchP2pSessionForRoom() {
           : type === "rr_state_snapshot"
             ? "snap"
             : type;
-      this.appendEmbeddedEvent(logType, payload);
+      // Desk log only — live peers get CHECKPOINT from publishSnapshot.
+      appendEmbeddedEventLocal(this, logType, payload, { wire: false });
       return;
     }
     return prevBroadcast(type, payload);
   };
 
   ctrl.appendEmbeddedEvent = function appendEmbeddedEvent(type, payload) {
-    if (!this.log) return;
-    const added = appendEvent(this.log, type, payload);
-    if (!added.ok) return;
-    this.log = added.log;
-    if (this.embeddedMode) pushLogWire(this);
+    appendEmbeddedEventLocal(this, type, payload, { wire: false });
   };
 
   const prevPublish = ctrl.publishSnapshot?.bind(ctrl);
@@ -397,7 +541,6 @@ export function patchP2pSessionForRoom() {
     ctrl.publishSnapshot = async function publishSnapshot(opts = {}) {
       if (!this.isHost() || !window.RobotRallyApp?.engine) return;
       const gameState = window.RobotRallyApp.engine.exportGameState();
-      // Replay frames are local-only — keep wire payloads small enough for P2P/bridge.
       gameState.currentRoundReplayFrames = [];
       gameState.lastRoundReplay = null;
       const boardData = window.RobotRallyApp.engine.serializeBoard();
@@ -407,8 +550,11 @@ export function patchP2pSessionForRoom() {
       this.lobby.gameState = gameState;
       this.lobby.updatedAt = Date.now();
       if (this.embeddedMode) {
-        this.broadcast("rr_state_snapshot", { boardData, gameState });
-        if (opts.fullWire) pushLogWire(this, { full: true });
+        const persist = opts.persist !== false;
+        if (persist) {
+          appendEmbeddedEventLocal(this, "snap", { boardData, gameState }, { wire: false });
+        }
+        pushTruthCheckpoint(this, { boardData, gameState });
         return;
       }
       return prevPublish.call(this, opts);
@@ -416,7 +562,15 @@ export function patchP2pSessionForRoom() {
   }
 
   ctrl.requestLogResync = function requestLogResyncFromCtrl() {
-    requestLogResync(this);
+    if (this.isHost?.() || !this._bridgeTransport) return;
+    this._bridgeTransport.send(SyncMsg.RESYNC, {
+      haveTipSeq: tipSeq(this.log),
+      haveTipEventId: tipEventId(this.log),
+    });
+  };
+
+  ctrl.rebroadcastLastTruth = function rebroadcastLastTruthFromCtrl() {
+    return rebroadcastLastTruth(this);
   };
 
   ctrl.syncFromEmbeddedLog = function syncFromEmbeddedLog({ enterPlay = false } = {}) {
