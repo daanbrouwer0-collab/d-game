@@ -11,6 +11,7 @@ Lees eerst [docs/README.md](../../README.md) voor de actieve documentatieset.
 | Spec | Onderwerp |
 |------|-----------|
 | [2026-08-26-robotrun-tip-checkpoint-sync-design.md](./2026-08-26-robotrun-tip-checkpoint-sync-design.md) | **RobotRun live sync:** tip-CHECKPOINT + kritieke overgangen |
+| [2026-08-26-robotrun-rejoin-tip-ready-design.md](./2026-08-26-robotrun-rejoin-tip-ready-design.md) | Joiner rejoin + countdown sync + dunne tip-ack |
 | [2026-08-26-robotrun-merge-slots-design.md](./2026-08-26-robotrun-merge-slots-design.md) | Slot-tabs + Merge/Combo recepten |
 | [2026-08-26-robotrun-local-play-host-truth-design.md](./2026-08-26-robotrun-local-play-host-truth-design.md) | Lokale Play + host eind-waarheid (via CHECKPOINT) |
 | [2026-08-26-robotrun-stepped-execution-design.md](./2026-08-26-robotrun-stepped-execution-design.md) | Stepped play + lasers |

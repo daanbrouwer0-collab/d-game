@@ -1129,6 +1129,23 @@ const P2pSessionController = {
 
     if (!this.isHost()) return;
 
+    if (type === "rr_tip_ack") {
+      const tip = Number(payload.tipSeq) || 0;
+      if (!tip || tip !== (this._truthTipSeq || 0)) return;
+      const bound = window.RobotRunIntentBind?.resolveSeatAction?.(
+        this.lobby,
+        payload,
+        msg.fromPeerId,
+        this.peerToPlayer || {},
+      );
+      const userId = String(bound?.userId || payload.userId || "");
+      if (!userId || userId === this.playerId) return;
+      if (!this._tipAckedUserIds) this._tipAckedUserIds = new Set();
+      this._tipAckedUserIds.add(userId);
+      window.RobotRallyApp?.ui?.renderPlaybackOverlay?.();
+      return;
+    }
+
     if (type === "rr_intent_commit") {
       const bound = window.RobotRunIntentBind?.resolveSeatAction?.(
         this.lobby,

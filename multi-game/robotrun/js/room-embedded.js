@@ -88,9 +88,11 @@ export function bootstrapRoomEmbedded(ctx) {
     // Boot catch-up for peers already in the room.
     ctrl.publishSnapshot?.({ persist: false }).catch(() => {});
   } else {
-    ctrl.syncFromEmbeddedLog({ enterPlay: true });
+    // Desk log = seats/boot only. Live phase/timers come from tip-CHECKPOINT.
+    ctrl.syncFromEmbeddedLog({ enterPlay: false, applyTruth: false });
     ctrl.sendLocalProfileUpdate?.();
     startGuestTruthWatchdog(ctrl);
+    ctrl.requestLogResync?.();
   }
 
   Nav.switchTab("play");
@@ -342,6 +344,12 @@ function adoptTruthCheckpoint(ctrl, raw) {
     && tipId === ctrl._truthTipEventId
   ) {
     ctrl._lastTruthAdoptAt = Date.now();
+    maybeSendTipAck(
+      ctrl,
+      tip,
+      tipId,
+      /** @type {{ phase?: string }} */ (payload.gameState).phase,
+    );
     return;
   }
 
@@ -363,6 +371,32 @@ function adoptTruthCheckpoint(ctrl, raw) {
     { boardData: payload.boardData, gameState: payload.gameState },
     { enterPlay: !hadBoard },
   );
+  maybeSendTipAck(
+    ctrl,
+    tip,
+    tipId,
+    /** @type {{ phase?: string }} */ (payload.gameState).phase,
+  );
+}
+
+/**
+ * Guest confirms it has host tip (race-start soft sync).
+ * @param {typeof window.P2pSessionController} ctrl
+ * @param {number} tip
+ * @param {string|null} tipId
+ * @param {string|undefined} phase
+ */
+function maybeSendTipAck(ctrl, tip, tipId, phase) {
+  if (ctrl.isHost?.() || !tip) return;
+  if (phase !== "match_ready") return;
+  const key = `${tip}:${tipId || ""}`;
+  if (ctrl._lastAckedTipKey === key) return;
+  ctrl._lastAckedTipKey = key;
+  ctrl.send?.("rr_tip_ack", {
+    tipSeq: tip,
+    tipEventId: tipId,
+    userId: ctrl.playerId,
+  });
 }
 
 /**
@@ -470,6 +504,11 @@ export function pushTruthCheckpoint(ctrl, truth) {
     boardData: frozen.boardData,
     gameState: frozen.gameState,
   };
+  const phase = /** @type {{ phase?: string }} */ (frozen.gameState || {}).phase;
+  if (phase === "match_ready") {
+    ctrl._tipAckedUserIds = new Set([String(ctrl.playerId || "")].filter(Boolean));
+    ctrl._awaitingTipAcksUntil = Date.now() + 3000;
+  }
   ctrl._bridgeTransport.send(SyncMsg.CHECKPOINT, {
     tipSeq: tip,
     tipEventId: tipId,
@@ -573,7 +612,22 @@ export function patchP2pSessionForRoom() {
     return rebroadcastLastTruth(this);
   };
 
-  ctrl.syncFromEmbeddedLog = function syncFromEmbeddedLog({ enterPlay = false } = {}) {
+  /** Soft race-start gate: true while waiting for guest tip-acks (max 3s). */
+  ctrl.tipAcksPending = function tipAcksPending() {
+    if (!this.isHost?.()) return false;
+    if (Date.now() >= (this._awaitingTipAcksUntil || 0)) return false;
+    const seats = this.lobby?.seats || [];
+    const acked = this._tipAckedUserIds || new Set();
+    return seats.some((s) => {
+      const id = String(s?.userId || "");
+      return id && !acked.has(id);
+    });
+  };
+
+  ctrl.syncFromEmbeddedLog = function syncFromEmbeddedLog({
+    enterPlay = false,
+    applyTruth = true,
+  } = {}) {
     const restored = this.restoreFromEmbeddedLog();
     if (!restored) return;
     const seats =
@@ -583,12 +637,17 @@ export function patchP2pSessionForRoom() {
     this.lobby = {
       ...(this.lobby || {}),
       seats,
-      boardData: restored.boardData || this.lobby?.boardData,
-      gameState: restored.gameState || this.lobby?.gameState,
-      status: restored.status || this.lobby?.status,
       settings: restored.settings || this.lobby?.settings,
       roomCode: this.session?.roomCode,
     };
+    if (!applyTruth) {
+      // Keep roster; wait for tip-CHECKPOINT for board/timers.
+      this.lobby.status = restored.status === "playing" ? "playing" : (this.lobby.status || "lobby");
+      return;
+    }
+    this.lobby.boardData = restored.boardData || this.lobby?.boardData;
+    this.lobby.gameState = restored.gameState || this.lobby?.gameState;
+    this.lobby.status = restored.status || this.lobby?.status;
     if (restored.boardData && restored.gameState) {
       this.applyGameSnapshot(
         { boardData: restored.boardData, gameState: restored.gameState },

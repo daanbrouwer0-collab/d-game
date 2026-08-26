@@ -2306,12 +2306,14 @@ class RobotRallyUI {
       this.playbackStatusCard?.classList.remove('hidden');
       if (matchCountdownPhase) {
         const endsAt = this.engine.matchCountdownEndsAt;
-        const leftSec = endsAt != null
-          ? Math.max(0, Math.ceil((endsAt - Date.now()) / 1000))
-          : (CONFIG.MATCH_COUNTDOWN_SECONDS || 10);
         if (this.playbackTitle) this.playbackTitle.textContent = 'Iedereen is klaar';
         if (this.playbackText) {
-          this.playbackText.textContent = leftSec > 0 ? String(leftSec) : 'Start laden…';
+          if (endsAt == null || !Number.isFinite(Number(endsAt))) {
+            this.playbackText.textContent = 'Synchroniseren…';
+          } else {
+            const leftSec = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
+            this.playbackText.textContent = leftSec > 0 ? String(leftSec) : 'Start laden…';
+          }
         }
       } else if (iAmReady) {
         if (this.playbackTitle) this.playbackTitle.textContent = 'Upgrade gekozen';

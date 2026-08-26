@@ -59,6 +59,8 @@ Stale checkpoints: gast negeert `tipSeq < _truthTipSeq`.
 
 **Niet gegarandeerd (buiten sync):** totale P2P-disconnect, host-tab dicht, intent zonder retry (speler moet opnieuw klikken). Bij werkende host↔guest link herstelt de tip ≤ ~2–3s.
 
+**Rejoin / valse countdown:** zie [2026-08-26-robotrun-rejoin-tip-ready-design.md](./2026-08-26-robotrun-rejoin-tip-ready-design.md) (plan: `plans/2026-08-26-robotrun-rejoin-tip-ready.md`).
+
 ---
 
 ## 4. Fase-heartbeat
