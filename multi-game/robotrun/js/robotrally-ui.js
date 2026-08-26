@@ -89,7 +89,10 @@ class RobotRallyUI {
 
   bindEngine() {
     this.engine.onStateChange = () => {
-      this.resizeCanvas();
+      // Setting canvas.width/height clears the bitmap — never do that every Play step.
+      if (this.engine.phase !== 'executing') {
+        this.resizeCanvas();
+      }
       this.updateCardsUI();
     };
     this.engine.onLogMessage = () => {
@@ -210,8 +213,11 @@ class RobotRallyUI {
     const maxW = Math.max(320, host.clientWidth || window.innerWidth);
     const tile = Math.floor(maxW / gridW);
     this.tileSize = Math.max(24, Math.min(tile, 72));
-    this.canvas.width = gridW * this.tileSize;
-    this.canvas.height = gridH * this.tileSize;
+    const nextW = gridW * this.tileSize;
+    const nextH = gridH * this.tileSize;
+    // Assigning canvas.width/height clears the drawing buffer → visible blink.
+    if (this.canvas.width !== nextW) this.canvas.width = nextW;
+    if (this.canvas.height !== nextH) this.canvas.height = nextH;
   }
 
   startAnimLoop() {
@@ -265,20 +271,37 @@ class RobotRallyUI {
       }
 
       const state = this.robotAnimStates[robot.id];
-      state.x += (robot.x - state.x) * 0.22;
-      state.y += (robot.y - state.y) * 0.22;
+      const follow = this.engine.phase === 'executing' ? 0.42 : 0.22;
+      const turnFollow = this.engine.phase === 'executing' ? 0.5 : 0.3;
+      state.x += (robot.x - state.x) * follow;
+      state.y += (robot.y - state.y) * follow;
 
       const targetAngle = [0, Math.PI / 2, Math.PI, -Math.PI / 2][robot.dir];
       let delta = targetAngle - state.angle;
       while (delta < -Math.PI) delta += Math.PI * 2;
       while (delta > Math.PI) delta -= Math.PI * 2;
-      state.angle += delta * 0.3;
+      state.angle += delta * turnFollow;
     });
   }
 
   updateCardsUI() {
     const currentRobot = this.getFocusedRobot();
     if (!currentRobot || !this.engine.board) return;
+
+    // Play: keep DOM light so each micro-step does not rebuild the whole panel.
+    if (this.engine.phase === 'executing') {
+      this.syncProgrammingPrivacy(currentRobot);
+      this.captureLaserEffects();
+      this.applyModeState();
+      this.renderActivePlayer(currentRobot);
+      this.updatePanelTitle(currentRobot);
+      this.renderHud();
+      this.renderActionLog();
+      this.renderPlaybackOverlay();
+      this.updateButtons();
+      this.syncExecutionTimer();
+      return;
+    }
 
     this.syncProgrammingPrivacy(currentRobot);
     this.captureLaserEffects();
@@ -1846,6 +1869,7 @@ class RobotRallyUI {
 
   applyPanelState() {
     const phase = this.engine.phase;
+    const prevPhase = this._panelPhase;
     const privacyLocked = this.isPrivacyGateVisible();
     const matchGate = phase === 'match_ready' || phase === 'match_countdown';
     const shouldCollapse = phase === 'executing' || phase === 'ready' || phase === 'upgrade_choice'
@@ -1862,7 +1886,11 @@ class RobotRallyUI {
     this.gameWrap?.classList.toggle('privacy-locked', privacyLocked);
     this.app?.classList.toggle('playback-only', phase === 'executing');
     this.updateBoardBorder();
-    requestAnimationFrame(() => this.resizeCanvas());
+    this._panelPhase = phase;
+    // Only resize when layout mode changes — per-step resize caused Play flicker.
+    if (prevPhase !== phase) {
+      requestAnimationFrame(() => this.resizeCanvas());
+    }
   }
 
   updateBoardBorder() {
@@ -1919,7 +1947,7 @@ class RobotRallyUI {
             this.selectedRegisters = [null, null, null, null, null];
             this.updateCardsUI();
           }
-        }, 950);
+        }, CONFIG.EXECUTION_STEP_MS || 560);
       }
       return;
     }
