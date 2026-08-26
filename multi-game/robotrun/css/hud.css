@@ -3,22 +3,33 @@
   display: none !important;
 }
 
-.player-status-bar {
+/* Scroll-up pad: alleen zichtbaar als je omhoog scrollt; geen grijze toplaag in play-view. */
+.player-status-spacer {
   flex: 0 0 auto;
+  height: var(--player-status-h, 0px);
+  pointer-events: none;
+  background: transparent;
+}
+
+.player-status-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   display: flex;
   align-items: stretch;
   gap: clamp(6px, 1.4vw, 10px);
-  padding: calc(6px + var(--safe-top)) clamp(6px, 2vw, 10px) 6px;
-  background: rgba(4, 8, 18, 0.92);
+  padding: 6px clamp(6px, 2vw, 10px);
+  background: rgba(4, 8, 18, 0.96);
   border-bottom: 1px solid rgba(148, 163, 184, 0.18);
   overflow-x: auto;
   overflow-y: hidden;
   z-index: 20;
-  position: relative;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+  box-sizing: border-box;
 }
 
 .player-status-bar::-webkit-scrollbar {

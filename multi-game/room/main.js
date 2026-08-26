@@ -115,14 +115,24 @@ function setError(msg) {
 }
 
 function setStatus(text) {
-  roomStatus.textContent = text;
+  roomStatus.textContent = text || "";
 }
 
-function showPanel(name) {
+/**
+ * @param {"idle"|"lobby"|"playing"} name
+ * @param {{ bootTitle?: string, bootHint?: string }} [opts]
+ */
+function showPanel(name, opts = {}) {
   panelIdle.classList.toggle("hidden", name !== "idle");
   panelLobby.classList.toggle("hidden", name !== "lobby");
   panelPlaying.classList.toggle("hidden", name !== "playing");
   roomChrome?.classList.toggle("hidden", name === "idle");
+  if (name === "idle") {
+    const titleEl = document.getElementById("room-boot-title");
+    const hintEl = document.getElementById("room-boot-hint");
+    if (titleEl && opts.bootTitle) titleEl.textContent = opts.bootTitle;
+    if (hintEl && opts.bootHint) hintEl.textContent = opts.bootHint;
+  }
 }
 
 function goToRooms() {
@@ -429,9 +439,10 @@ function clearGameFrame() {
 
 function syncPlayingBarButtons() {
   if (!session) return;
-  // Spec: no ← Lobby during play; Stop remains for host.
+  // Room chrome bar removed during play — RobotRun "Verlaat game" is enough.
+  playingBar?.classList.add("hidden");
   btnLeaveGame?.classList.add("hidden");
-  btnEndSession?.classList.toggle("hidden", session.role !== "host");
+  btnEndSession?.classList.add("hidden");
 }
 
 /**
@@ -788,7 +799,7 @@ function bindSession(s) {
 
   s.onStatus = (status, detail) => {
     const labels = {
-      idle: "Niet verbonden",
+      idle: "",
       hosting: "Room open — wacht op spelers",
       connecting: "Verbinden…",
       connected: "In room",
@@ -1181,7 +1192,11 @@ async function startHost() {
     await session.destroy();
     session = null;
   }
-  showPanel("lobby");
+  showPanel("idle", {
+    bootTitle: "Host Room",
+    bootHint: "Peer-verbinding opzetten…",
+  });
+  setStatus("Room maken…");
   document.getElementById("invite-card")?.classList.remove("hidden");
 
   const s = createRoomSession({ maxGuests: 5 });
@@ -1289,7 +1304,10 @@ async function joinRoom(code) {
 
   const s = createRoomSession({ maxGuests: 5 });
   bindSession(s);
-  showPanel("lobby");
+  showPanel("idle", {
+    bootTitle: "Join Room",
+    bootHint: `Verbinden met ${c}…`,
+  });
   setStatus("Verbinden…");
 
   try {
@@ -1419,11 +1437,17 @@ guardRoomNavigation({
 
 const urlRoom = readRoomFromUrl();
 if (readHostIntentFromUrl()) {
-  showPanel("lobby");
-  setStatus("Room starten…");
+  showPanel("idle", {
+    bootTitle: "Host Room",
+    bootHint: "Peer-verbinding opzetten…",
+  });
+  setStatus("Room maken…");
   startHost();
 } else if (urlRoom) {
-  showPanel("lobby");
+  showPanel("idle", {
+    bootTitle: "Join Room",
+    bootHint: `Verbinden met ${urlRoom}…`,
+  });
   setStatus("Verbinden…");
   joinRoom(urlRoom);
 } else {

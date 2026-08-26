@@ -36,6 +36,8 @@
     <!-- ===== SPEL TAB ===== -->
     <section id="screen-play" class="view-screen active">
       <div id="game-wrap">
+        <!-- Spacer reserves scroll-up room; status bar overlays it (out of play viewport). -->
+        <div id="player-status-spacer" class="player-status-spacer" aria-hidden="true"></div>
         <div id="player-status-bar" class="player-status-bar" aria-label="Spelerstatus"></div>
 
         <!-- Canvas Area -->
@@ -50,21 +52,15 @@
           <div id="board-frame" class="board-frame">
             <canvas id="board-canvas"></canvas>
           </div>
+          <div id="program-timer" class="program-timer hidden" aria-hidden="true">
+            <div class="program-timer-track">
+              <div id="program-timer-fill" class="program-timer-fill"></div>
+            </div>
+          </div>
         </div>
 
         <!-- Programming Cards Panel -->
         <div id="programming-panel">
-          <div id="program-timer" class="program-timer hidden" aria-live="polite">
-            <div class="program-timer-track">
-              <div id="program-timer-fill" class="program-timer-fill"></div>
-            </div>
-            <span id="program-timer-label" class="program-timer-label">60s</span>
-          </div>
-          <div id="slot-tabs" class="slot-tabs" role="tablist">
-            <button type="button" class="slot-tab active" data-slot-tab="program" role="tab">Program</button>
-            <button type="button" class="slot-tab" data-slot-tab="merge" role="tab">Merge</button>
-          </div>
-
           <div id="registers-row-program" class="registers-row" data-slot-panel="program">
             <div class="register-slot" data-index="0"><span class="register-num">1</span></div>
             <div class="register-slot" data-index="1"><span class="register-num">2</span></div>
@@ -87,6 +83,12 @@
 
           <button id="btn-merge-cards" class="btn success below-cards-action hidden" type="button">Merge</button>
           <button id="btn-confirm-program" class="btn success below-cards-action hidden" type="button">Bevestig Programma</button>
+
+          <div id="slot-tabs" class="slot-tabs" role="tablist">
+            <button type="button" class="slot-tab active" data-slot-tab="program" role="tab">Program</button>
+            <button type="button" class="slot-tab" data-slot-tab="merge" role="tab">Merge</button>
+          </div>
+
           <button id="btn-power-down" class="btn alt below-cards-action" type="button">Power Down Volgende Ronde</button>
           <button id="btn-board-replay" class="btn success below-cards-action hidden" type="button">Replay</button>
 
@@ -130,6 +132,12 @@
 
         <div id="upgrade-choice-overlay" class="hidden">
           <div class="upgrade-choice-card">
+            <div id="upgrade-choice-you" class="upgrade-choice-you hidden">
+              <span class="upgrade-choice-you-label">Jij bent</span>
+              <canvas id="upgrade-choice-robot" class="upgrade-choice-robot" width="112" height="112" aria-hidden="true"></canvas>
+              <p id="upgrade-choice-you-name" class="upgrade-choice-you-name"></p>
+              <p class="upgrade-choice-you-hint">Kies eerst een upgrade en programmeer 5 moves</p>
+            </div>
             <div class="upgrade-choice-label">Upgrade Vakje</div>
             <h2 id="upgrade-choice-title">Kies 1 upgrade</h2>
             <p id="upgrade-choice-text">Je bent geeindigd op een upgrade-vakje. Kies 1 upgrade voor de rest van de game.</p>

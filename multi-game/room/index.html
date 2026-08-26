@@ -13,7 +13,7 @@
     <div class="app app-room">
       <header class="header">
         <h1 class="brand">Room</h1>
-        <p id="room-status" class="tagline">Niet verbonden</p>
+        <p id="room-status" class="tagline"></p>
       </header>
 
       <div id="room-chrome" class="room-chrome hidden" aria-label="Spelers in room">
@@ -28,8 +28,16 @@
       </div>
 
       <main>
-        <section id="panel-idle" class="panel hidden">
-          <p class="lede">Room starten…</p>
+        <section id="panel-idle" class="panel panel-boot hidden">
+          <div class="room-boot" role="status" aria-live="polite">
+            <div class="room-boot-rings" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <p id="room-boot-title" class="room-boot-title">Host Room</p>
+            <p id="room-boot-hint" class="room-boot-hint">Verbinding opzetten…</p>
+          </div>
         </section>
 
         <p id="room-error" class="hint room-error hidden" role="alert"></p>

@@ -91,6 +91,7 @@ export function bootstrapRoomEmbedded(ctx) {
     app.ui.resizeCanvas();
     app.ui.updateCardsUI();
     app.ui.render?.();
+    app.ui.scheduleScrollBoardToTop?.({ delay: 50 });
   }
   // Geen "programmeer"-toast vóór match_ready; dat voelde als vastzitten op oude UI.
   if (window.RobotRallyApp?.engine?.phase === "programming") {
@@ -239,6 +240,7 @@ function startEmbeddedRace(ctrl) {
     app.ui.resizeCanvas();
     app.ui.updateCardsUI();
     app.ui.render?.();
+    app.ui.scheduleScrollBoardToTop?.({ delay: 50 });
   }
 
   Nav.switchTab("play");

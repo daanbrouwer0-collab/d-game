@@ -65,7 +65,8 @@ html.dgame-embedded #game-wrap.upgrade-choice-mode {
 }
 
 html.dgame-embedded .player-status-bar {
-  flex: 0 0 auto;
+  /* Overlay op spacer; geen layout-hoogte in de play-view. */
+  position: absolute;
 }
 
 html.dgame-embedded #canvas-container {
@@ -73,9 +74,14 @@ html.dgame-embedded #canvas-container {
   width: 100%;
   min-height: 12rem;
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  background: linear-gradient(180deg, #151820 0%, #0e1116 100%);
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  background: transparent;
+}
+
+html.dgame-embedded #program-timer {
+  order: 2;
 }
 
 html.dgame-embedded #board-canvas {

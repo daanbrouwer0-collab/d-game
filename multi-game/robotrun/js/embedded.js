@@ -16,6 +16,7 @@ function wireEmbeddedLayout() {
   hideEmbeddedLeaveButtons(".embedded-leave");
   // Scroll only inside #screen-play (CSS). Do not forward touch/wheel to the
   // room parent — that competed with native scroll and felt dead on phones.
+  window.RobotRallyApp?.ui?.scheduleScrollBoardToTop?.({ delay: 80 });
 }
 
 runEmbeddedGame({

@@ -32,15 +32,16 @@ function toHex2(n) {
 }
 
 /**
- * Half gray / half color: random hue at ~50% saturation, varied lightness.
- * Same hue family for pijl / lichaam / ogen so the set still looks like one character.
+ * Mostly gray with a hint of color (~3/4 gray, ~1/4 chroma).
+ * Same hue family for pijl / lichaam / ogen so it still reads as one character.
  */
 function randomMutedCharacterColors() {
   const baseHue = Math.random() * 360;
   const mk = (lightnessBias, hueShift = 0) => {
     const h = (baseHue + hueShift + 360) % 360;
-    const s = 0.42 + Math.random() * 0.16; // ~42–58% sat
-    const l = 0.28 + lightnessBias * 0.4 + (Math.random() * 0.06 - 0.03);
+    // ~18–28% saturation ≈ one quarter color, three quarters gray.
+    const s = 0.18 + Math.random() * 0.1;
+    const l = 0.32 + lightnessBias * 0.38 + (Math.random() * 0.05 - 0.025);
     const c = (1 - Math.abs(2 * l - 1)) * s;
     const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
     const m = l - c / 2;
@@ -82,7 +83,7 @@ function randomPlayerName() {
 }
 
 /**
- * First visit: assign Speler + number and muted (half gray / half color) character.
+ * First visit: assign Speler + number and muted (~3/4 gray) character.
  * Idempotent — keeps existing profile.
  */
 export function ensureLocalProfile() {

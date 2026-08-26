@@ -42,6 +42,9 @@ class RobotRallyUI {
     this.hudRegister = document.getElementById('hud-register');
     this.hudTurnPlayer = document.getElementById('hud-turn-player');
     this.playerStatusBar = document.getElementById('player-status-bar');
+    this.playerStatusSpacer = document.getElementById('player-status-spacer');
+    this._preferBoardTop = true;
+    this._pinningBoard = false;
     this.panelTitle = document.getElementById('panel-title-text');
     this.cardsHandWrap = document.getElementById('cards-hand');
     this.btnPowerDown = document.getElementById('btn-power-down');
@@ -59,7 +62,7 @@ class RobotRallyUI {
     this.programmingPanel = document.getElementById('programming-panel');
     this.programTimer = document.getElementById('program-timer');
     this.programTimerFill = document.getElementById('program-timer-fill');
-    this.programTimerLabel = document.getElementById('program-timer-label');
+    this.programTimerLabel = null;
     this.upgradeShop = document.getElementById('upgrade-shop');
     this.gameWrap = document.getElementById('game-wrap');
     this.activePlayerCard = document.getElementById('active-player-card');
@@ -85,6 +88,24 @@ class RobotRallyUI {
     this.upgradeChoiceTitle = document.getElementById('upgrade-choice-title');
     this.upgradeChoiceText = document.getElementById('upgrade-choice-text');
     this.upgradeChoiceList = document.getElementById('upgrade-choice-list');
+    this.upgradeChoiceYou = document.getElementById('upgrade-choice-you');
+    this.upgradeChoiceYouName = document.getElementById('upgrade-choice-you-name');
+    this.upgradeChoiceRobot = document.getElementById('upgrade-choice-robot');
+    this.bindBoardTopPin();
+  }
+
+  bindBoardTopPin() {
+    const scroller = document.getElementById('screen-play');
+    if (!scroller || this._boardPinBound) return;
+    this._boardPinBound = true;
+    scroller.addEventListener('scroll', () => {
+      if (this._pinningBoard) return;
+      const spacerH = this.playerStatusSpacer?.offsetHeight
+        || Number.parseFloat(this.gameWrap?.style?.getPropertyValue('--player-status-h'))
+        || 0;
+      // Alleen "loslaten" als de speler bewust de statusbalk in beeld scrollt.
+      this._preferBoardTop = scroller.scrollTop >= Math.max(0, spacerH - 12);
+    }, { passive: true });
   }
 
   bindEngine() {
@@ -218,6 +239,62 @@ class RobotRallyUI {
     // Assigning canvas.width/height clears the drawing buffer → visible blink.
     if (this.canvas.width !== nextW) this.canvas.width = nextW;
     if (this.canvas.height !== nextH) this.canvas.height = nextH;
+  }
+
+  /** Scroll #screen-play so the board top sits at the viewport top (player bar above). */
+  scrollBoardToTop({ smooth = false } = {}) {
+    const scroller = document.getElementById('screen-play');
+    const target = this.boardFrame
+      || document.getElementById('board-frame')
+      || document.getElementById('canvas-container');
+    if (!scroller || !target) return;
+    this.syncPlayerStatusSpacer();
+    const sRect = scroller.getBoundingClientRect();
+    const tRect = target.getBoundingClientRect();
+    const next = scroller.scrollTop + (tRect.top - sRect.top);
+    this._pinningBoard = true;
+    this._preferBoardTop = true;
+    scroller.scrollTo({ top: Math.max(0, next), behavior: smooth ? 'smooth' : 'auto' });
+    requestAnimationFrame(() => {
+      this._pinningBoard = false;
+    });
+  }
+
+  scheduleScrollBoardToTop({ smooth = false, delay = 0 } = {}) {
+    const run = () => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => this.scrollBoardToTop({ smooth }));
+      });
+    };
+    if (delay > 0) setTimeout(run, delay);
+    else run();
+  }
+
+  /** Keep scroll-up pad equal to status bar height so play view starts on the board. */
+  syncPlayerStatusSpacer() {
+    const bar = this.playerStatusBar || document.getElementById('player-status-bar');
+    const spacer = this.playerStatusSpacer || document.getElementById('player-status-spacer');
+    const wrap = this.gameWrap || document.getElementById('game-wrap');
+    if (!bar || !spacer || !wrap) return;
+    const h = Math.ceil(bar.getBoundingClientRect().height || bar.offsetHeight || 0);
+    const px = `${Math.max(0, h)}px`;
+    if (wrap.style.getPropertyValue('--player-status-h') !== px) {
+      wrap.style.setProperty('--player-status-h', px);
+    }
+  }
+
+  maybeKeepBoardPinned() {
+    if (this._preferBoardTop === false) return;
+    const scroller = document.getElementById('screen-play');
+    if (!scroller) return;
+    this.syncPlayerStatusSpacer();
+    const spacerH = this.playerStatusSpacer?.offsetHeight
+      || Number.parseFloat(this.gameWrap?.style?.getPropertyValue('--player-status-h'))
+      || 0;
+    // Alleen terugzetten als de grijze statusbalk weer in de viewport zou komen.
+    if (scroller.scrollTop < Math.max(0, spacerH - 8)) {
+      this.scrollBoardToTop();
+    }
   }
 
   startAnimLoop() {
@@ -778,6 +855,8 @@ class RobotRallyUI {
 
     if (!robots.length) {
       this.playerStatusBar.innerHTML = '<div class="player-status-empty">Geen actieve spelers</div>';
+      this.syncPlayerStatusSpacer();
+      this.maybeKeepBoardPinned();
       return;
     }
 
@@ -850,6 +929,8 @@ class RobotRallyUI {
     }).join('');
 
     this.playerStatusBar.scrollLeft = scrollLeft;
+    this.syncPlayerStatusSpacer();
+    this.maybeKeepBoardPinned();
   }
 
   shortName(robot, max = 10) {
@@ -1052,7 +1133,7 @@ class RobotRallyUI {
     this._programTimerExpiring = false;
     this.clearProgrammingTimer();
     this.updateCardsUI();
-    this.canvas?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    this.scheduleScrollBoardToTop({ smooth: true });
   }
 
   leaveGame() {
@@ -1889,7 +1970,14 @@ class RobotRallyUI {
     this._panelPhase = phase;
     // Only resize when layout mode changes — per-step resize caused Play flicker.
     if (prevPhase !== phase) {
-      requestAnimationFrame(() => this.resizeCanvas());
+      requestAnimationFrame(() => {
+        this.resizeCanvas();
+        // Open on the board; player status sits above and is reached by scrolling up.
+        if (phase === 'programming' || phase === 'match_ready' || phase === 'match_countdown'
+          || phase === 'ready' || phase === 'executing') {
+          this.scheduleScrollBoardToTop();
+        }
+      });
     }
   }
 
@@ -1969,9 +2057,6 @@ class RobotRallyUI {
     this.programTimer?.classList.add('hidden');
     this.programTimer?.classList.remove('is-urgent');
     if (this.programTimerFill) this.programTimerFill.style.width = '100%';
-    if (this.programTimerLabel) {
-      this.programTimerLabel.textContent = `${CONFIG.PROGRAMMING_SECONDS || 60}s`;
-    }
   }
 
   syncProgrammingTimer() {
@@ -1994,7 +2079,6 @@ class RobotRallyUI {
       this.programTimer?.classList.remove('hidden');
       this.programTimer?.classList.add('is-urgent');
       if (this.programTimerFill) this.programTimerFill.style.width = '0%';
-      if (this.programTimerLabel) this.programTimerLabel.textContent = '0s';
       return;
     }
 
@@ -2014,7 +2098,6 @@ class RobotRallyUI {
     this._programTimerDeadline = Date.now() + seconds * 1000;
     this.programTimer?.classList.remove('is-urgent');
     if (this.programTimerFill) this.programTimerFill.style.width = '100%';
-    if (this.programTimerLabel) this.programTimerLabel.textContent = `${seconds}s`;
 
     const tick = () => {
       if (this._programTimerKey !== key) return;
@@ -2022,9 +2105,6 @@ class RobotRallyUI {
       const leftSec = Math.ceil(leftMs / 1000);
       if (this.programTimerFill) {
         this.programTimerFill.style.width = `${(leftMs / (seconds * 1000)) * 100}%`;
-      }
-      if (this.programTimerLabel) {
-        this.programTimerLabel.textContent = `${leftSec}s`;
       }
       this.programTimer?.classList.toggle('is-urgent', leftSec <= 10);
 
@@ -2324,18 +2404,31 @@ class RobotRallyUI {
     const playerName = this.getDisplayPlayerName(robot);
     const labelEl = this.upgradeChoiceOverlay.querySelector('.upgrade-choice-label');
     if (labelEl) {
-      labelEl.textContent = matchPick ? 'Start upgrade' : 'Upgrade Vakje';
+      labelEl.classList.toggle('hidden', matchPick);
+      if (!matchPick) labelEl.textContent = 'Upgrade Vakje';
+    }
+    if (this.upgradeChoiceYou) {
+      this.upgradeChoiceYou.classList.toggle('hidden', !matchPick);
+      if (matchPick) {
+        if (this.upgradeChoiceYouName) {
+          this.upgradeChoiceYouName.textContent = playerName;
+        }
+        this.paintUpgradeChoiceRobot(robot);
+      }
     }
     if (this.upgradeChoiceTitle) {
-      this.upgradeChoiceTitle.textContent = matchPick
-        ? `${playerName} kiest een start-upgrade`
-        : `${playerName} kiest een upgrade`;
+      this.upgradeChoiceTitle.classList.toggle('hidden', matchPick);
+      if (!matchPick) {
+        this.upgradeChoiceTitle.textContent = `${playerName} kiest een upgrade`;
+      }
     }
     if (this.upgradeChoiceText) {
-      const n = options.length;
-      this.upgradeChoiceText.textContent = matchPick
-        ? `Kies 1 van deze ${n} upgrades om te starten. Daarna wacht je tot iedereen gekozen heeft.`
-        : `Je staat op een upgrade-vakje. Kies 1 van deze ${n} upgrades (blijft actief tot het einde).`;
+      this.upgradeChoiceText.classList.toggle('hidden', matchPick);
+      if (!matchPick) {
+        const n = options.length;
+        this.upgradeChoiceText.textContent =
+          `Je staat op een upgrade-vakje. Kies 1 van deze ${n} upgrades (blijft actief tot het einde).`;
+      }
     }
 
     this.upgradeChoiceList.innerHTML = options.map(option => `
@@ -2363,6 +2456,26 @@ class RobotRallyUI {
         }
       });
     });
+  }
+
+  paintUpgradeChoiceRobot(robot) {
+    const canvas = this.upgradeChoiceRobot;
+    if (!canvas || typeof RobotDraw === 'undefined' || !robot) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    ctx.save();
+    ctx.translate(w / 2, h / 2 + 4);
+    RobotDraw.draw(ctx, {
+      size: Math.min(w, h) * 0.72,
+      colors: this.getVividRobotColors(robot),
+      style: robot.style || 'scout',
+      showFrontMarker: true,
+      glow: true,
+    });
+    ctx.restore();
   }
 
   startExecution() {

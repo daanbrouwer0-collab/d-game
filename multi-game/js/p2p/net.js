@@ -142,7 +142,7 @@ export class Net {
 
       const timer = setTimeout(() => {
         cleanup();
-        const err = new Error("Room maken duurde te lang. Tik nog eens op Maak room.");
+        const err = new Error("Room maken duurde te lang. Tik nog eens op Host Room.");
         this.#setStatus("error", err.message);
         reject(err);
       }, 12000);

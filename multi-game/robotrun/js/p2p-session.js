@@ -894,6 +894,7 @@ const P2pSessionController = {
         SessionMenu.hideModal?.();
         Nav.switchTab("play");
         if (!this.isHost()) this.sendLocalProfileUpdate();
+        app.ui?.scheduleScrollBoardToTop?.({ delay: 50 });
       }
     } finally {
       this.applyingSnapshot = false;

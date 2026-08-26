@@ -2,7 +2,6 @@ import {
   clearAllRecentRooms,
   clearAllSandboxData,
   clearEventLogs,
-  clearFriends,
   ensureLocalProfile,
   getCharacter,
   getDisplayName,
@@ -25,7 +24,6 @@ const stats = document.getElementById("stats");
 function refreshStats() {
   const c = storageCounts();
   stats.innerHTML = `
-    <div class="stat-pill"><strong>${c.friends}</strong><span>vrienden</span></div>
     <div class="stat-pill"><strong>${c.recentRooms}</strong><span>rooms</span></div>
     <div class="stat-pill"><strong>${c.eventLogs}</strong><span>logs</span></div>`;
 }
@@ -56,13 +54,6 @@ document.getElementById("btn-clear-rooms").addEventListener("click", () => {
   refreshStats();
 });
 
-document.getElementById("btn-clear-friends").addEventListener("click", () => {
-  if (!confirm("Vrienden wissen?")) return;
-  clearFriends();
-  clearMsg.textContent = "Vrienden gewist.";
-  refreshStats();
-});
-
 document.getElementById("btn-clear-logs").addEventListener("click", () => {
   if (!confirm("Event-logs wissen?")) return;
   clearEventLogs();
@@ -71,7 +62,7 @@ document.getElementById("btn-clear-logs").addEventListener("click", () => {
 });
 
 document.getElementById("btn-clear-all").addEventListener("click", () => {
-  if (!confirm("Alles wissen (profiel, vrienden, rooms, logs, voorkeur)?")) return;
+  if (!confirm("Alles wissen (profiel, rooms, logs, voorkeur)?")) return;
   clearAllSandboxData();
   loadProfile();
   clearMsg.textContent = "Alles gewist.";

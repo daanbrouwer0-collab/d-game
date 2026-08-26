@@ -1,5 +1,5 @@
 /**
- * Room chat panel — open / collapsed / expanded (spec keuze C).
+ * Room chat panel — compact open chat (no toggle button chrome).
  * @param {HTMLElement} rootEl
  * @param {{ onSend: (text: string) => void, maxVisible?: number }} opts
  */
@@ -12,10 +12,9 @@ export function mountRoomChat(rootEl, opts) {
 
   rootEl.innerHTML = `
     <div class="room-chat panel" data-mode="open">
-      <button type="button" class="room-chat-toggle" aria-expanded="true">
-        <span class="room-chat-label">Chat</span>
-        <span class="room-chat-badge hidden" aria-label="Ongelezen">0</span>
-      </button>
+      <div class="room-chat-head">
+        <span class="room-chat-title">Chat</span>
+      </div>
       <div class="room-chat-body">
         <ul class="room-chat-messages" aria-live="polite"></ul>
         <form class="room-chat-form">
@@ -26,10 +25,6 @@ export function mountRoomChat(rootEl, opts) {
     </div>`;
 
   const shell = /** @type {HTMLElement} */ (rootEl.querySelector(".room-chat"));
-  const toggle = /** @type {HTMLButtonElement} */ (
-    rootEl.querySelector(".room-chat-toggle")
-  );
-  const badge = /** @type {HTMLElement} */ (rootEl.querySelector(".room-chat-badge"));
   const body = /** @type {HTMLElement} */ (rootEl.querySelector(".room-chat-body"));
   const list = /** @type {HTMLElement} */ (
     rootEl.querySelector(".room-chat-messages")
@@ -43,27 +38,9 @@ export function mountRoomChat(rootEl, opts) {
 
   function applyMode() {
     shell.dataset.mode = mode;
-    toggle.setAttribute(
-      "aria-expanded",
-      mode !== "collapsed" ? "true" : "false",
-    );
-    body.classList.toggle("hidden", mode === "collapsed");
-    body.classList.toggle("is-drawer", mode === "expanded");
+    // Always keep chat body visible in lobby; collapse modes are unused.
+    body.classList.remove("hidden", "is-drawer");
   }
-
-  toggle.addEventListener("click", () => {
-    if (mode === "collapsed") {
-      mode = "expanded";
-      applyMode();
-      markRead(Number(shell.dataset.chatSeq || 0));
-      renderLast();
-      return;
-    }
-    if (mode === "expanded") {
-      mode = "collapsed";
-      applyMode();
-    }
-  });
 
   /** @type {{ messages: { messageId: string, playerId: string, name: string, text: string, seq: number }[], localPlayerId: string, chatSeq: number } | null} */
   let lastRender = null;
@@ -82,14 +59,7 @@ export function mountRoomChat(rootEl, opts) {
       })
       .join("");
     list.scrollTop = list.scrollHeight;
-
-    if (mode === "open" || mode === "expanded") {
-      lastReadSeq = Math.max(lastReadSeq, data.chatSeq || 0);
-    }
-    const unread = Math.max(0, (data.chatSeq || 0) - lastReadSeq);
-    const showBadge = mode === "collapsed" && unread > 0;
-    badge.classList.toggle("hidden", !showBadge);
-    badge.textContent = String(unread);
+    lastReadSeq = Math.max(lastReadSeq, data.chatSeq || 0);
   }
 
   function renderLast() {
@@ -104,9 +74,11 @@ export function mountRoomChat(rootEl, opts) {
     input.value = "";
   });
 
+  applyMode();
+
   return {
     setMode(next) {
-      mode = next;
+      mode = next === "collapsed" || next === "expanded" ? "open" : next;
       applyMode();
     },
     markRead(chatSeq) {
