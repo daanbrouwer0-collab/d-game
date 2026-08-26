@@ -124,6 +124,26 @@ export function bindEmbeddedParentScroll(root = document) {
   };
   root.addEventListener("touchend", end, { passive: true });
   root.addEventListener("touchcancel", end, { passive: true });
+
+  // PC: forward mouse wheel to the room play card.
+  root.addEventListener(
+    "wheel",
+    (event) => {
+      const panel = playPanel();
+      if (!panel) return;
+      const target = /** @type {Element | null} */ (event.target);
+      if (
+        target?.closest?.(
+          "input, textarea, select, .cards-hand-wrap, .rules-sheet-body, .program-board",
+        )
+      ) {
+        return;
+      }
+      panel.scrollTop += event.deltaY;
+      event.preventDefault();
+    },
+    { passive: false },
+  );
 }
 
 /**

@@ -1884,21 +1884,33 @@ class RobotRallyUI {
   }
 
   syncExecutionTimer() {
-    // Guests follow host snapshots — only the host drives execution.
-    if (this.isP2pMode() && !this.isP2pHost()) {
-      if (this.autoStepTimer) {
-        clearInterval(this.autoStepTimer);
-        this.autoStepTimer = null;
-      }
-      return;
-    }
+    // Everyone runs local Play animation. Guests must not finalize the round
+    // (host end-snapshot is truth).
+    const allowFinalize = !(this.isP2pMode() && !this.isP2pHost());
 
     if (this.engine.phase === 'executing') {
       if (!this.autoStepTimer) {
         this.autoStepTimer = setInterval(() => {
-          if (this.engine.phase === 'executing') {
-            this.engine.advanceExecutionStep();
-          } else {
+          if (this.engine.phase !== 'executing') {
+            clearInterval(this.autoStepTimer);
+            this.autoStepTimer = null;
+            this.selectedRegisters = [null, null, null, null, null];
+            this.updateCardsUI();
+            return;
+          }
+          this.engine.advanceExecutionStep({ allowFinalize });
+          // Guest finished local playback — stop timer and wait for host snap.
+          if (
+            !allowFinalize
+            && this.engine.phase === 'executing'
+            && this.engine.execHeadline === 'Wachten op host…'
+          ) {
+            clearInterval(this.autoStepTimer);
+            this.autoStepTimer = null;
+            this.updateCardsUI();
+            return;
+          }
+          if (this.engine.phase !== 'executing') {
             clearInterval(this.autoStepTimer);
             this.autoStepTimer = null;
             this.selectedRegisters = [null, null, null, null, null];

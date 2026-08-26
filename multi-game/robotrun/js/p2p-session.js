@@ -1171,7 +1171,12 @@ const P2pSessionController = {
       if (!this.isActive() || !this.isHost() || this.applyingSnapshot) return;
       if (this.lobby?.status !== "playing") return;
       const phase = app.engine.phase;
-      if (phase === "finished") {
+      const prevPhase = this._lastEnginePhase;
+      this._lastEnginePhase = phase;
+      // Local Play: do not flood peers with micro-step snapshots.
+      if (phase === "executing") return;
+      // Leaving Play (or finished): push host truth immediately.
+      if (prevPhase === "executing" || phase === "finished") {
         clearTimeout(this._snapTimer);
         this.publishSnapshot().catch(() => {});
         return;

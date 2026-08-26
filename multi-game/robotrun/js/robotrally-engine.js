@@ -2077,16 +2077,25 @@ class RobotRallyEngine {
   }
 
   /**
-   * One visible execution micro-step (host timer / Play).
-   * Order per register: moves (priority) → board (conveyors/gears) → lasers.
+   * One visible execution micro-step.
+   * @param {{ allowFinalize?: boolean }} [opts]
+   *   allowFinalize false = guest local playback: do not startNewRound / checkRoundEnd.
    */
-  advanceExecutionStep() {
+  advanceExecutionStep(opts = {}) {
+    const allowFinalize = opts.allowFinalize !== false;
     if (this.phase !== 'executing') return;
 
-    if (this.registerIndex >= 5) {
+    const finishLocalPlayback = () => {
       this.execPhase = null;
-      this.execHeadline = '';
-      this.checkRoundEnd();
+      this.execMoveQueue = [];
+      this.execHeadline = allowFinalize ? 'Ronde afronden…' : 'Wachten op host…';
+      this.captureReplayFrame(this.registerIndex);
+      this.emitStateChange();
+      if (allowFinalize) this.checkRoundEnd();
+    };
+
+    if (this.registerIndex >= 5) {
+      finishLocalPlayback();
       return;
     }
 
@@ -2131,12 +2140,7 @@ class RobotRallyEngine {
     this.registerIndex += 1;
     this.lastLaserBursts = [];
     if (this.registerIndex >= 5) {
-      this.execPhase = null;
-      this.execMoveQueue = [];
-      this.execHeadline = 'Ronde afronden…';
-      this.captureReplayFrame(this.registerIndex);
-      this.emitStateChange();
-      this.checkRoundEnd();
+      finishLocalPlayback();
       return;
     }
 
