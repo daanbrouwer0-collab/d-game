@@ -10,6 +10,7 @@ import {
   encodeSyncPacket,
   parseSyncPacket,
   replaceFromHostPacket,
+  tipEventId,
   tipSeq,
 } from "../../js/sync/event-log.js";
 
@@ -269,6 +270,16 @@ function handleTransportMessage(ctrl, msg) {
     return;
   }
 
+  if (msg.type === SyncMsg.RESYNC) {
+    if (!ctrl.isHost()) return;
+    // Guest missed events (often the post-Play truth snap). Republish + full dump.
+    Promise.resolve(ctrl.publishSnapshot?.({ fullWire: true }))
+      .catch(() => {
+        pushLogWire(ctrl, { full: true });
+      });
+    return;
+  }
+
   if (ctrl.isHost()) {
     const payload = normalizeIntentPayload(msg.payload);
     const claimedUserId = String(
@@ -294,7 +305,11 @@ function adoptLogPacket(ctrl, raw) {
   const packet = parseSyncPacket(raw);
   if (!packet) return;
   const merged = applySyncPacket(ctrl.log, packet);
-  if (!merged.ok) return;
+  if (!merged.ok) {
+    // Silent gap = classic "guest stuck after Play". Ask host for a full dump.
+    requestLogResync(ctrl);
+    return;
+  }
   ctrl.log = merged.log;
   const hadBoard = !!window.RobotRallyApp?.engine?.board;
   ctrl.syncFromEmbeddedLog({ enterPlay: !hadBoard });
@@ -303,13 +318,29 @@ function adoptLogPacket(ctrl, raw) {
 /**
  * @param {typeof window.P2pSessionController} ctrl
  */
-export function pushLogWire(ctrl) {
+function requestLogResync(ctrl) {
+  if (!ctrl || ctrl.isHost?.() || !ctrl._bridgeTransport) return;
+  const now = Date.now();
+  if (ctrl._resyncAt && now - ctrl._resyncAt < 1600) return;
+  ctrl._resyncAt = now;
+  ctrl._bridgeTransport.send(SyncMsg.RESYNC, {
+    haveTipSeq: tipSeq(ctrl.log),
+    haveTipEventId: tipEventId(ctrl.log),
+  });
+}
+
+/**
+ * @param {typeof window.P2pSessionController} ctrl
+ * @param {{ full?: boolean }} [opts]
+ */
+export function pushLogWire(ctrl, { full = false } = {}) {
   if (!ctrl.isHost() || !ctrl._bridgeTransport || !ctrl.log) return;
-  const fromSeq = ctrl._wireFromSeq || 0;
+  const fromSeq = full ? 0 : (ctrl._wireFromSeq || 0);
   const packet = encodeSyncPacket(ctrl.log, fromSeq);
   if (!packet.events.length) return;
-  ctrl._bridgeTransport.send(SyncMsg.LOG, packet);
-  ctrl._wireFromSeq = tipSeq(ctrl.log);
+  const ok = ctrl._bridgeTransport.send(SyncMsg.LOG, packet);
+  // Only advance tip after a successful handoff — otherwise guests gap forever.
+  if (ok !== false) ctrl._wireFromSeq = tipSeq(ctrl.log);
 }
 
 /**
@@ -361,9 +392,12 @@ export function patchP2pSessionForRoom() {
 
   const prevPublish = ctrl.publishSnapshot?.bind(ctrl);
   if (prevPublish) {
-    ctrl.publishSnapshot = async function publishSnapshot() {
+    ctrl.publishSnapshot = async function publishSnapshot(opts = {}) {
       if (!this.isHost() || !window.RobotRallyApp?.engine) return;
       const gameState = window.RobotRallyApp.engine.exportGameState();
+      // Replay frames are local-only — keep wire payloads small enough for P2P/bridge.
+      gameState.currentRoundReplayFrames = [];
+      gameState.lastRoundReplay = null;
       const boardData = window.RobotRallyApp.engine.serializeBoard();
       this.lobby = this.lobby || {};
       this.lobby.status = gameState.phase === "finished" ? "finished" : "playing";
@@ -372,11 +406,16 @@ export function patchP2pSessionForRoom() {
       this.lobby.updatedAt = Date.now();
       if (this.embeddedMode) {
         this.broadcast("rr_state_snapshot", { boardData, gameState });
+        if (opts.fullWire) pushLogWire(this, { full: true });
         return;
       }
-      return prevPublish();
+      return prevPublish.call(this, opts);
     };
   }
+
+  ctrl.requestLogResync = function requestLogResyncFromCtrl() {
+    requestLogResync(this);
+  };
 
   ctrl.syncFromEmbeddedLog = function syncFromEmbeddedLog({ enterPlay = false } = {}) {
     const restored = this.restoreFromEmbeddedLog();

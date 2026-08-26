@@ -2027,6 +2027,9 @@ class RobotRallyUI {
             clearInterval(this.autoStepTimer);
             this.autoStepTimer = null;
             this.updateCardsUI();
+            // If the end-snap was dropped, ask host for a full log dump.
+            P2pSessionController?.requestLogResync?.();
+            this.scheduleWaitHostResync();
             return;
           }
           if (this.engine.phase !== 'executing') {
@@ -2043,6 +2046,31 @@ class RobotRallyUI {
     if (this.autoStepTimer) {
       clearInterval(this.autoStepTimer);
       this.autoStepTimer = null;
+    }
+    if (this.engine.phase !== 'executing') {
+      this.clearWaitHostResync();
+    }
+  }
+
+  scheduleWaitHostResync() {
+    this.clearWaitHostResync();
+    if (!(this.isP2pMode() && !this.isP2pHost())) return;
+    this._waitHostResyncTimer = setInterval(() => {
+      if (
+        this.engine.phase === 'executing'
+        && this.engine.execHeadline === 'Wachten op host…'
+      ) {
+        P2pSessionController?.requestLogResync?.();
+        return;
+      }
+      this.clearWaitHostResync();
+    }, 2000);
+  }
+
+  clearWaitHostResync() {
+    if (this._waitHostResyncTimer != null) {
+      clearInterval(this._waitHostResyncTimer);
+      this._waitHostResyncTimer = null;
     }
   }
 

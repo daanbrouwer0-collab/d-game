@@ -902,9 +902,13 @@ const P2pSessionController = {
     }
   },
 
-  async publishSnapshot() {
+  async publishSnapshot(opts = {}) {
     if (!this.isHost() || !window.RobotRallyApp?.engine) return;
     const gameState = window.RobotRallyApp.engine.exportGameState();
+    // Replay frames are local-only; shipping them bloated Play end-snaps and
+    // made guests miss the return-to-programming packet.
+    gameState.currentRoundReplayFrames = [];
+    gameState.lastRoundReplay = null;
     const boardData = window.RobotRallyApp.engine.serializeBoard();
     this.lobby = this.lobby || {};
     this.lobby.status = gameState.phase === "finished" ? "finished" : "playing";
@@ -923,6 +927,7 @@ const P2pSessionController = {
       StorageManager.updateSession(this.localSessionId, { boardData, gameState });
     }
     this.persistActiveRoom();
+    return opts;
   },
 
   async sendCommit(registers) {
@@ -969,7 +974,8 @@ const P2pSessionController = {
     if (!this.isHost()) throw new Error("Alleen de host mag Play drukken.");
     if (window.RobotRallyApp?.engine?.phase !== "ready") return;
     window.RobotRallyApp.engine.startExecution();
-    await this.publishSnapshot();
+    // Full wire so late/gapped guests still enter executing.
+    await this.publishSnapshot({ fullWire: true });
   },
 
   async sendMatchReady() {
@@ -1219,10 +1225,10 @@ const P2pSessionController = {
       this._lastEnginePhase = phase;
       // Local Play: do not flood peers with micro-step snapshots.
       if (phase === "executing") return;
-      // Leaving Play (or finished): push host truth immediately.
+      // Leaving Play (or finished): push host truth + full wire so guests unstick.
       if (prevPhase === "executing" || phase === "finished") {
         clearTimeout(this._snapTimer);
-        this.publishSnapshot().catch(() => {});
+        this.publishSnapshot({ fullWire: true }).catch(() => {});
         return;
       }
       clearTimeout(this._snapTimer);
