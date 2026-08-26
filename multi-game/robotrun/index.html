@@ -5,6 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>RobotRun — Tactical Robot Board Game</title>
 
+  <script>
+    (function () {
+      try {
+        var embedded =
+          window.__DGAME_EMBEDDED === 1 ||
+          /(?:^|[?&])embedded=1(?:&|$)/.test(String(location.search || ""));
+        if (!embedded) return;
+        window.__DGAME_EMBEDDED = 1;
+        document.documentElement.classList.add("dgame-embedded");
+      } catch (e) { /* ignore */ }
+    })();
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">

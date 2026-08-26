@@ -25,17 +25,29 @@ export function bindEmbeddedNavGuard(root = document) {
 
 /**
  * Strip standalone shell chrome when a game runs inside the room iframe (layer 2).
+ * Removes D-robotrally leftover nav/session UI so it cannot cover play/upgrade.
  */
 export function stripEmbeddedChrome() {
   document.documentElement.classList.add("dgame-embedded");
+  window.__DGAME_EMBEDDED = 1;
   document.querySelector("header.header")?.classList.add("hidden");
   document.querySelector(".nav")?.classList.add("hidden");
   document.getElementById("lobby")?.classList.add("hidden");
   document.getElementById("shell-nav")?.remove();
   document.getElementById("room-strip")?.remove();
   document.documentElement.classList.remove("has-shell-nav", "has-room-strip");
-  document.querySelector(".bottom-nav")?.classList.add("hidden");
-  document.getElementById("menu-overlay")?.classList.add("hidden");
+  // Remove — display:none alone still left a late FOUC / tap-blocker for guests.
+  document.querySelector(".bottom-nav")?.remove();
+  document.getElementById("menu-scrim")?.remove();
+  document.getElementById("menu-popup")?.remove();
+  document.getElementById("menu-overlay")?.remove();
+  document.getElementById("session-modal")?.remove();
+  [
+    "screen-courses",
+    "screen-character",
+    "screen-help",
+    "screen-settings",
+  ].forEach((id) => document.getElementById(id)?.classList.add("hidden"));
   hideLegacyP2pLobby();
   bindEmbeddedNavGuard(document);
 }

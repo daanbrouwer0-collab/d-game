@@ -318,14 +318,26 @@ function rewriteEmbeddedGameHtml(html, pagePath, cdnBase, searchQuery) {
     ? pagePath.slice(0, pagePath.lastIndexOf("/") + 1)
     : "";
   const pageBase = `${cdnBase}/${pageDir}`;
-  const embedBoot = `<script>window.__DGAME_EMBEDDED=1;window.__DGAME_EMBEDDED_SEARCH=${JSON.stringify(searchQuery)};</script>`;
-  if (!/<base\s/i.test(html)) {
-    return html.replace(
+  const embedBoot = `<script>window.__DGAME_EMBEDDED=1;window.__DGAME_EMBEDDED_SEARCH=${JSON.stringify(searchQuery)};document.documentElement.classList.add("dgame-embedded");</script>`;
+  let out = html;
+  if (!/<html[^>]*\bdgame-embedded\b/i.test(out)) {
+    out = out.replace(/<html(\s[^>]*)?>/i, (match, attrs = "") => {
+      if (/\bclass\s*=/i.test(attrs)) {
+        return `<html${attrs.replace(
+          /class\s*=\s*(["'])([^"']*)\1/i,
+          (_, q, cls) => `class=${q}${cls} dgame-embedded${q}`,
+        )}>`;
+      }
+      return `<html class="dgame-embedded"${attrs || ""}>`;
+    });
+  }
+  if (!/<base\s/i.test(out)) {
+    return out.replace(
       /<head([^>]*)>/i,
       `<head$1><base href="${pageBase}">${embedBoot}`,
     );
   }
-  return html.replace(/<head([^>]*)>/i, `<head$1>${embedBoot}`);
+  return out.replace(/<head([^>]*)>/i, `<head$1>${embedBoot}`);
 }
 
 /**

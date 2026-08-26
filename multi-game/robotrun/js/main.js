@@ -5,7 +5,15 @@ window.RobotRallyApp = {
   sessionReady: false,
 
   init(opts = {}) {
-    const embedded = opts.embedded === true || window.__DGAME_EMBEDDED;
+    const embedded = opts.embedded === true
+      || window.__DGAME_EMBEDDED
+      || (typeof location !== 'undefined'
+        && new URLSearchParams(location.search).get('embedded') === '1');
+    if (embedded) {
+      document.documentElement.classList.add('dgame-embedded');
+      window.__DGAME_EMBEDDED = 1;
+    }
+
     this.engine = new RobotRallyEngine();
     const canvas = document.getElementById('board-canvas');
 
@@ -15,18 +23,22 @@ window.RobotRallyApp = {
 
     this.setupAutoSave();
 
-    Nav.init();
     if (!embedded) {
+      Nav.init();
       SessionMenu.init();
+      AppMenu.init();
+      CharacterManager.init();
+      this.renderCourseCards();
+      this.initSettings();
+      this.renderHelpUpgrades();
     } else {
+      // Room play: drop standalone D-robotrally chrome immediately.
+      document.querySelector('.bottom-nav')?.remove();
+      document.getElementById('menu-overlay')?.remove();
+      document.getElementById('menu-scrim')?.remove();
+      document.getElementById('menu-popup')?.remove();
       SessionMenu.hideModal?.();
     }
-    AppMenu.init();
-    CharacterManager.init();
-
-    this.renderCourseCards();
-    this.initSettings();
-    this.renderHelpUpgrades();
 
     // Refresh always lands on Home to pick a session — do not auto-resume.
     const players = StorageManager.loadPlayers();

@@ -85,11 +85,17 @@ export function bootstrapRoomEmbedded(ctx) {
   Nav.switchTab("play");
   const app = window.RobotRallyApp;
   if (app?.ui) {
+    app.ui.localP2pRobotId = ctrl.localRobotId() || app.ui.localP2pRobotId;
+    app.ui.p2pHostMode = ctrl.isHost();
+    app.ui.programmingUnlockedRobotId = ctrl.localRobotId() || app.ui.programmingUnlockedRobotId;
     app.ui.resizeCanvas();
     app.ui.updateCardsUI();
     app.ui.render?.();
   }
-  Toast.show("RobotRun — programmeer tegelijk!");
+  // Geen "programmeer"-toast vóór match_ready; dat voelde als vastzitten op oude UI.
+  if (window.RobotRallyApp?.engine?.phase === "programming") {
+    Toast.show("RobotRun — programmeer tegelijk!");
+  }
 }
 
 /**
@@ -262,9 +268,17 @@ function handleTransportMessage(ctrl, msg) {
   }
 
   if (ctrl.isHost()) {
+    const payload = normalizeIntentPayload(msg.payload);
+    const claimedUserId = String(
+      /** @type {{ userId?: string }} */ (payload).userId || "",
+    );
+    if (msg.fromPeerId && claimedUserId) {
+      ctrl.peerToPlayer = ctrl.peerToPlayer || {};
+      ctrl.peerToPlayer[msg.fromPeerId] = claimedUserId;
+    }
     ctrl.handleMessage({
       type: msg.type,
-      payload: normalizeIntentPayload(msg.payload),
+      payload,
       fromPeerId: msg.fromPeerId || null,
     });
   }

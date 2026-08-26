@@ -6,6 +6,9 @@ import {
 } from "../../js/shell/embedded-chrome.js";
 import { bootstrapRoomEmbedded, patchP2pSessionForRoom } from "./room-embedded.js";
 
+// Hide D-robotrally chrome before any room bootstrap / first paint settle.
+stripEmbeddedChrome();
+hideEmbeddedLeaveButtons(".embedded-leave");
 patchP2pSessionForRoom();
 
 function wireEmbeddedLayout() {
