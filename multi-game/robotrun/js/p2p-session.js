@@ -870,6 +870,7 @@ const P2pSessionController = {
       if (app.ui) {
         app.ui.localP2pRobotId = localId;
         app.ui.p2pHostMode = this.isHost();
+        app.ui.syncLocalP2pRobotId?.();
         if (app.engine.phase === "programming") {
           app.ui.programmingUnlockedRobotId = localId;
           const committed = app.engine.isRobotCommitted?.(localId);
@@ -1008,18 +1009,38 @@ const P2pSessionController = {
     if (this.isHost()) {
       const engine = window.RobotRallyApp.engine;
       if (engine.phase === "match_ready") {
-        engine.confirmMatchUpgrade(robotId, upgradeId);
+        const ok = engine.confirmMatchUpgrade(robotId, upgradeId);
+        if (!ok) throw new Error("Upgrade kiezen lukt nu niet.");
       } else {
         engine.chooseUpgrade(upgradeId);
       }
-      await this.publishSnapshot();
+      await this.publishSnapshot({ fullWire: true });
       return;
     }
-    this.send("rr_intent_upgrade", {
+    const sent = this.send("rr_intent_upgrade", {
       robotId,
       userId: this.playerId,
       upgradeId,
     });
+    if (sent === false) throw new Error("Verbinding kwijt — upgrade niet verstuurd.");
+
+    // Optimistic UI: leave the start-upgrade sheet while waiting for host truth.
+    // If the host rejects / snap is stale, the next heartbeat restores offers.
+    const engine = window.RobotRallyApp?.engine;
+    const ui = window.RobotRallyApp?.ui;
+    if (engine?.phase === "match_ready" && engine.matchUpgradeOffers) {
+      delete engine.matchUpgradeOffers[robotId];
+      if (!engine.matchReadyRobotIds.includes(robotId)) {
+        engine.matchReadyRobotIds = [...(engine.matchReadyRobotIds || []), robotId];
+      }
+      ui?.updateCardsUI?.();
+    }
+    // Heal missed host snaps that leave the joiner on the upgrade sheet.
+    setTimeout(() => {
+      if (engine?.phase !== "match_ready") return;
+      if (engine.isRobotMatchReady?.(robotId) && !engine.getMatchUpgradeOffer?.(robotId)?.length) return;
+      this.requestLogResync?.();
+    }, 1800);
   },
 
   handleMessage(msg) {
@@ -1165,8 +1186,13 @@ const P2pSessionController = {
       if (bound.userId === this.playerId) return;
       const engine = window.RobotRallyApp.engine;
       if (engine.phase === "match_ready") {
-        engine.confirmMatchUpgrade(bound.robotId, payload.upgradeId);
-        this.publishSnapshot().catch(() => {});
+        const ok = engine.confirmMatchUpgrade(bound.robotId, payload.upgradeId);
+        if (ok) {
+          this.publishSnapshot({ fullWire: true }).catch(() => {});
+        } else {
+          // Replay truth so the guest leaves a stale upgrade sheet.
+          this.publishSnapshot({ fullWire: true }).catch(() => {});
+        }
         return;
       }
       const choice = engine.currentUpgradeChoice;
@@ -1211,7 +1237,9 @@ const P2pSessionController = {
           this._phaseHeartbeatPhase = "";
           return;
         }
-        this.publishSnapshot().catch(() => {});
+        // Periodic full wire heals joiners stuck on the start-upgrade sheet.
+        const beat = (this._phaseHeartbeatCount = (this._phaseHeartbeatCount || 0) + 1);
+        this.publishSnapshot({ fullWire: beat % 3 === 0 }).catch(() => {});
       }, 1000);
     };
     const previous = app.engine.onStateChange;

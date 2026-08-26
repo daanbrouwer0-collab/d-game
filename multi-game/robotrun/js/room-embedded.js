@@ -86,9 +86,10 @@ export function bootstrapRoomEmbedded(ctx) {
   Nav.switchTab("play");
   const app = window.RobotRallyApp;
   if (app?.ui) {
-    app.ui.localP2pRobotId = ctrl.localRobotId() || app.ui.localP2pRobotId;
     app.ui.p2pHostMode = ctrl.isHost();
-    app.ui.programmingUnlockedRobotId = ctrl.localRobotId() || app.ui.programmingUnlockedRobotId;
+    app.ui.syncLocalP2pRobotId?.();
+    app.ui.localP2pRobotId = ctrl.localRobotId() || app.ui.localP2pRobotId;
+    app.ui.programmingUnlockedRobotId = app.ui.localP2pRobotId || app.ui.programmingUnlockedRobotId;
     app.ui.resizeCanvas();
     app.ui.updateCardsUI();
     app.ui.render?.();
@@ -235,9 +236,10 @@ function startEmbeddedRace(ctrl) {
   app.sessionReady = true;
   ctrl.applyLocalHubProfile?.();
   if (app.ui) {
-    app.ui.localP2pRobotId = ctrl.localRobotId();
     app.ui.p2pHostMode = true;
-    app.ui.programmingUnlockedRobotId = ctrl.localRobotId();
+    app.ui.syncLocalP2pRobotId?.();
+    app.ui.localP2pRobotId = ctrl.localRobotId() || app.ui.localP2pRobotId;
+    app.ui.programmingUnlockedRobotId = app.ui.localP2pRobotId;
     app.ui.resizeCanvas();
     app.ui.updateCardsUI();
     app.ui.render?.();

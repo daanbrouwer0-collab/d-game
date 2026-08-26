@@ -362,8 +362,16 @@ class RobotRallyUI {
   }
 
   updateCardsUI() {
+    this.syncLocalP2pRobotId();
     const currentRobot = this.getFocusedRobot();
-    if (!currentRobot || !this.engine.board) return;
+    if (!currentRobot || !this.engine.board) {
+      // P2P guest can briefly miss seat mapping; still keep upgrade/ready overlays honest.
+      if (this.isP2pMode() && this.engine.board) {
+        this.renderUpgradeChoiceOverlay();
+        this.renderPlaybackOverlay();
+      }
+      return;
+    }
 
     // Play: keep DOM light so each micro-step does not rebuild the whole panel.
     if (this.engine.phase === 'executing') {
@@ -1931,17 +1939,43 @@ class RobotRallyUI {
     if (this.engine.phase === 'upgrade_choice' && this.engine.currentUpgradeChoice) {
       return this.engine.robots.find(robot => robot.id === this.engine.currentUpgradeChoice.robotId) || null;
     }
-    return this.getProgrammingRobot() || this.engine.robots[0] || null;
+    return this.getProgrammingRobot() || (!this.isP2pMode() ? (this.engine.robots[0] || null) : null);
   }
 
   getProgrammingRobot() {
-    if (this.isP2pMode() && this.localP2pRobotId) {
-      return this.engine.robots.find(robot => robot.id === this.localP2pRobotId)
-        || this.engine.robots.find(robot => robot.peerUserId === P2pSessionController?.playerId)
-        || this.engine.robots.find(robot => robot.peerUserId === P2pSessionController?.localPeerId)
-        || null;
+    if (this.isP2pMode()) {
+      this.syncLocalP2pRobotId();
+      const localId = this.localP2pRobotId;
+      const playerId = P2pSessionController?.playerId;
+      if (localId) {
+        const byId = this.engine.robots.find((robot) => robot.id === localId);
+        if (byId) return byId;
+      }
+      if (playerId) {
+        const byPeer = this.engine.robots.find((robot) => robot.peerUserId === playerId);
+        if (byPeer) {
+          this.localP2pRobotId = byPeer.id;
+          return byPeer;
+        }
+      }
+      // Never fall back to robots[0] in P2P — that is usually the host seat.
+      return null;
     }
     return this.engine.robots[this.engine.programmingPlayerIndex] || this.engine.robots[0] || null;
+  }
+
+  /** Keep UI seat identity aligned with room playerId / lobby seat. */
+  syncLocalP2pRobotId() {
+    if (!this.isP2pMode()) return;
+    const fromSeat = P2pSessionController?.localRobotId?.();
+    if (fromSeat) {
+      this.localP2pRobotId = fromSeat;
+      return;
+    }
+    const playerId = P2pSessionController?.playerId;
+    if (!playerId || !this.engine?.robots) return;
+    const hit = this.engine.robots.find((robot) => robot.peerUserId === playerId);
+    if (hit) this.localP2pRobotId = hit.id;
   }
 
   applyModeState() {
