@@ -92,7 +92,7 @@
   box-shadow: none;
   border-radius: 0;
   border: none;
-  touch-action: none;
+  touch-action: pan-y;
 }
 
 #programming-panel {

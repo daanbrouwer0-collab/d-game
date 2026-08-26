@@ -42,6 +42,91 @@ export function notifyLeaveGame() {
 }
 
 /**
+ * Tell the room shell the embedded document height (for iframe sizing).
+ * @param {number} [explicitHeight]
+ */
+export function reportContentHeight(explicitHeight) {
+  if (window.parent === window) return;
+  const app = document.getElementById("app");
+  const height = Number.isFinite(explicitHeight) && explicitHeight > 0
+    ? explicitHeight
+    : Math.max(
+      app?.scrollHeight || 0,
+      document.documentElement?.scrollHeight || 0,
+      document.body?.scrollHeight || 0,
+      320,
+    );
+  window.parent.postMessage(
+    { type: BridgeMsg.CONTENT_HEIGHT, height: Math.ceil(height) },
+    "*",
+  );
+}
+
+/**
+ * Vertical pan on non-controls scrolls the room play card (same-origin iframe).
+ * @param {ParentNode} [root]
+ */
+export function bindEmbeddedParentScroll(root = document) {
+  if (!document.documentElement.classList.contains("dgame-embedded")) return;
+  if (window.parent === window) return;
+
+  /** @type {number | null} */
+  let lastY = null;
+  let tracking = false;
+
+  const playPanel = () => {
+    try {
+      return window.parent.document?.getElementById("panel-playing");
+    } catch {
+      return null;
+    }
+  };
+
+  root.addEventListener(
+    "touchstart",
+    (event) => {
+      if (event.touches.length !== 1) {
+        tracking = false;
+        return;
+      }
+      const target = /** @type {Element | null} */ (event.target);
+      if (
+        target?.closest?.(
+          "button, input, textarea, select, a, .card-item, .register-slot, .playback-btn",
+        )
+      ) {
+        tracking = false;
+        return;
+      }
+      tracking = true;
+      lastY = event.touches[0].clientY;
+    },
+    { passive: true },
+  );
+
+  root.addEventListener(
+    "touchmove",
+    (event) => {
+      if (!tracking || lastY == null || event.touches.length !== 1) return;
+      const panel = playPanel();
+      if (!panel) return;
+      const y = event.touches[0].clientY;
+      panel.scrollTop += lastY - y;
+      lastY = y;
+      event.preventDefault();
+    },
+    { passive: false },
+  );
+
+  const end = () => {
+    tracking = false;
+    lastY = null;
+  };
+  root.addEventListener("touchend", end, { passive: true });
+  root.addEventListener("touchcancel", end, { passive: true });
+}
+
+/**
  * Host-only: roep aan wanneer sessie klaar is (win, draw, quit).
  * @param {() => boolean} isFinished
  * @param {string | (() => {

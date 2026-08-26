@@ -8,4 +8,5 @@ export const BridgeMsg = Object.freeze({
   SESSION_ENDED: "dgame:session-ended",
   LEAVE_GAME: "dgame:leave-game",
   READY: "dgame:ready",
+  CONTENT_HEIGHT: "dgame:content-height",
 });

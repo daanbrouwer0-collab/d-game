@@ -16,7 +16,6 @@ class RobotRallyUI {
     this.p2pHostMode = false;
     this.isReplaying = false;
     this.replayPoseById = null;
-    this.replayPromptTimer = null;
     this.replayRunToken = 0;
     this._programTimerInterval = null;
     this._programTimerKey = '';
@@ -66,7 +65,6 @@ class RobotRallyUI {
     this.activePlayerText = document.getElementById('active-player-text');
     this.activePlayerStatus = document.getElementById('active-player-status');
     this.boardFrame = document.getElementById('board-frame');
-    this.boardReplayPrompt = document.getElementById('board-replay-prompt');
     this.btnBoardReplay = document.getElementById('btn-board-replay');
     this.playbackOverlay = document.getElementById('playback-overlay');
     this.playbackStatusCard = this.playbackOverlay?.querySelector('.playback-status-card') || null;
@@ -105,13 +103,6 @@ class RobotRallyUI {
       event.stopPropagation();
       this.startBoardReplay();
     });
-    this.canvas?.addEventListener('click', () => this.onBoardTap());
-    this.canvas?.addEventListener('touchend', (event) => {
-      if (event.changedTouches?.length) {
-        event.preventDefault();
-        this.onBoardTap();
-      }
-    }, { passive: false });
     this.btnPowerDown?.addEventListener('click', () => {
       const robot = this.getProgrammingRobot();
       if (!robot) return;
@@ -808,6 +799,12 @@ class RobotRallyUI {
           ? (lockedCount ? `Bevestig (${lockedCount} vast)` : 'Bevestig Programma')
           : `Kies nog ${openEmpty} kaarten`);
     }
+
+    if (this.btnBoardReplay) {
+      const showReplay = this.canOfferBoardReplay();
+      this.btnBoardReplay.classList.toggle('hidden', !showReplay);
+      this.btnBoardReplay.disabled = !showReplay || this.isReplaying;
+    }
   }
 
   runProgram({ allowPartial = false } = {}) {
@@ -873,34 +870,13 @@ class RobotRallyUI {
     return true;
   }
 
-  onBoardTap() {
-    if (!this.canOfferBoardReplay()) {
-      this.hideBoardReplayPrompt();
-      return;
-    }
-    this.showBoardReplayPrompt();
-  }
-
-  showBoardReplayPrompt() {
-    if (!this.boardReplayPrompt) return;
-    this.boardReplayPrompt.classList.remove('hidden');
-    clearTimeout(this.replayPromptTimer);
-    this.replayPromptTimer = setTimeout(() => this.hideBoardReplayPrompt(), 4000);
-  }
-
-  hideBoardReplayPrompt() {
-    clearTimeout(this.replayPromptTimer);
-    this.replayPromptTimer = null;
-    this.boardReplayPrompt?.classList.add('hidden');
-  }
-
   async startBoardReplay() {
     const frames = this.engine?.lastRoundReplay?.frames;
     if (!frames?.length || this.isReplaying) return;
-    this.hideBoardReplayPrompt();
     this.isReplaying = true;
     const token = ++this.replayRunToken;
     Toast.show(`Replay ronde ${this.engine.lastRoundReplay.roundNumber}`);
+    this.updateButtons();
 
     for (let i = 0; i < frames.length; i++) {
       if (token !== this.replayRunToken) return;

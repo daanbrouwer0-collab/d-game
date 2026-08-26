@@ -430,8 +430,20 @@ function clearGameFrame() {
 
 function syncPlayingBarButtons() {
   if (!session) return;
-  btnLeaveGame?.classList.remove("hidden");
+  // Spec: no ← Lobby during play; Stop remains for host.
+  btnLeaveGame?.classList.add("hidden");
   btnEndSession?.classList.toggle("hidden", session.role !== "host");
+}
+
+/**
+ * Size the game iframe to the embedded document so chat scrolls on the same card.
+ * @param {number} height
+ */
+function applyGameFrameHeight(height) {
+  if (!gameFrame) return;
+  const px = Math.max(320, Math.ceil(height));
+  gameFrame.style.height = `${px}px`;
+  gameFrame.style.minHeight = `${px}px`;
 }
 
 /** @param {"player"|"spectator"} [participation] */
@@ -1086,12 +1098,15 @@ async function mountActiveGame(gameId, sessionId, sessionLogPacket) {
   if (gameBridge) gameBridge.destroy();
   gameBridge = mountGameBridge(gameFrame);
   gameBridge.onGameOut(relayGameOut);
+  gameBridge.onContentHeight(applyGameFrameHeight);
   gameBridge.onHandshakeReady(() => {
     signalPlayerInGame();
     pushPresenceToGame();
   });
 
   clearGameFrame();
+  gameFrame.style.height = "";
+  gameFrame.style.minHeight = "";
   gameBridge.resetHandshake();
 
   const initPayload = () => {

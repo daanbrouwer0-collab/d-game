@@ -1,4 +1,8 @@
-import { runEmbeddedGame } from "../../js/bridge/embedded-bootstrap.js";
+import {
+  runEmbeddedGame,
+  reportContentHeight,
+  bindEmbeddedParentScroll,
+} from "../../js/bridge/embedded-bootstrap.js";
 import {
   hideEmbeddedLeaveButtons,
   stripEmbeddedChrome,
@@ -7,6 +11,28 @@ import {
 import { bootstrapRoomEmbedded, patchP2pSessionForRoom } from "./room-embedded.js";
 
 patchP2pSessionForRoom();
+
+function wireEmbeddedLayout() {
+  stripEmbeddedChrome();
+  hideEmbeddedLeaveButtons(".embedded-leave");
+  bindEmbeddedParentScroll(document.getElementById("screen-play") || document);
+  const report = () => reportContentHeight();
+  report();
+  requestAnimationFrame(report);
+  if (typeof ResizeObserver !== "undefined") {
+    const root = document.getElementById("app") || document.body;
+    const ro = new ResizeObserver(() => report());
+    if (root) ro.observe(root);
+  }
+  window.addEventListener("resize", report);
+  const prev = window.RobotRallyApp?.engine?.onStateChange;
+  if (window.RobotRallyApp?.engine) {
+    window.RobotRallyApp.engine.onStateChange = () => {
+      if (typeof prev === "function") prev();
+      requestAnimationFrame(report);
+    };
+  }
+}
 
 runEmbeddedGame({
   gameId: "robotrun",
@@ -25,11 +51,10 @@ runEmbeddedGame({
   },
   start(ctx) {
     applySpectatorMode(ctx.participation === "spectator");
-    stripEmbeddedChrome();
-    hideEmbeddedLeaveButtons(".embedded-leave");
     if (!window.RobotRallyApp?.engine) {
       throw new Error("RobotRun boot: engine niet geïnitialiseerd");
     }
     bootstrapRoomEmbedded(ctx);
+    wireEmbeddedLayout();
   },
 });

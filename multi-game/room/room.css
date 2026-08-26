@@ -243,7 +243,7 @@ html.has-shell-nav body:has(.app-room #panel-playing:not(.hidden)) {
   display: none;
 }
 
-/* Full-bleed play shell: definite height so iframe flex + chat dock share the viewport. */
+/* Full-bleed play shell: one scrollable card (game iframe + chat). */
 .app-room:has(#panel-playing:not(.hidden)) {
   max-width: none;
   width: 100%;
@@ -273,14 +273,34 @@ html.has-shell-nav body:has(.app-room #panel-playing:not(.hidden)) {
   border: 0;
   box-shadow: none;
   background: transparent;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+.app-room:has(#panel-playing:not(.hidden)) .playing-bar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--cell, #fff);
 }
 
 .app-room:has(#panel-playing:not(.hidden)) .game-frame {
-  /* flex-basis 0: size from remaining space, not empty iframe intrinsic height */
-  flex: 1 1 0;
-  min-height: 0;
-  height: auto;
+  flex: 0 0 auto;
   width: 100%;
+  min-height: 50vh;
+  height: auto;
+  border: 0;
+  display: block;
+}
+
+.app-room:has(#panel-playing:not(.hidden)) .room-chat-play-slot {
+  flex: 0 0 auto;
+}
+
+.app-room:has(#panel-playing:not(.hidden)) #btn-leave-game {
+  display: none !important;
 }
 
 @media (max-width: 640px) {
@@ -350,6 +370,8 @@ html.has-shell-nav body:has(.app-room #panel-playing:not(.hidden)) {
   flex-shrink: 0;
   border-top: 1px solid var(--border, #e8e8e8);
   background: var(--cell, #fff);
+  /* Same visual card as the game column */
+  box-shadow: none;
 }
 
 .room-chat-play-slot:empty {

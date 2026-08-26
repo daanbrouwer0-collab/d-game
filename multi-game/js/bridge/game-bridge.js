@@ -10,6 +10,8 @@ export function mountGameBridge(iframe) {
   let onGameOut = null;
   /** @type {(() => void) | null} */
   let onHandshakeReady = null;
+  /** @type {((height: number) => void) | null} */
+  let onContentHeight = null;
   /** @type {Record<string, unknown> | null} */
   let pendingInit = null;
   let gameReady = false;
@@ -27,6 +29,14 @@ export function mountGameBridge(iframe) {
     if (data.type === BridgeMsg.READY) {
       gameReady = true;
       flushSessionInit();
+      return;
+    }
+
+    if (data.type === BridgeMsg.CONTENT_HEIGHT) {
+      const height = Number(/** @type {{ height?: unknown }} */ (data).height);
+      if (Number.isFinite(height) && height > 0) {
+        onContentHeight?.(height);
+      }
       return;
     }
 
@@ -75,6 +85,13 @@ export function mountGameBridge(iframe) {
       onHandshakeReady = handler;
     },
     /**
+     * Embedded game reports document height so the room can size the iframe.
+     * @param {(height: number) => void} handler
+     */
+    onContentHeight(handler) {
+      onContentHeight = handler;
+    },
+    /**
      * Call before navigating the iframe to a new game document.
      */
     resetHandshake() {
@@ -103,6 +120,7 @@ export function mountGameBridge(iframe) {
       alive = false;
       onGameOut = null;
       onHandshakeReady = null;
+      onContentHeight = null;
       pendingInit = null;
       gameReady = false;
       window.removeEventListener("message", onMessage);
