@@ -22,6 +22,8 @@ const P2pSessionController = {
   joinInFlight: false,
   lastSnapshotAt: 0,
   _snapTimer: null,
+  _phaseHeartbeatTimer: null,
+  _phaseHeartbeatPhase: "",
   _deskSnapAt: 0,
 
   isActive() {
@@ -242,6 +244,9 @@ const P2pSessionController = {
   stop() {
     if (this._snapTimer) clearTimeout(this._snapTimer);
     this._snapTimer = null;
+    if (this._phaseHeartbeatTimer) clearInterval(this._phaseHeartbeatTimer);
+    this._phaseHeartbeatTimer = null;
+    this._phaseHeartbeatPhase = "";
     if (this.session) {
       this.session.destroy().catch(() => {});
     }
@@ -1177,12 +1182,38 @@ const P2pSessionController = {
   wireHostAutosnapshots() {
     const app = window.RobotRallyApp;
     if (!app?.engine) return;
+    const syncPhaseHeartbeat = (phase) => {
+      const shouldBeat = phase === "match_ready" || phase === "match_countdown";
+      if (!shouldBeat) {
+        if (this._phaseHeartbeatTimer) clearInterval(this._phaseHeartbeatTimer);
+        this._phaseHeartbeatTimer = null;
+        this._phaseHeartbeatPhase = "";
+        return;
+      }
+      if (this._phaseHeartbeatTimer && this._phaseHeartbeatPhase === phase) return;
+      if (this._phaseHeartbeatTimer) clearInterval(this._phaseHeartbeatTimer);
+      this._phaseHeartbeatPhase = phase;
+      // Reliability hedge: late joiners / delayed peers still receive phase sync.
+      this._phaseHeartbeatTimer = setInterval(() => {
+        if (!this.isActive() || !this.isHost() || this.applyingSnapshot) return;
+        if (this.lobby?.status !== "playing") return;
+        const livePhase = app.engine.phase;
+        if (livePhase !== "match_ready" && livePhase !== "match_countdown") {
+          clearInterval(this._phaseHeartbeatTimer);
+          this._phaseHeartbeatTimer = null;
+          this._phaseHeartbeatPhase = "";
+          return;
+        }
+        this.publishSnapshot().catch(() => {});
+      }, 1000);
+    };
     const previous = app.engine.onStateChange;
     app.engine.onStateChange = () => {
       if (typeof previous === "function") previous();
       if (!this.isActive() || !this.isHost() || this.applyingSnapshot) return;
       if (this.lobby?.status !== "playing") return;
       const phase = app.engine.phase;
+      syncPhaseHeartbeat(phase);
       const prevPhase = this._lastEnginePhase;
       this._lastEnginePhase = phase;
       // Local Play: do not flood peers with micro-step snapshots.

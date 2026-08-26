@@ -2323,16 +2323,8 @@ class RobotRallyUI {
         const upgradeId = button.getAttribute('data-upgrade-choice');
         if (!upgradeId) return;
         if (this.isP2pMode() && P2pSessionController?.isActive?.()) {
-          this.upgradeChoiceList.querySelectorAll('[data-upgrade-choice]').forEach((btn) => {
-            btn.disabled = true;
-          });
           P2pSessionController.sendUpgrade(upgradeId)
-            .catch((err) => {
-              this.upgradeChoiceList.querySelectorAll('[data-upgrade-choice]').forEach((btn) => {
-                btn.disabled = false;
-              });
-              Toast.show(err.message || 'Upgrade kiezen mislukt');
-            });
+            .catch((err) => Toast.show(err.message || 'Upgrade kiezen mislukt'));
           return;
         }
         const chosen = matchPick
