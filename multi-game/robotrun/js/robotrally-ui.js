@@ -324,11 +324,11 @@ class RobotRallyUI {
     if (!this.panelTitle) return;
 
     if (this.engine.phase === 'match_ready') {
-      this.panelTitle.textContent = 'Ready check';
+      this.panelTitle.textContent = 'Start-upgrade';
       if (this.selectionHint) {
         const readyCount = (this.engine.matchReadyRobotIds || []).length;
         const total = this.engine.getMatchReadyHumans?.().length || 0;
-        this.selectionHint.textContent = `Iedereen moet Ready drukken (${readyCount}/${total}).`;
+        this.selectionHint.textContent = `Iedereen kiest een upgrade (${readyCount}/${total}).`;
       }
       return;
     }
@@ -426,9 +426,9 @@ class RobotRallyUI {
       const info = document.createElement('div');
       info.className = 'cards-hand-message';
       if (this.engine.phase === 'match_ready') {
-        info.textContent = 'Druk op Ready om te starten. Daarna wachten we op de anderen.';
+        info.textContent = 'Kies een start-upgrade. Daarna wachten we op de anderen.';
       } else if (this.engine.phase === 'match_countdown') {
-        info.textContent = 'Iedereen is ready — het spel start zo.';
+        info.textContent = 'Iedereen is klaar — het spel start zo.';
       } else if (this.engine.phase === 'ready') {
         info.textContent = 'Alle kaarten zijn bevestigd. Druk op Play om de acties op het bord te starten.';
       } else if (this.engine.phase === 'executing') {
@@ -713,7 +713,7 @@ class RobotRallyUI {
 
     if (this.hudRegister) {
       if (this.engine.phase === 'match_ready') {
-        this.hudRegister.textContent = 'Ready check';
+        this.hudRegister.textContent = 'Upgrade kiezen';
       } else if (this.engine.phase === 'match_countdown') {
         this.hudRegister.textContent = 'Start over…';
       } else if (this.engine.phase === 'programming') {
@@ -804,7 +804,7 @@ class RobotRallyUI {
       const tipParts = [
         isYou ? 'Jij' : this.getDisplayPlayerName(robot),
         matchGate
-          ? (isReady ? 'Ready' : 'Wacht…')
+          ? (isReady ? 'Upgrade gekozen' : 'Kiest…')
           : (isReady ? 'Ready' : (isTurn ? 'Programmeert' : '')),
       ].filter(Boolean);
 
@@ -1853,7 +1853,10 @@ class RobotRallyUI {
     this.gameWrap?.classList.toggle('panel-collapsed', shouldCollapse);
     this.gameWrap?.classList.toggle('ready-mode', phase === 'ready');
     this.gameWrap?.classList.toggle('executing-mode', phase === 'executing');
-    this.gameWrap?.classList.toggle('upgrade-choice-mode', phase === 'upgrade_choice');
+    this.gameWrap?.classList.toggle('upgrade-choice-mode', phase === 'upgrade_choice'
+      || (phase === 'match_ready' && !!(this.getProgrammingRobot()
+        && !this.engine.isRobotMatchReady?.(this.getProgrammingRobot().id)
+        && this.engine.getMatchUpgradeOffer?.(this.getProgrammingRobot().id)?.length)));
     this.gameWrap?.classList.toggle('match-ready-mode', phase === 'match_ready');
     this.gameWrap?.classList.toggle('match-countdown-mode', phase === 'match_countdown');
     this.gameWrap?.classList.toggle('privacy-locked', privacyLocked);
@@ -2104,10 +2107,10 @@ class RobotRallyUI {
       if (this.engine.phase === 'match_ready') {
         const iAmReady = this.engine.isRobotMatchReady?.(currentRobot.id);
         this.activePlayerText.textContent = iAmReady
-          ? 'Je bent ready — wacht op de anderen.'
-          : 'Druk op Ready als je er bent.';
+          ? 'Upgrade gekozen — wacht op de anderen.'
+          : 'Kies een start-upgrade om verder te gaan.';
       } else if (this.engine.phase === 'match_countdown') {
-        this.activePlayerText.textContent = 'Iedereen is ready — het spel start zo.';
+        this.activePlayerText.textContent = 'Iedereen is klaar — het spel start zo.';
       } else if (this.engine.phase === 'programming' && !this.isProgrammingUnlocked(currentRobot)) {
         this.activePlayerText.textContent = `Geef het toestel door en druk op "Programmeer ${this.getDisplayPlayerName(currentRobot)}".`;
       } else if (this.engine.phase === 'programming') {
@@ -2139,14 +2142,16 @@ class RobotRallyUI {
     const readyMode = phase === 'ready';
     const matchReadyPhase = phase === 'match_ready';
     const matchCountdownPhase = phase === 'match_countdown';
-    const matchGate = matchReadyPhase || matchCountdownPhase;
     const iAmReady = !!(localRobot && this.engine.isRobotMatchReady?.(localRobot.id));
+    const matchUpgradePending = matchReadyPhase && localRobot && !iAmReady
+      && (this.engine.getMatchUpgradeOffer?.(localRobot.id)?.length > 0);
+    // Tijdens start-upgrade kiezen: geen Ready-overlay (upgrade-overlay is de UI).
+    const matchGate = (matchReadyPhase || matchCountdownPhase) && !matchUpgradePending;
     const readyCount = (this.engine.matchReadyRobotIds || []).length;
     const readyTotal = this.engine.getMatchReadyHumans?.().length || 0;
     const p2pAutoReady = this.isP2pMode() && readyMode;
     // Hotseat privacy / Play, of P2P match-ready gate.
     const showPlay = privacyLocked || (readyMode && !this.isP2pMode());
-    const showMatchReadyBtn = matchReadyPhase && !iAmReady;
     const show = showPlay || matchGate;
 
     this.playbackOverlay.classList.toggle('hidden', !show);
@@ -2162,17 +2167,17 @@ class RobotRallyUI {
         const leftSec = endsAt != null
           ? Math.max(0, Math.ceil((endsAt - Date.now()) / 1000))
           : (CONFIG.MATCH_COUNTDOWN_SECONDS || 10);
-        if (this.playbackTitle) this.playbackTitle.textContent = 'Iedereen is ready';
+        if (this.playbackTitle) this.playbackTitle.textContent = 'Iedereen is klaar';
         if (this.playbackText) this.playbackText.textContent = String(leftSec);
       } else if (iAmReady) {
-        if (this.playbackTitle) this.playbackTitle.textContent = 'Je bent ready';
+        if (this.playbackTitle) this.playbackTitle.textContent = 'Upgrade gekozen';
         if (this.playbackText) {
           this.playbackText.textContent = `Wacht op anderen (${readyCount}/${readyTotal})…`;
         }
       } else {
-        if (this.playbackTitle) this.playbackTitle.textContent = 'Klaar om te starten?';
+        if (this.playbackTitle) this.playbackTitle.textContent = 'Start-upgrade';
         if (this.playbackText) {
-          this.playbackText.textContent = `Druk op Ready. (${readyCount}/${readyTotal} ready)`;
+          this.playbackText.textContent = `Wacht op je upgrade-keuze (${readyCount}/${readyTotal})…`;
         }
       }
     } else {
@@ -2180,10 +2185,9 @@ class RobotRallyUI {
     }
 
     this.btnStartExecution?.classList.toggle('hidden', !showPlay);
-    this.btnMatchReady?.classList.toggle('hidden', !showMatchReadyBtn);
-    if (this.btnMatchReady) {
-      this.btnMatchReady.disabled = !showMatchReadyBtn;
-    }
+    // Ready-knop verwijderd: start-upgrade is de ready-actie.
+    this.btnMatchReady?.classList.add('hidden');
+    if (this.btnMatchReady) this.btnMatchReady.disabled = true;
 
     if (p2pAutoReady && this.selectionHint) {
       this.selectionHint.textContent = 'Iedereen is ready — ronde start automatisch.';
@@ -2260,16 +2264,7 @@ class RobotRallyUI {
   }
 
   handleMatchReady() {
-    if (!this.isP2pMode() || this.engine.phase !== 'match_ready') return;
-    const robot = this.getProgrammingRobot();
-    if (!robot || this.engine.isRobotMatchReady?.(robot.id)) return;
-    if (!P2pSessionController?.sendMatchReady) {
-      Toast.show('Ready lukte niet.');
-      return;
-    }
-    P2pSessionController.sendMatchReady()
-      .then(() => this.updateCardsUI())
-      .catch((err) => Toast.show(err.message || 'Ready lukte niet'));
+    // Ready-knop is vervangen door start-upgrade kiezen.
   }
 
   shadeHex(hex, amount) {
@@ -2284,22 +2279,38 @@ class RobotRallyUI {
 
   renderUpgradeChoiceOverlay() {
     if (!this.upgradeChoiceOverlay || !this.upgradeChoiceList) return;
-    const choice = this.engine.currentUpgradeChoice;
-    const show = this.engine.phase === 'upgrade_choice' && !!choice;
+    const phase = this.engine.phase;
+    const localRobot = this.getProgrammingRobot();
+    const midChoice = phase === 'upgrade_choice' ? this.engine.currentUpgradeChoice : null;
+    const matchOptions = phase === 'match_ready' && localRobot && !this.engine.isRobotMatchReady?.(localRobot.id)
+      ? (this.engine.getMatchUpgradeOffer?.(localRobot.id) || [])
+      : [];
+    const matchPick = matchOptions.length > 0;
+    const show = !!midChoice || matchPick;
     this.upgradeChoiceOverlay.classList.toggle('hidden', !show);
     if (!show) return;
 
-    const robot = this.engine.robots.find(entry => entry.id === choice.robotId);
+    const choiceRobotId = midChoice ? midChoice.robotId : localRobot.id;
+    const options = midChoice ? midChoice.options : matchOptions;
+    const robot = this.engine.robots.find(entry => entry.id === choiceRobotId);
     const playerName = this.getDisplayPlayerName(robot);
+    const labelEl = this.upgradeChoiceOverlay.querySelector('.upgrade-choice-label');
+    if (labelEl) {
+      labelEl.textContent = matchPick ? 'Start upgrade' : 'Upgrade Vakje';
+    }
     if (this.upgradeChoiceTitle) {
-      this.upgradeChoiceTitle.textContent = `${playerName} kiest een upgrade`;
+      this.upgradeChoiceTitle.textContent = matchPick
+        ? `${playerName} kiest een start-upgrade`
+        : `${playerName} kiest een upgrade`;
     }
     if (this.upgradeChoiceText) {
-      const n = choice.options.length;
-      this.upgradeChoiceText.textContent = `Je staat op een upgrade-vakje. Kies 1 van deze ${n} upgrades (blijft actief tot het einde).`;
+      const n = options.length;
+      this.upgradeChoiceText.textContent = matchPick
+        ? `Kies 1 van deze ${n} upgrades om te starten. Daarna wacht je tot iedereen gekozen heeft.`
+        : `Je staat op een upgrade-vakje. Kies 1 van deze ${n} upgrades (blijft actief tot het einde).`;
     }
 
-    this.upgradeChoiceList.innerHTML = choice.options.map(option => `
+    this.upgradeChoiceList.innerHTML = options.map(option => `
       <button class="upgrade-card upgrade-choice-button" type="button" data-upgrade-choice="${option.id}">
         <span class="upgrade-card-title">${option.label}</span>
         <span class="upgrade-card-desc">${option.desc}</span>
@@ -2312,11 +2323,21 @@ class RobotRallyUI {
         const upgradeId = button.getAttribute('data-upgrade-choice');
         if (!upgradeId) return;
         if (this.isP2pMode() && P2pSessionController?.isActive?.()) {
+          this.upgradeChoiceList.querySelectorAll('[data-upgrade-choice]').forEach((btn) => {
+            btn.disabled = true;
+          });
           P2pSessionController.sendUpgrade(upgradeId)
-            .catch((err) => Toast.show(err.message || 'Upgrade kiezen mislukt'));
+            .catch((err) => {
+              this.upgradeChoiceList.querySelectorAll('[data-upgrade-choice]').forEach((btn) => {
+                btn.disabled = false;
+              });
+              Toast.show(err.message || 'Upgrade kiezen mislukt');
+            });
           return;
         }
-        const chosen = this.engine.chooseUpgrade(upgradeId);
+        const chosen = matchPick
+          ? this.engine.confirmMatchUpgrade(choiceRobotId, upgradeId)
+          : this.engine.chooseUpgrade(upgradeId);
         if (!chosen) {
           Toast.show('Upgrade kiezen lukt nu niet.');
         }

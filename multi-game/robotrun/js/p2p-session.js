@@ -992,8 +992,14 @@ const P2pSessionController = {
 
   async sendUpgrade(upgradeId) {
     const robotId = this.localRobotId();
+    if (!robotId) throw new Error("Geen robot gekoppeld.");
     if (this.isHost()) {
-      window.RobotRallyApp.engine.chooseUpgrade(upgradeId);
+      const engine = window.RobotRallyApp.engine;
+      if (engine.phase === "match_ready") {
+        engine.confirmMatchUpgrade(robotId, upgradeId);
+      } else {
+        engine.chooseUpgrade(upgradeId);
+      }
       await this.publishSnapshot();
       return;
     }
@@ -1145,9 +1151,15 @@ const P2pSessionController = {
       );
       if (!bound) return;
       if (bound.userId === this.playerId) return;
-      const choice = window.RobotRallyApp.engine.currentUpgradeChoice;
+      const engine = window.RobotRallyApp.engine;
+      if (engine.phase === "match_ready") {
+        engine.confirmMatchUpgrade(bound.robotId, payload.upgradeId);
+        this.publishSnapshot().catch(() => {});
+        return;
+      }
+      const choice = engine.currentUpgradeChoice;
       if (choice && choice.robotId === bound.robotId) {
-        window.RobotRallyApp.engine.chooseUpgrade(payload.upgradeId);
+        engine.chooseUpgrade(payload.upgradeId);
         this.publishSnapshot().catch(() => {});
       }
     }
