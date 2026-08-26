@@ -1,8 +1,4 @@
-import {
-  runEmbeddedGame,
-  reportContentHeight,
-  bindEmbeddedParentScroll,
-} from "../../js/bridge/embedded-bootstrap.js";
+import { runEmbeddedGame } from "../../js/bridge/embedded-bootstrap.js";
 import {
   hideEmbeddedLeaveButtons,
   stripEmbeddedChrome,
@@ -15,23 +11,8 @@ patchP2pSessionForRoom();
 function wireEmbeddedLayout() {
   stripEmbeddedChrome();
   hideEmbeddedLeaveButtons(".embedded-leave");
-  bindEmbeddedParentScroll(document.getElementById("screen-play") || document);
-  const report = () => reportContentHeight();
-  report();
-  requestAnimationFrame(report);
-  if (typeof ResizeObserver !== "undefined") {
-    const root = document.getElementById("app") || document.body;
-    const ro = new ResizeObserver(() => report());
-    if (root) ro.observe(root);
-  }
-  window.addEventListener("resize", report);
-  const prev = window.RobotRallyApp?.engine?.onStateChange;
-  if (window.RobotRallyApp?.engine) {
-    window.RobotRallyApp.engine.onStateChange = () => {
-      if (typeof prev === "function") prev();
-      requestAnimationFrame(report);
-    };
-  }
+  // Scroll only inside #screen-play (CSS). Do not forward touch/wheel to the
+  // room parent — that competed with native scroll and felt dead on phones.
 }
 
 runEmbeddedGame({

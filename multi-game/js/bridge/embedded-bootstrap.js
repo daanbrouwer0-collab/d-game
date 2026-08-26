@@ -63,87 +63,13 @@ export function reportContentHeight(explicitHeight) {
 }
 
 /**
- * Vertical pan on non-controls scrolls the room play card (same-origin iframe).
- * @param {ParentNode} [root]
+ * @deprecated Nested parent scroll forwarding fought native touch scroll.
+ * Embedded games should scroll inside their own document; room iframe is
+ * viewport-sized (see room.css play layout).
+ * @param {ParentNode} [_root]
  */
-export function bindEmbeddedParentScroll(root = document) {
-  if (!document.documentElement.classList.contains("dgame-embedded")) return;
-  if (window.parent === window) return;
-
-  /** @type {number | null} */
-  let lastY = null;
-  let tracking = false;
-
-  const playPanel = () => {
-    try {
-      return window.parent.document?.getElementById("panel-playing");
-    } catch {
-      return null;
-    }
-  };
-
-  root.addEventListener(
-    "touchstart",
-    (event) => {
-      if (event.touches.length !== 1) {
-        tracking = false;
-        return;
-      }
-      const target = /** @type {Element | null} */ (event.target);
-      if (
-        target?.closest?.(
-          "button, input, textarea, select, a, .card-item, .register-slot, .playback-btn",
-        )
-      ) {
-        tracking = false;
-        return;
-      }
-      tracking = true;
-      lastY = event.touches[0].clientY;
-    },
-    { passive: true },
-  );
-
-  root.addEventListener(
-    "touchmove",
-    (event) => {
-      if (!tracking || lastY == null || event.touches.length !== 1) return;
-      const panel = playPanel();
-      if (!panel) return;
-      const y = event.touches[0].clientY;
-      panel.scrollTop += lastY - y;
-      lastY = y;
-      event.preventDefault();
-    },
-    { passive: false },
-  );
-
-  const end = () => {
-    tracking = false;
-    lastY = null;
-  };
-  root.addEventListener("touchend", end, { passive: true });
-  root.addEventListener("touchcancel", end, { passive: true });
-
-  // PC: forward mouse wheel to the room play card.
-  root.addEventListener(
-    "wheel",
-    (event) => {
-      const panel = playPanel();
-      if (!panel) return;
-      const target = /** @type {Element | null} */ (event.target);
-      if (
-        target?.closest?.(
-          "input, textarea, select, .cards-hand-wrap, .rules-sheet-body, .program-board",
-        )
-      ) {
-        return;
-      }
-      panel.scrollTop += event.deltaY;
-      event.preventDefault();
-    },
-    { passive: false },
-  );
+export function bindEmbeddedParentScroll(_root = document) {
+  /* no-op — kept for API compatibility */
 }
 
 /**

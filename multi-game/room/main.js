@@ -204,22 +204,21 @@ function renderChat() {
   });
 }
 
-function placeRoomChat(playing) {
+function placeRoomChat() {
   const root = document.getElementById("room-chat-root");
   const chrome = document.getElementById("room-chrome");
-  const playSlot = document.getElementById("room-chat-play-slot");
-  if (!root || !chrome || !playSlot) return;
-  const target = playing ? playSlot : chrome;
-  if (root.parentElement !== target) {
-    target.appendChild(root);
+  if (!root || !chrome) return;
+  // Chat blijft in lobby-chrome. Tijdens play is chrome verborgen —
+  // geen aparte chat-laag onder de iframe (dat vocht met scroll).
+  if (root.parentElement !== chrome) {
+    chrome.appendChild(root);
   }
-  root.dataset.dock = playing ? "play" : "lobby";
+  root.dataset.dock = "lobby";
 }
 
 function syncChatMode() {
   if (!roomChat) return;
-  const playing = !!roomState().activeSession || !!activeSession;
-  placeRoomChat(playing);
+  placeRoomChat();
   roomChat.setMode("open");
   roomChat.markRead(roomState().chatSeq);
 }
@@ -436,14 +435,15 @@ function syncPlayingBarButtons() {
 }
 
 /**
- * Size the game iframe to the embedded document so chat scrolls on the same card.
- * @param {number} height
+ * Embedded games may report content height; play layout uses a viewport-sized
+ * iframe and scrolls inside the game — ignore growth so parent/child scroll
+ * layers do not fight on mobile.
+ * @param {number} _height
  */
-function applyGameFrameHeight(height) {
+function applyGameFrameHeight(_height) {
   if (!gameFrame) return;
-  const px = Math.max(320, Math.ceil(height));
-  gameFrame.style.height = `${px}px`;
-  gameFrame.style.minHeight = `${px}px`;
+  gameFrame.style.height = "";
+  gameFrame.style.minHeight = "";
 }
 
 /** @param {"player"|"spectator"} [participation] */

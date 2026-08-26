@@ -1,10 +1,19 @@
-/* Room iframe: content grows; room panel scrolls the play card (game + chat). */
+/* Room iframe: one native scroller inside the game (not the room parent). */
 html.dgame-embedded,
 html.dgame-embedded body {
-  height: auto;
-  min-height: 0;
+  height: 100%;
+  max-height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
+  touch-action: pan-y;
+}
+
+html.dgame-embedded #app {
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 html.dgame-embedded .bottom-nav,
@@ -20,14 +29,18 @@ html.dgame-embedded #screen-settings {
 
 html.dgame-embedded #screen-play {
   display: flex !important;
+  flex: 1 1 0;
   flex-direction: column;
   position: relative;
   inset: auto;
   z-index: 1;
-  overflow: visible;
   height: auto;
   min-height: 0;
-  -webkit-overflow-scrolling: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
 }
 
 html.dgame-embedded #game-wrap {
@@ -36,6 +49,17 @@ html.dgame-embedded #game-wrap {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: visible;
+}
+
+/* Geen tweede scroller op game-wrap tijdens ready/exec — alleen #screen-play. */
+html.dgame-embedded #game-wrap.privacy-locked,
+html.dgame-embedded #game-wrap.ready-mode,
+html.dgame-embedded #game-wrap.executing-mode,
+html.dgame-embedded #game-wrap.match-ready-mode,
+html.dgame-embedded #game-wrap.match-countdown-mode,
+html.dgame-embedded #game-wrap.upgrade-choice-mode {
+  height: auto;
   overflow: visible;
 }
 
@@ -61,7 +85,7 @@ html.dgame-embedded #board-canvas {
 
 html.dgame-embedded #programming-panel {
   flex: 0 0 auto;
-  overflow: hidden;
+  overflow: visible;
   max-width: 100%;
 }
 
