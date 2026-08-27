@@ -135,26 +135,26 @@ const CONFIG = {
   },
 
   CARD_TYPES: [
-    { type: 'move1', label: 'MOVE 1', icon: '⬆', priorityBase: 490 },
-    { type: 'move2', label: 'MOVE 2', icon: '⏫', priorityBase: 670 },
-    { type: 'move3', label: 'MOVE 3', icon: '🚀', priorityBase: 790 },
-    { type: 'backup', label: 'BACK UP', icon: '⬇', priorityBase: 430 },
-    { type: 'turnR', label: 'TURN RIGHT', icon: '↻', priorityBase: 80 },
-    { type: 'turnL', label: 'TURN LEFT', icon: '↺', priorityBase: 70 },
-    { type: 'uturn', label: 'U-TURN', icon: '🔄', priorityBase: 10 }
+    { type: 'move1', label: 'MOVE 1', icon: '⬆', priorityBase: 490, weight: 4 },
+    { type: 'move2', label: 'MOVE 2', icon: '⏫', priorityBase: 670, weight: 2 },
+    { type: 'move3', label: 'MOVE 3', icon: '🚀', priorityBase: 790, weight: 1 },
+    { type: 'backup', label: 'BACK UP', icon: '⬇', priorityBase: 430, weight: 2 },
+    { type: 'turnR', label: 'TURN RIGHT', icon: '↻', priorityBase: 80, weight: 4 },
+    { type: 'turnL', label: 'TURN LEFT', icon: '↺', priorityBase: 70, weight: 4 },
+    { type: 'uturn', label: 'U-TURN', icon: '🔄', priorityBase: 10, weight: 1 }
   ],
 
   /** Extra kaarten die alleen in de hand komen met een upgrade. */
   UPGRADE_CARD_TYPES: {
     fourthGear: [
-      { type: 'move4', label: 'MOVE 4', icon: '⚡', priorityBase: 860 }
+      { type: 'move4', label: 'MOVE 4', icon: '⚡', priorityBase: 860, weight: 1 }
     ],
     crabWalk: [
-      { type: 'strafeL', label: 'KRAB L', icon: '⬅', priorityBase: 410 },
-      { type: 'strafeR', label: 'KRAB R', icon: '➡', priorityBase: 420 }
+      { type: 'strafeL', label: 'KRAB L', icon: '⬅', priorityBase: 410, weight: 1 },
+      { type: 'strafeR', label: 'KRAB R', icon: '➡', priorityBase: 420, weight: 1 }
     ],
     reverseThruster: [
-      { type: 'backup2', label: 'BACK 2', icon: '⏬', priorityBase: 460 }
+      { type: 'backup2', label: 'BACK 2', icon: '⏬', priorityBase: 460, weight: 1 }
     ]
   },
 

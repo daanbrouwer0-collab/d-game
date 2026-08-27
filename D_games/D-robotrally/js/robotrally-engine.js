@@ -1553,20 +1553,24 @@ class RobotRallyEngine {
     return index >= this.getUnlockedRegisterCount(robot);
   }
 
-  getCardPoolForRobot(robot) {
-    const pool = [...CONFIG.CARD_TYPES];
-    const bonus = CONFIG.UPGRADE_CARD_TYPES || {};
-    Object.keys(bonus).forEach(upgradeId => {
-      if (!this.hasUpgrade(robot, upgradeId)) return;
-      (bonus[upgradeId] || []).forEach(cardType => pool.push(cardType));
-    });
-    return pool;
+  getCardPoolForRobot(robot = null) {
+    return (CONFIG.CARD_TYPES || []).filter((c) => c.weight == null || c.weight > 0);
   }
 
   generateProgramCard(robot = null) {
-    const pool = robot ? this.getCardPoolForRobot(robot) : CONFIG.CARD_TYPES;
+    const pool = robot ? this.getCardPoolForRobot(robot) : (CONFIG.CARD_TYPES || []).filter((c) => c.weight == null || c.weight > 0);
+    const totalWeight = pool.reduce((sum, card) => sum + (Number(card.weight) || 1), 0);
     const roll = this.isMatrixMode() ? this.rng() : Math.random();
-    const cardType = pool[Math.floor(roll * pool.length)];
+    let threshold = roll * totalWeight;
+    let cardType = pool[0];
+    for (const card of pool) {
+      threshold -= (Number(card.weight) || 1);
+      if (threshold <= 0) {
+        cardType = card;
+        break;
+      }
+    }
+
     const idRoll = this.isMatrixMode() ? this.rng() : Math.random();
     const prioRoll = this.isMatrixMode() ? this.rng() : Math.random();
     return {
@@ -1602,6 +1606,7 @@ class RobotRallyEngine {
     this.robots.forEach(robot => {
       if (!this.isRobotInGame(robot)) return;
       const previousRegisters = (robot.registers || []).map(card => (card ? { ...card } : null));
+      const wasShutdown = !!robot.shutdownActive;
       robot.hand = [];
       robot.roundShieldCharges = this.countUpgrade(robot, 'deflectorShield');
       robot.roundBoardShieldUsed = false;
@@ -1611,9 +1616,21 @@ class RobotRallyEngine {
       if (robot.shutdownActive) {
         robot.damage = 0;
         robot.registers = [null, null, null, null, null];
+        robot.hand = [];
         this.refreshRobotStats(robot);
-        this.pushLog(`${robot.name} gaat in power down en herstelt volledig.`);
+        this.pushLog(`⚡ ${robot.name} staat deze ronde in Power Down (slaat beurt over) en herstelt alle schade.`);
+        if (this.isSimultaneousProgramming?.()) {
+          if (!this.committedRobotIds.includes(robot.id)) {
+            this.committedRobotIds.push(robot.id);
+          }
+        }
         return;
+      }
+
+      if (wasShutdown) {
+        robot.damage = 0;
+        this.refreshRobotStats(robot);
+        this.pushLog(`⚡ ${robot.name} is weer wakker uit Power Down (volledig gerepareerd) en doet weer mee!`);
       }
 
       const repairAmount = Math.min(robot.damage, this.countUpgrade(robot, 'repairKit'));

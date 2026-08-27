@@ -289,6 +289,14 @@ class RobotRallyUI {
     if (!this.cardsHandWrap) return;
 
     this.cardsHandWrap.innerHTML = '';
+    if (currentRobot.shutdownActive) {
+      const info = document.createElement('div');
+      info.className = 'cards-hand-message is-power-down-banner';
+      info.textContent = '⚡ Power Down actief: Je robot slaat deze ronde over om alle schade te wissen (0 schade). Volgende ronde kun je weer programmeren!';
+      this.cardsHandWrap.appendChild(info);
+      return;
+    }
+
     if (this.engine.phase === 'programming' && !this.isProgrammingUnlocked(currentRobot)) {
       const info = document.createElement('div');
       info.className = 'cards-hand-message';

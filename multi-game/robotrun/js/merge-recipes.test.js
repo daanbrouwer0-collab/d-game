@@ -22,12 +22,20 @@ assert.deepEqual(sortedTypes(["move2", "move1", "move1"]), ["move1", "move1", "m
 
 const robot = { upgrades: [] };
 assert.equal(
-  resolveMergeRecipe([{ type: "move1" }, { type: "move1" }, { type: "move1" }], robot).output,
+  resolveMergeRecipe([{ type: "move1" }, { type: "move1" }], robot).output,
   "move2",
 );
 assert.equal(
-  resolveMergeRecipe([{ type: "move1" }, null, { type: "move1" }], robot),
-  null,
+  resolveMergeRecipe([{ type: "move1" }, null, { type: "move1" }], robot).output,
+  "move2",
+);
+assert.equal(
+  resolveMergeRecipe([{ type: "move1" }, { type: "move1" }, { type: "move1" }], robot).output,
+  "move3",
+);
+assert.equal(
+  resolveMergeRecipe([{ type: "turnL" }, { type: "turnL" }], robot).output,
+  "uturn",
 );
 assert.equal(
   resolveMergeRecipe([{ type: "uturn" }, { type: "uturn" }, { type: "uturn" }], robot).output,
@@ -50,10 +58,6 @@ assert.equal(
     { upgrades: [{ id: "fourthGear" }] },
   ).output,
   "move4",
-);
-assert.equal(
-  resolveMergeRecipe([{ type: "move2" }, { type: "move2" }, null], robot),
-  null,
 );
 assert.equal(
   resolveMergeRecipe([{ type: "move1" }, null, null], robot),

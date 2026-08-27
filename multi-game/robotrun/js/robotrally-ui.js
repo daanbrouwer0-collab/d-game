@@ -146,7 +146,13 @@ class RobotRallyUI {
     this.btnPowerDown?.addEventListener('click', () => {
       const robot = this.getProgrammingRobot();
       if (!robot) return;
-      this.engine.togglePowerDown(robot.id);
+      if (this.isP2pMode() && window.P2pSessionController?.isActive?.()) {
+        window.P2pSessionController.sendTogglePowerDown?.().catch((err) => {
+          Toast.show(err.message || 'Power down versturen mislukt');
+        });
+      } else {
+        this.engine.togglePowerDown(robot.id);
+      }
     });
 
     this.slotTabsEl?.querySelectorAll('.slot-tab').forEach((btn) => {
@@ -450,6 +456,13 @@ class RobotRallyUI {
     }
 
     if (this.engine.phase === 'programming') {
+      if (currentRobot.shutdownActive) {
+        this.panelTitle.textContent = `⚡ Power Down — ${this.getDisplayPlayerName(currentRobot)}`;
+        if (this.selectionHint) {
+          this.selectionHint.textContent = 'Je robot herstelt alle schade deze ronde (0 schade). Volgende ronde doe je weer volop mee!';
+        }
+        return;
+      }
       if (!this.isProgrammingUnlocked(currentRobot)) {
         this.panelTitle.textContent = `Programmeer ${this.getDisplayPlayerName(currentRobot)}`;
         if (this.selectionHint) {
@@ -460,7 +473,7 @@ class RobotRallyUI {
       this.panelTitle.textContent = `Kaarten voor ${this.getDisplayPlayerName(currentRobot)}`;
       if (this.selectionHint) {
         const powerDownText = currentRobot.pendingPowerDown
-          ? ' Power down staat ingepland voor de volgende ronde.'
+          ? ' ⚡ Power down gepland voor volgende ronde (volledig herstel).'
           : '';
         if (this.isP2pMode()) {
           const readyCount = (this.engine.committedRobotIds || []).length;
@@ -509,6 +522,14 @@ class RobotRallyUI {
     if (!this.cardsHandWrap) return;
 
     this.cardsHandWrap.innerHTML = '';
+    if (currentRobot.shutdownActive) {
+      const info = document.createElement('div');
+      info.className = 'cards-hand-message is-power-down-banner';
+      info.textContent = '⚡ Power Down actief: Je robot slaat deze ronde over om alle schade te wissen (0 schade). Volgende ronde kun je weer programmeren!';
+      this.cardsHandWrap.appendChild(info);
+      return;
+    }
+
     if (this.engine.phase === 'programming' && !this.isProgrammingUnlocked(currentRobot)) {
       const info = document.createElement('div');
       info.className = 'cards-hand-message';
@@ -562,8 +583,9 @@ class RobotRallyUI {
     }
 
     currentRobot.hand.forEach(card => {
-      const isUsed = this.selectedRegisters.some(entry => entry && entry.id === card.id)
-        || this.mergeInputs.some(entry => entry && entry.id === card.id);
+      const isUsedInMerge = this.mergeInputs.some(entry => entry && entry.id === card.id);
+      const isUsedInProgram = this.selectedRegisters.some(entry => entry && entry.id === card.id);
+      const isUsed = this.slotTab === 'merge' ? isUsedInMerge : isUsedInProgram;
       const cardEl = document.createElement('div');
       cardEl.className = `card-item ${isUsed ? 'selected' : ''}`;
       cardEl.setAttribute('data-type', card.type);
@@ -579,6 +601,8 @@ class RobotRallyUI {
             const emptyMerge = this.mergeInputs.findIndex((entry) => entry === null);
             if (emptyMerge !== -1) {
               this.mergeInputs[emptyMerge] = card;
+              // If this card was placed in a program slot draft, release it from draft
+              this.selectedRegisters = this.selectedRegisters.map((c) => (c && c.id === card.id ? null : c));
               this.updateCardsUI();
             }
             return;
@@ -678,11 +702,14 @@ class RobotRallyUI {
           <span class="register-num">OUT</span>
           <div class="card-icon">${preview.icon}</div>
           <div class="card-label register-card-label">${preview.label}</div>
+          <div class="merge-out-hint">Tik om te nemen</div>
         `;
-        this.mergeOutputSlot.title = 'Tik om te mergen';
+        this.mergeOutputSlot.title = `Tik om ${preview.label} samen te voegen naar je hand`;
       } else {
         this.mergeOutputSlot.innerHTML = '<span class="register-num">OUT</span>';
-        this.mergeOutputSlot.title = 'Geen geldig recept';
+        this.mergeOutputSlot.title = this.mergeInputs.filter(Boolean).length >= 2
+          ? 'Geen geldig recept voor deze combinatie'
+          : 'Kies minstens 2 kaarten in A en B';
         this.mergeOutputSlot.classList.remove('filled');
       }
       this.mergeOutputSlot.classList.toggle('filled', !!preview);
@@ -707,6 +734,10 @@ class RobotRallyUI {
       return;
     }
 
+    const recipe = this.engine.resolveMergeRecipe(this.mergeInputs, robot);
+    const preview = recipe && CONFIG.getCardTypeDef ? CONFIG.getCardTypeDef(recipe.output) : null;
+    const label = preview?.label || 'Nieuwe kaart';
+
     if (this.isP2pMode() && P2pSessionController?.isActive?.()) {
       P2pSessionController.sendMerge(ids)
         .then(() => {
@@ -714,7 +745,9 @@ class RobotRallyUI {
           this.selectedRegisters = this.selectedRegisters.map((card) => (
             card && ids.includes(card.id) ? null : card
           ));
+          this.setSlotTab('program');
           this.updateCardsUI();
+          Toast.show(`✨ ${label} gemaakt en in je hand geplaatst!`);
         })
         .catch((err) => Toast.show(err?.message || 'Merge mislukt'));
       return;
@@ -728,7 +761,9 @@ class RobotRallyUI {
     this.selectedRegisters = this.selectedRegisters.map((card) => (
       card && ids.includes(card.id) ? null : card
     ));
+    this.setSlotTab('program');
     this.updateCardsUI();
+    Toast.show(`✨ ${label} gemaakt en in je hand geplaatst!`);
   }
 
   renderRegisterSlots() {
@@ -913,14 +948,21 @@ class RobotRallyUI {
 
       const tipParts = [
         isYou ? 'Jij' : this.getDisplayPlayerName(robot),
+        robot.shutdownActive
+          ? 'Power Down actief (herstelt alle schade)'
+          : (robot.pendingPowerDown ? 'Power Down gepland' : ''),
         matchGate
           ? (isReady ? 'Upgrade gekozen' : 'Kiest…')
           : (isReady ? 'Ready' : (isTurn ? 'Programmeert' : '')),
       ].filter(Boolean);
 
-      const stateBadge = isReady
-        ? '<span class="player-status-state-pill is-ready">✓ Klaar</span>'
-        : (isTurn ? '<span class="player-status-state-pill is-busy">⏳ Bezig</span>' : '');
+      const stateBadge = robot.shutdownActive
+        ? '<span class="player-status-state-pill is-power-down">⚡ Power Down</span>'
+        : robot.pendingPowerDown
+          ? '<span class="player-status-state-pill is-power-down-armed">⚡ PD Gepland</span>'
+          : isReady
+            ? '<span class="player-status-state-pill is-ready">✓ Klaar</span>'
+            : (isTurn ? '<span class="player-status-state-pill is-busy">⏳ Bezig</span>' : '');
 
       return `
         <div class="player-status-chip${isYou ? ' is-you' : ''}${isTurn ? ' is-turn' : ''}${isReady ? ' is-ready' : ''}${isDown ? ' is-down' : ''}" style="--chip-color:${color}" title="${tipParts.join(' · ')}">
@@ -1066,25 +1108,27 @@ class RobotRallyUI {
     const allOpenFilled = openEmpty === 0;
 
     if (this.btnPowerDown) {
+      const isShutdown = !!(currentRobot && currentRobot.shutdownActive);
       const alreadyCommitted = this.isP2pMode() && currentRobot && this.engine.isRobotCommitted?.(currentRobot.id);
-      const canToggle = this.engine.phase === 'programming' && unlocked && currentRobot && !currentRobot.isBot && !currentRobot.eliminated && !currentRobot.shutdownActive && !alreadyCommitted;
+      const canToggle = this.engine.phase === 'programming' && unlocked && currentRobot && !currentRobot.isBot && !currentRobot.eliminated && !isShutdown && !alreadyCommitted;
       const isArmed = !!(currentRobot && currentRobot.pendingPowerDown);
-      this.btnPowerDown.classList.toggle('hidden', !!alreadyCommitted && this.isP2pMode());
+      this.btnPowerDown.classList.toggle('hidden', (!!alreadyCommitted && this.isP2pMode()) || isShutdown);
       this.btnPowerDown.disabled = !canToggle;
       this.btnPowerDown.classList.toggle('danger', isArmed);
       this.btnPowerDown.classList.toggle('alt', !isArmed);
       this.btnPowerDown.classList.remove('success');
       this.btnPowerDown.textContent = isArmed
-        ? 'Power Down Gepland'
-        : 'Power Down Volgende Ronde';
+        ? '⚡ Power Down Gepland'
+        : '⚡ Power Down Volgende Ronde';
     }
 
     if (this.btnConfirmProgram) {
+      const isShutdown = !!(currentRobot && currentRobot.shutdownActive);
       const alreadyCommitted = this.isP2pMode() && currentRobot && this.engine.isRobotCommitted?.(currentRobot.id);
-      const showConfirm = this.engine.phase === 'programming' && unlocked && currentRobot && !currentRobot.isBot && !alreadyCommitted;
+      const showConfirm = this.engine.phase === 'programming' && unlocked && currentRobot && !currentRobot.isBot && !alreadyCommitted && !isShutdown;
       this.btnConfirmProgram.classList.toggle('hidden', !showConfirm);
-      this.btnConfirmProgram.disabled = !allOpenFilled || !!alreadyCommitted;
-      this.btnConfirmProgram.classList.toggle('success', allOpenFilled && !alreadyCommitted);
+      this.btnConfirmProgram.disabled = !allOpenFilled || !showConfirm || !!alreadyCommitted;
+      this.btnConfirmProgram.classList.toggle('success', allOpenFilled && !alreadyCommitted && !isShutdown);
       const lockedCount = currentRobot ? 5 - this.engine.getUnlockedRegisterCount(currentRobot) : 0;
       this.btnConfirmProgram.textContent = alreadyCommitted
         ? 'Programma klaar'

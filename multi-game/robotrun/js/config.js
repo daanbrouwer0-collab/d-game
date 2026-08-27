@@ -135,30 +135,30 @@ const CONFIG = {
   },
 
   CARD_TYPES: [
-    { type: 'move1', label: 'MOVE 1', icon: '⬆', priorityBase: 490 },
-    { type: 'move2', label: 'MOVE 2', icon: '⏫', priorityBase: 670 },
-    { type: 'move3', label: 'MOVE 3', icon: '🚀', priorityBase: 790 },
-    { type: 'backup', label: 'BACK UP', icon: '⬇', priorityBase: 430 },
-    { type: 'turnR', label: 'TURN RIGHT', icon: '↻', priorityBase: 80 },
-    { type: 'turnL', label: 'TURN LEFT', icon: '↺', priorityBase: 70 },
-    { type: 'uturn', label: 'U-TURN', icon: '🔄', priorityBase: 10 },
-    { type: 'wait', label: 'STIL', icon: '⏸', priorityBase: 50 }
+    { type: 'move1', label: 'MOVE 1', icon: '⬆', priorityBase: 490, weight: 4 },
+    { type: 'move2', label: 'MOVE 2', icon: '⏫', priorityBase: 670, weight: 2 },
+    { type: 'move3', label: 'MOVE 3', icon: '🚀', priorityBase: 790, weight: 1 },
+    { type: 'backup', label: 'BACK UP', icon: '⬇', priorityBase: 430, weight: 2 },
+    { type: 'turnR', label: 'TURN RIGHT', icon: '↻', priorityBase: 80, weight: 4 },
+    { type: 'turnL', label: 'TURN LEFT', icon: '↺', priorityBase: 70, weight: 4 },
+    { type: 'uturn', label: 'U-TURN', icon: '🔄', priorityBase: 10, weight: 1 },
+    { type: 'wait', label: 'STIL', icon: '⏸', priorityBase: 50, weight: 0 }
   ],
 
   /** Extra kaarten die alleen in de hand komen met een upgrade. */
   UPGRADE_CARD_TYPES: {
     fourthGear: [
-      { type: 'move4', label: 'MOVE 4', icon: '⚡', priorityBase: 860 }
+      { type: 'move4', label: 'MOVE 4', icon: '⚡', priorityBase: 860, weight: 1 }
     ],
     crabWalk: [
-      { type: 'strafeL', label: 'KRAB L', icon: '⬅', priorityBase: 410 },
-      { type: 'strafeR', label: 'KRAB R', icon: '➡', priorityBase: 420 }
+      { type: 'strafeL', label: 'KRAB L', icon: '⬅', priorityBase: 410, weight: 1 },
+      { type: 'strafeR', label: 'KRAB R', icon: '➡', priorityBase: 420, weight: 1 }
     ],
     jumpJets: [
-      { type: 'jump', label: 'JUMP', icon: '⤴', priorityBase: 640 }
+      { type: 'jump', label: 'JUMP', icon: '⤴', priorityBase: 640, weight: 1 }
     ],
     reverseThruster: [
-      { type: 'backup2', label: 'BACK 2', icon: '⏬', priorityBase: 460 }
+      { type: 'backup2', label: 'BACK 2', icon: '⏬', priorityBase: 460, weight: 1 }
     ]
   },
 
@@ -167,14 +167,29 @@ const CONFIG = {
    * Optional requiresUpgrade gates the recipe.
    */
   MERGE_RECIPES: [
-    { inputs: ['move1', 'move1', 'move1'], output: 'move2' },
+    // 2-card intuitive base merges
+    { inputs: ['move1', 'move1'], output: 'move2' },
+    { inputs: ['move1', 'move2'], output: 'move3' },
+    { inputs: ['move2', 'move1'], output: 'move3' },
+    { inputs: ['backup', 'backup'], output: 'backup2' },
+    { inputs: ['turnL', 'turnL'], output: 'uturn' },
+    { inputs: ['turnR', 'turnR'], output: 'uturn' },
+    { inputs: ['turnL', 'turnR'], output: 'wait' },
+    { inputs: ['uturn', 'uturn'], output: 'wait' },
+
+    // 3-card base merges
+    { inputs: ['move1', 'move1', 'move1'], output: 'move3' },
     { inputs: ['move2', 'move2', 'move2'], output: 'move3' },
     { inputs: ['backup', 'backup', 'backup'], output: 'backup2' },
-    { inputs: ['turnL', 'turnL', 'turnL'], output: 'uturn' },
-    { inputs: ['turnR', 'turnR', 'turnR'], output: 'uturn' },
+    { inputs: ['turnL', 'turnL', 'turnL'], output: 'turnR' },
+    { inputs: ['turnR', 'turnR', 'turnR'], output: 'turnL' },
     { inputs: ['uturn', 'uturn', 'uturn'], output: 'wait' },
+
+    // Upgrade-gated recipes (checked first if upgrade is owned)
     { inputs: ['move1', 'turnL'], output: 'strafeL', requiresUpgrade: 'crabWalk' },
     { inputs: ['move1', 'turnR'], output: 'strafeR', requiresUpgrade: 'crabWalk' },
+    { inputs: ['move2', 'turnL'], output: 'strafeL', requiresUpgrade: 'crabWalk' },
+    { inputs: ['move2', 'turnR'], output: 'strafeR', requiresUpgrade: 'crabWalk' },
     { inputs: ['move3', 'move1'], output: 'move4', requiresUpgrade: 'fourthGear' },
     { inputs: ['move2', 'move2'], output: 'move4', requiresUpgrade: 'fourthGear' },
     { inputs: ['move1', 'move1', 'move2'], output: 'move4', requiresUpgrade: 'fourthGear' },
@@ -274,28 +289,28 @@ const CONFIG = {
       id: 'fourthGear',
       label: 'Fourth Gear',
       short: '4e Versnelling',
-      desc: 'Kans op een MOVE 4-kaart in je hand.',
+      desc: 'Ontgrendelt merge-recepten voor MOVE 4 (o.a. MOVE 3 + MOVE 1 of 2× MOVE 2).',
       cost: 1
     },
     {
       id: 'crabWalk',
       label: 'Crab Walk',
       short: 'Krab Move',
-      desc: 'Kans op zijwaarts links/rechts bewegen zonder te draaien. Unlockt merge-recepten voor KRAB.',
+      desc: 'Ontgrendelt merge-recepten voor KRAB L & R zijwaarts bewegen (o.a. MOVE 1 + TURN L/R).',
       cost: 1
     },
     {
       id: 'jumpJets',
       label: 'Jump Jets',
       short: 'Jump',
-      desc: 'Kans op JUMP: 2 stappen vooruit, tussenvak overslaan (muur/pit). Landing op een robot: duw + 1 schade. Unlockt JUMP-merge-recepten.',
+      desc: 'Ontgrendelt merge-recepten voor JUMP (o.a. MOVE 2 + U-TURN): spring over een tussenvak heen!',
       cost: 1
     },
     {
       id: 'reverseThruster',
       label: 'Reverse Thruster',
-      short: 'Achteruit',
-      desc: 'Kans op een BACK 2-kaart (2 stappen achteruit).',
+      short: 'Achteruit 2',
+      desc: 'Ontgrendelt merge-recepten voor BACK 2 (2 stappen achteruit).',
       cost: 1
     },
     {

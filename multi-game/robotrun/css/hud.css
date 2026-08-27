@@ -110,6 +110,30 @@
   animation: pulse-busy 1.5s infinite ease-in-out;
 }
 
+.player-status-state-pill.is-power-down {
+  background: rgba(239, 68, 68, 0.25);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+}
+
+.player-status-state-pill.is-power-down-armed {
+  background: rgba(249, 115, 22, 0.22);
+  color: #fb923c;
+  border: 1px solid rgba(251, 146, 60, 0.45);
+}
+
+.cards-hand-message.is-power-down-banner {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.85rem 1.25rem;
+  border-radius: 8px;
+  text-align: center;
+}
+
 @keyframes pulse-busy {
   0%, 100% { opacity: 0.85; }
   50% { opacity: 1; }

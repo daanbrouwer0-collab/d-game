@@ -970,6 +970,20 @@ const P2pSessionController = {
     });
   },
 
+  async sendTogglePowerDown() {
+    const robotId = this.localRobotId();
+    if (!robotId) throw new Error("Geen robot gekoppeld.");
+    if (this.isHost()) {
+      window.RobotRallyApp.engine.togglePowerDown(robotId);
+      await this.publishSnapshot();
+      return;
+    }
+    this.send("rr_intent_power_down", {
+      robotId,
+      userId: this.playerId,
+    });
+  },
+
   async maybeAutoStartExecution() {
     if (!this.isHost()) return;
     const engine = window.RobotRallyApp?.engine;
@@ -1175,6 +1189,20 @@ const P2pSessionController = {
       if (!bound) return;
       if (bound.userId === this.playerId) return;
       window.RobotRallyApp.engine.mergeHandCards(bound.robotId, payload.cardIds);
+      this.publishSnapshot().catch(() => {});
+      return;
+    }
+
+    if (type === "rr_intent_power_down") {
+      const bound = window.RobotRunIntentBind?.resolveSeatAction?.(
+        this.lobby,
+        payload,
+        msg.fromPeerId,
+        this.peerToPlayer || {},
+      );
+      if (!bound) return;
+      if (bound.userId === this.playerId) return;
+      window.RobotRallyApp.engine.togglePowerDown(bound.robotId);
       this.publishSnapshot().catch(() => {});
       return;
     }
