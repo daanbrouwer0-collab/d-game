@@ -32,7 +32,7 @@
     </div>
 
     <script type="module">
-      import { GAMES } from "./js/core/catalog.js";
+      import { GAMES, resolveGameImageUrl } from "./js/core/catalog.js";
       import { mountShellNav } from "./js/shell/nav.js";
       import { isRoomPlayable } from "./js/bridge/embedded-contract.js";
 
@@ -44,15 +44,27 @@
         const roomLine = roomOk
           ? "Speelbaar in room"
           : "Room-modus volgt";
+        const imgUrl = resolveGameImageUrl(g, "");
+        const primaryTag = g.tags?.[0] || "Game";
+
         return `
         <li class="game-info-card">
-          <div class="game-info-body">
-            <strong>${g.title}</strong>
-            <span>${g.blurb}</span>
-            <span class="game-meta-line">${g.minPlayers}–${g.maxPlayers} spelers · ${roomLine}</span>
+          <div class="game-info-thumb-wrap">
+            ${imgUrl ? `<img src="${imgUrl}" alt="${g.title}" class="game-info-thumb" loading="lazy" />` : ""}
+            <span class="game-info-tag">${primaryTag}</span>
           </div>
-          <div class="actions">
-            <a href="${g.path}" class="btn btn-ghost">Hotseat / solo</a>
+          <div class="game-info-content">
+            <div class="game-info-body">
+              <div class="game-info-title-row">
+                <strong>${g.title}</strong>
+                <span class="game-info-badge">${g.minPlayers}–${g.maxPlayers} spelers</span>
+              </div>
+              <p class="game-info-blurb">${g.blurb}</p>
+              <span class="game-meta-line">✓ ${roomLine}</span>
+            </div>
+            <div class="actions game-info-actions">
+              <a href="${g.path}" class="btn btn-ghost">Hotseat / Solo</a>
+            </div>
           </div>
         </li>`;
       }).join("");

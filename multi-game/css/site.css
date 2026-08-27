@@ -1194,32 +1194,130 @@ html.page-ganzenbord body {
   color: var(--accent);
 }
 
+.game-info-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 1rem;
+}
+
 .game-info-list .game-info-card {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 1rem 1.1rem;
+  flex-direction: column;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: 12px;
   background: var(--bg-panel);
+  overflow: hidden;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.game-info-list .game-info-body {
-  flex: 1 1 12rem;
+@media (min-width: 480px) {
+  .game-info-list .game-info-card {
+    flex-direction: row;
+  }
 }
 
-.game-info-list strong {
+.game-info-list .game-info-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  transform: translateY(-2px);
+}
+
+.game-info-thumb-wrap {
+  position: relative;
+  width: 100%;
+  height: 130px;
+  background: #151924;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+@media (min-width: 480px) {
+  .game-info-thumb-wrap {
+    width: 140px;
+    height: auto;
+    min-height: 120px;
+  }
+}
+
+.game-info-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   display: block;
-  font-size: 1.1rem;
 }
 
-.game-info-list span {
-  display: block;
-  margin-top: 0.25rem;
+.game-info-tag {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(4px);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.game-info-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex: 1;
+  padding: 0.85rem 1rem;
+  gap: 0.65rem;
+}
+
+.game-info-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.game-info-title-row strong {
+  font-size: 1.15rem;
+  color: var(--text);
+}
+
+.game-info-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--muted);
-  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.15rem 0.45rem;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.game-info-blurb {
+  margin: 0.25rem 0 0.35rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.game-info-list .game-meta-line {
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.game-info-actions {
+  margin-top: 0.25rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.game-info-actions .btn {
+  padding: 0.45rem 0.85rem;
+  font-size: 0.88rem;
 }
 
 .room-multiplayer-banner {

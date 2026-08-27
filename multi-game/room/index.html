@@ -115,12 +115,27 @@
           <div id="room-chat-play-slot" class="room-chat-play-slot" aria-label="Room chat"></div>
           <div id="game-end-overlay" class="game-end-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="game-end-title">
             <div class="game-end-card">
+              <div class="game-end-trophy" aria-hidden="true">🏆</div>
               <p id="game-end-title" class="game-end-title">Spel afgelopen</p>
               <p id="game-end-summary" class="game-end-summary hint"></p>
-              <button type="button" id="btn-dismiss-end" class="btn btn-primary">
-                Terug naar stemmen
-              </button>
+              <div class="game-end-actions">
+                <button type="button" id="btn-toggle-view-board" class="btn btn-ghost">
+                  Bekijk speelbord
+                </button>
+                <button type="button" id="btn-dismiss-end" class="btn btn-primary">
+                  Terug naar stemmen
+                </button>
+              </div>
             </div>
+          </div>
+          <div id="game-end-minibar" class="game-end-minibar hidden">
+            <span id="game-end-minibar-text" class="game-end-minibar-text">🏆 Spel afgelopen</span>
+            <button type="button" id="btn-show-end-card" class="btn btn-ghost btn-compact">
+              Uitslag
+            </button>
+            <button type="button" id="btn-dismiss-minibar" class="btn btn-primary btn-compact">
+              Lobby
+            </button>
           </div>
         </section>
       </main>

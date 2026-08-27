@@ -60,12 +60,13 @@ export function bootstrapRoomEmbedded(ctx) {
     () => {
       const winner = window.RobotRallyApp?.engine?.winner;
       const name = String(winner?.name || "").trim();
+      const cpCount = window.RobotRallyApp?.engine?.board?.checkpointsCount || 4;
       if (name) {
         return {
           reason: "finished",
           winnerName: name,
           winnerId: winner?.id || winner?.peerUserId || null,
-          summary: `${name} wint`,
+          summary: `🏆 ${name} heeft vlag ${cpCount} gehaald en wint de race!`,
         };
       }
       return { reason: "finished", summary: "Spel afgelopen" };

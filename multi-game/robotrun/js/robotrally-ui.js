@@ -918,11 +918,16 @@ class RobotRallyUI {
           : (isReady ? 'Ready' : (isTurn ? 'Programmeert' : '')),
       ].filter(Boolean);
 
+      const stateBadge = isReady
+        ? '<span class="player-status-state-pill is-ready">✓ Klaar</span>'
+        : (isTurn ? '<span class="player-status-state-pill is-busy">⏳ Bezig</span>' : '');
+
       return `
         <div class="player-status-chip${isYou ? ' is-you' : ''}${isTurn ? ' is-turn' : ''}${isReady ? ' is-ready' : ''}${isDown ? ' is-down' : ''}" style="--chip-color:${color}" title="${tipParts.join(' · ')}">
           <div class="player-status-top">
             <span class="player-status-swatch" aria-hidden="true"></span>
             <span class="player-status-name">${isYou ? `Jij · ${displayName}` : displayName}</span>
+            ${stateBadge}
             <span class="player-status-flags" title="Behaalde vlaggen">${flags}</span>
           </div>
           <div class="player-status-lives" title="Opnieuw beginnen: ${livesLeft}/${maxLives}">${lives}</div>
@@ -1273,15 +1278,16 @@ class RobotRallyUI {
 
     this.gameOverOverlay?.classList.remove('hidden');
     const winner = this.engine.winner;
+    const cpCount = this.engine.board?.checkpointsCount || 4;
     if (this.goCard) {
       this.goCard.className = `go-card ${winner ? 'victory' : 'defeat'}`;
     }
     if (this.goTitle) {
-      this.goTitle.textContent = winner ? `${this.getDisplayPlayerName(winner)} wint!` : 'Game over';
+      this.goTitle.textContent = winner ? `🏆 ${this.getDisplayPlayerName(winner)} wint!` : 'Game over';
     }
     if (this.goStats) {
       this.goStats.innerHTML = winner
-        ? `<b>${this.getDisplayPlayerName(winner)}</b> heeft alle checkpoints gehaald.`
+        ? `<b>${this.getDisplayPlayerName(winner)}</b> heeft vlag ${cpCount} als eerste bereikt en wint de race!`
         : 'Alle robots zijn uitgeschakeld of niemand haalde het parcours.';
     }
   }

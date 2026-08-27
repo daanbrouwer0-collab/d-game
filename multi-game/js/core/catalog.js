@@ -5,6 +5,7 @@
  *   id: string,
  *   title: string,
  *   path: string,
+ *   image: string,
  *   minPlayers: number,
  *   maxPlayers: number,
  *   blurb: string,
@@ -16,16 +17,17 @@
 /** @type {GameEntry[]} */
 export const GAMES = [
   {
-    id: "tic-tac-toe",
-    title: "Tic Tac Toe",
-    path: "tic-tac-toe/",
+    id: "robotrun",
+    title: "RobotRun",
+    path: "robotrun/",
+    image: "robotrun/img/D-RobotRally.jpg",
     minPlayers: 2,
-    maxPlayers: 2,
-    blurb: "4×4 met geblokkeerde vakjes — 3 op rij/kolom. Room of hotseat.",
-    tags: ["snel", "2 spelers"],
+    maxPlayers: 5,
+    blurb: "RoboRally — programmeer je robot over de checkpoints. Race live tegen elkaar!",
+    tags: ["bordspel", "tactisch", "populair"],
     embedded: {
-      entry: "embedded.js",
-      syncProfile: "event-log",
+      entry: "js/embedded.js",
+      syncProfile: "snapshot",
       roomReady: true,
     },
   },
@@ -33,9 +35,10 @@ export const GAMES = [
     id: "ganzenbord",
     title: "Ganzenbord",
     path: "ganzenbord/",
+    image: "assets/games/ganzenbord.svg",
     minPlayers: 2,
     maxPlayers: 6,
-    blurb: "Klassiek spiraalbord (63) — tot 6 spelers via room of hotseat.",
+    blurb: "Klassiek spiraalbord (63 vakjes) — tot 6 spelers via room of hotseat.",
     tags: ["bordspel", "lobby"],
     embedded: {
       entry: "embedded.js",
@@ -44,20 +47,32 @@ export const GAMES = [
     },
   },
   {
-    id: "robotrun",
-    title: "RobotRun",
-    path: "robotrun/",
+    id: "tic-tac-toe",
+    title: "Tic Tac Toe",
+    path: "tic-tac-toe/",
+    image: "assets/games/tic-tac-toe.svg",
     minPlayers: 2,
-    maxPlayers: 5,
-    blurb: "RoboRally — hotseat op dit apparaat of multiplayer via room (2–5).",
-    tags: ["bordspel", "tactisch"],
+    maxPlayers: 2,
+    blurb: "4×4 met geblokkeerde vakjes — 3 op rij of kolom. Snel en tactisch.",
+    tags: ["snel", "2 spelers"],
     embedded: {
-      entry: "js/embedded.js",
-      syncProfile: "snapshot",
+      entry: "embedded.js",
+      syncProfile: "event-log",
       roomReady: true,
     },
   },
 ];
+
+/**
+ * @param {GameEntry} game
+ * @param {string} [base]
+ * @returns {string}
+ */
+export function resolveGameImageUrl(game, base = "") {
+  if (!game || !game.image) return "";
+  const prefix = base.endsWith("/") || base === "" ? base : `${base}/`;
+  return `${prefix}${game.image}`;
+}
 
 /**
  * @param {string} id
@@ -84,3 +99,4 @@ export function gamesForPlayerCount(count) {
 export function roomReadyGames(count) {
   return gamesForPlayerCount(count).filter((g) => g.embedded?.roomReady === true);
 }
+

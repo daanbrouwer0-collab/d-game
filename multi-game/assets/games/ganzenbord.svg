@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <defs>
+    <linearGradient id="gbg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a121d"/>
+      <stop offset="50%" stop-color="#0e2329"/>
+      <stop offset="100%" stop-color="#0d1b1e"/>
+    </linearGradient>
+    <linearGradient id="track" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="50%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <filter id="gglow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="800" height="500" fill="url(#gbg)"/>
+  
+  <circle cx="160" cy="140" r="160" fill="#10b981" opacity="0.08"/>
+  <circle cx="650" cy="350" r="180" fill="#06b6d4" opacity="0.08"/>
+
+  <!-- Spiral track tiles simulation -->
+  <g transform="translate(400, 200)" filter="url(#gglow)">
+    <!-- Outer ring tiles -->
+    <rect x="-240" y="-140" width="55" height="40" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="-212" y="-115" fill="#10b981" font-family="sans-serif" font-weight="700" font-size="14" text-anchor="middle">1</text>
+
+    <rect x="-175" y="-140" width="55" height="40" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+    <text x="-147" y="-115" fill="#94a3b8" font-family="sans-serif" font-weight="700" font-size="14" text-anchor="middle">2</text>
+
+    <rect x="-110" y="-140" width="55" height="40" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+    <text x="-82" y="-115" fill="#94a3b8" font-family="sans-serif" font-weight="700" font-size="14" text-anchor="middle">3</text>
+
+    <rect x="-45" y="-140" width="55" height="40" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+    <text x="-17" y="-115" fill="#94a3b8" font-family="sans-serif" font-weight="700" font-size="14" text-anchor="middle">4</text>
+
+    <rect x="20" y="-140" width="55" height="40" rx="8" fill="#064e3b" stroke="#10b981" stroke-width="2"/>
+    <!-- Goose icon tile 5 -->
+    <circle cx="47" cy="-120" r="12" fill="#10b981"/>
+    <text x="47" y="-116" fill="#fff" font-family="sans-serif" font-weight="900" font-size="11" text-anchor="middle">🦆</text>
+
+    <rect x="85" y="-140" width="55" height="40" rx="8" fill="#1e293b" stroke="#06b6d4" stroke-width="2"/>
+    <text x="112" y="-115" fill="#06b6d4" font-family="sans-serif" font-weight="700" font-size="14" text-anchor="middle">6</text>
+
+    <rect x="150" y="-140" width="55" height="40" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+    <text x="177" y="-115" fill="#94a3b8" font-family="sans-serif" font-weight="700" font-size="14" text-anchor="middle">7</text>
+
+    <!-- Side turn -->
+    <rect x="150" y="-90" width="55" height="40" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+    <rect x="150" y="-40" width="55" height="40" rx="8" fill="#1e293b" stroke="#06b6d4" stroke-width="2"/>
+    <rect x="150" y="10" width="55" height="40" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+    <rect x="150" y="60" width="55" height="40" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+
+    <!-- Bottom row -->
+    <rect x="85" y="60" width="55" height="40" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+    <rect x="20" y="60" width="55" height="40" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+    <rect x="-45" y="60" width="55" height="40" rx="8" fill="#451a03" stroke="#f59e0b" stroke-width="2"/>
+    <text x="-17" y="85" fill="#f59e0b" font-family="sans-serif" font-weight="900" font-size="11" text-anchor="middle">☠️</text>
+    <rect x="-110" y="60" width="55" height="40" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+    <rect x="-175" y="60" width="55" height="40" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+    <rect x="-240" y="60" width="55" height="40" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+
+    <!-- Center Goal (63) -->
+    <rect x="-60" y="-40" width="120" height="80" rx="16" fill="url(#gold)" stroke="#fef08a" stroke-width="3"/>
+    <text x="0" y="-8" fill="#78350f" font-family="sans-serif" font-weight="900" font-size="22" text-anchor="middle">63</text>
+    <text x="0" y="20" fill="#78350f" font-family="sans-serif" font-weight="800" font-size="13" text-anchor="middle">FINISH</text>
+
+    <!-- Dice in corner -->
+    <g transform="translate(-200, -60)">
+      <rect x="0" y="0" width="44" height="44" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+      <circle cx="12" cy="12" r="3.5" fill="#1e293b"/>
+      <circle cx="32" cy="12" r="3.5" fill="#1e293b"/>
+      <circle cx="22" cy="22" r="3.5" fill="#ef4444"/>
+      <circle cx="12" cy="32" r="3.5" fill="#1e293b"/>
+      <circle cx="32" cy="32" r="3.5" fill="#1e293b"/>
+    </g>
+  </g>
+
+  <!-- Title & Tagline -->
+  <g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" text-anchor="middle">
+    <text x="400" y="420" font-size="34" font-weight="800" fill="#f8fafc" letter-spacing="1">GANZENBORD</text>
+    <text x="400" y="455" font-size="16" font-weight="500" fill="#94a3b8">Klassiek Bordspel (63 Vakjes) · Tot 6 Spelers</text>
+  </g>
+</svg>

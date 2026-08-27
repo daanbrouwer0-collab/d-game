@@ -1,5 +1,5 @@
 import { createRoomSession } from "../js/core/room.js";
-import { GAMES, getGame, roomReadyGames } from "../js/core/catalog.js";
+import { GAMES, getGame, roomReadyGames, resolveGameImageUrl } from "../js/core/catalog.js";
 import { isRoomPlayable } from "../js/bridge/embedded-contract.js";
 import {
   loadRoomLogByCode,
@@ -74,6 +74,8 @@ const gameSessionHint = document.getElementById("game-session-hint");
 const gameEndOverlay = document.getElementById("game-end-overlay");
 const gameEndTitle = document.getElementById("game-end-title");
 const gameEndSummary = document.getElementById("game-end-summary");
+const gameEndMinibar = document.getElementById("game-end-minibar");
+const gameEndMinibarText = document.getElementById("game-end-minibar-text");
 
 /** @type {{ reason?: string, winnerName?: string|null, summary?: string|null } | null} */
 let gameEndResult = null;
@@ -313,6 +315,9 @@ function renderGamePicker() {
     const votes = tallies.get(g.id) || 0;
     const isVoted = myVote === g.id;
     const isLeading = ok && winner === g.id && votes > 0;
+    const imgUrl = resolveGameImageUrl(g, "../");
+    const primaryTag = g.tags?.[0] || "Game";
+
     const li = document.createElement("li");
     const btn = document.createElement("button");
     btn.type = "button";
@@ -321,17 +326,38 @@ function renderGamePicker() {
     if (isLeading) btn.classList.add("is-leading");
     btn.disabled = !ok || !!state.activeSession;
     btn.dataset.game = g.id;
+
     const reason = !countOk
       ? `Vereist ${g.minPlayers}–${g.maxPlayers} spelers`
       : !roomReady
         ? "Room-modus volgt"
         : `${g.minPlayers}–${g.maxPlayers} spelers`;
+
     const voteLine =
       votes > 0
         ? `${votes} stem${votes === 1 ? "" : "men"}`
         : "Nog geen stemmen";
-    btn.innerHTML = `<strong>${escapeHtml(g.title)}</strong>
-      <span class="vote-meta">${escapeHtml(reason)} · ${escapeHtml(voteLine)}</span>`;
+
+    btn.innerHTML = `
+      <div class="game-vote-thumb-wrap">
+        ${imgUrl ? `<img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(g.title)}" class="game-vote-thumb" loading="lazy" />` : `<div class="game-vote-thumb-placeholder">${escapeHtml(g.title.slice(0, 2))}</div>`}
+        <span class="game-vote-tag">${escapeHtml(primaryTag)}</span>
+      </div>
+      <div class="game-vote-body">
+        <div class="game-vote-header">
+          <strong class="game-vote-title">${escapeHtml(g.title)}</strong>
+          <span class="game-vote-badge ${votes > 0 ? "has-votes" : ""}">${escapeHtml(voteLine)}</span>
+        </div>
+        <p class="game-vote-blurb">${escapeHtml(g.blurb || "")}</p>
+        <div class="game-vote-footer">
+          <span class="game-vote-players">${escapeHtml(reason)}</span>
+          <div class="game-vote-status-pills">
+            ${isVoted ? '<span class="game-vote-pill is-your-vote">✓ Jouw stem</span>' : ""}
+            ${isLeading ? '<span class="game-vote-pill is-top-vote">★ Aan kop</span>' : ""}
+          </div>
+        </div>
+      </div>
+    `;
     btn.addEventListener("click", () => voteForGame(g.id));
     li.appendChild(btn);
     gamePicker.appendChild(li);
@@ -696,7 +722,7 @@ function showGameEndScreen(payload = {}) {
   const winnerName = String(payload.winnerName || "").trim();
   let title = "Spel afgelopen";
   if (reason === "draw") title = "Gelijkspel";
-  else if (winnerName) title = `${winnerName} wint`;
+  else if (winnerName) title = `${winnerName} wint!`;
   if (gameEndTitle) gameEndTitle.textContent = title;
   if (gameEndSummary) {
     const summary = String(payload.summary || "").trim();
@@ -706,15 +732,30 @@ function showGameEndScreen(payload = {}) {
       !(winnerName && summary.toLowerCase() === `${winnerName} wint`.toLowerCase());
     gameEndSummary.textContent = showSummary ? summary : "";
   }
+  if (gameEndMinibarText) {
+    gameEndMinibarText.textContent = winnerName ? `🏆 ${winnerName} wint de race!` : "🏆 Spel afgelopen";
+  }
   gameEndOverlay?.classList.remove("hidden");
+  gameEndMinibar?.classList.add("hidden");
   showPanel("playing");
 }
 
 function hideGameEndScreen() {
   gameEndResult = null;
   gameEndOverlay?.classList.add("hidden");
+  gameEndMinibar?.classList.add("hidden");
   if (gameEndTitle) gameEndTitle.textContent = "Spel afgelopen";
   if (gameEndSummary) gameEndSummary.textContent = "";
+}
+
+function toggleBoardView(showBoard) {
+  if (showBoard) {
+    gameEndOverlay?.classList.add("hidden");
+    gameEndMinibar?.classList.remove("hidden");
+  } else {
+    gameEndOverlay?.classList.remove("hidden");
+    gameEndMinibar?.classList.add("hidden");
+  }
 }
 
 function dismissGameEndScreen() {
@@ -1410,6 +1451,9 @@ btnEndSession?.addEventListener("click", () => endGame("host_abort"));
 btnGoToGame?.addEventListener("click", () => goToGame());
 document.getElementById("btn-leave-room")?.addEventListener("click", leaveRoom);
 document.getElementById("btn-dismiss-end")?.addEventListener("click", dismissGameEndScreen);
+document.getElementById("btn-toggle-view-board")?.addEventListener("click", () => toggleBoardView(true));
+document.getElementById("btn-show-end-card")?.addEventListener("click", () => toggleBoardView(false));
+document.getElementById("btn-dismiss-minibar")?.addEventListener("click", dismissGameEndScreen);
 
 function inviteShareUrl() {
   return (

@@ -554,69 +554,111 @@ class RobotRallyEngine {
   }
 
   /**
-   * Plaats vlaggen als heen-en-weer route: progressie weg van de start,
-   * maar om-en-om links/rechts (of boven/onder) zodat 1-2-3-4 niet op één lijn ligt.
+   * Plaats vlaggen als een uitdagende heen-en-weer route:
+   * Vlaggen 1-2-3-4 wisselen van kwadrant/hoek zodat de totale raceafstand
+   * maximaal groot is en spelers meerdere keren het bord moeten oversteken.
    */
   placeZigzagCheckpoints(board, count, edge, rng, pickFree) {
     const width = board.width;
     const height = board.height;
     const placed = [];
-    const minSep = Math.max(3, Math.floor(Math.min(width, height) / 4));
-    // Start zigzag aan een willekeurige kant
-    let side = rng() < 0.5 ? 0 : 1;
+    const minGlobalSep = Math.max(3, Math.floor(Math.min(width, height) / 4));
+    const minHopDist = Math.max(5, Math.floor(Math.min(width, height) * 0.5));
 
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const dist = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 
-    const tooClose = (x, y) => placed.some(p => Math.abs(p.x - x) + Math.abs(p.y - y) < minSep);
+    // Kwadranten voor het 12x12 bord (binnenste speelveld [1..width-2, 1..height-2])
+    const midX = Math.floor(width / 2);
+    const midY = Math.floor(height / 2);
 
-    const candidateAt = (i, jitter = 0) => {
-      // Progressie langs de race-as (dicht bij start → ver weg)
-      const t = (i + 0.35 + rng() * 0.25) / (count + 0.5);
-      const progress = clamp(t + jitter * 0.08, 0.12, 0.92);
-      // Laterale zigzag: afwisselend diep links / diep rechts
-      const lateralBase = side === 0
-        ? 0.12 + rng() * 0.22
-        : 0.66 + rng() * 0.22;
-      const lateral = clamp(lateralBase + jitter * 0.1, 0.08, 0.92);
+    const quadrants = {
+      TL: { xMin: 1, xMax: midX - 1, yMin: 1, yMax: midY - 1 },
+      TR: { xMin: midX + 1, xMax: width - 2, yMin: 1, yMax: midY - 1 },
+      BL: { xMin: 1, xMax: midX - 1, yMin: midY + 1, yMax: height - 2 },
+      BR: { xMin: midX + 1, xMax: width - 2, yMin: midY + 1, yMax: height - 2 }
+    };
 
-      let x;
-      let y;
-      if (edge === 'south') {
-        // Start zuid → race naar noord (y daalt), zigzag op x
-        y = clamp(Math.floor((height - 2) * (1 - progress)), 1, height - 3);
-        x = clamp(Math.floor(1 + lateral * (width - 3)), 1, width - 2);
-      } else if (edge === 'north') {
-        y = clamp(Math.floor(1 + progress * (height - 3)), 2, height - 2);
-        x = clamp(Math.floor(1 + lateral * (width - 3)), 1, width - 2);
-      } else if (edge === 'west') {
-        x = clamp(Math.floor(1 + progress * (width - 3)), 2, width - 2);
-        y = clamp(Math.floor(1 + lateral * (height - 3)), 1, height - 2);
-      } else {
-        x = clamp(Math.floor((width - 2) * (1 - progress)), 1, width - 3);
-        y = clamp(Math.floor(1 + lateral * (height - 3)), 1, height - 2);
+    // Kies een criss-cross volgorde gebaseerd op de startrand
+    const routesByEdge = {
+      south: [
+        ['BL', 'TR', 'BR', 'TL'],
+        ['BR', 'TL', 'BL', 'TR'],
+        ['BL', 'TR', 'TL', 'BR'],
+        ['BR', 'TL', 'TR', 'BL']
+      ],
+      north: [
+        ['TL', 'BR', 'BL', 'TR'],
+        ['TR', 'BL', 'BR', 'TL'],
+        ['TL', 'BR', 'TR', 'BL'],
+        ['TR', 'BL', 'TL', 'BR']
+      ],
+      west: [
+        ['BL', 'TR', 'TL', 'BR'],
+        ['TL', 'BR', 'BL', 'TR'],
+        ['BL', 'TR', 'BR', 'TL'],
+        ['TL', 'BR', 'TR', 'BL']
+      ],
+      east: [
+        ['BR', 'TL', 'TR', 'BL'],
+        ['TR', 'BL', 'BR', 'TL'],
+        ['BR', 'TL', 'BL', 'TR'],
+        ['TR', 'BL', 'TL', 'BR']
+      ]
+    };
+
+    const edgeRoutes = routesByEdge[edge] || routesByEdge.south;
+    const selectedRoute = edgeRoutes[Math.floor(rng() * edgeRoutes.length)];
+
+    const pickPointInQuadrant = (quadKey, prevPoint, avoidStarts = true) => {
+      const q = quadrants[quadKey] || quadrants.TL;
+      let best = null;
+      let bestDist = -1;
+
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const x = q.xMin + Math.floor(rng() * (q.xMax - q.xMin + 1));
+        const y = q.yMin + Math.floor(rng() * (q.yMax - q.yMin + 1));
+        if (board.grid[y][x].type !== CONFIG.TILE_TYPES.FLOOR) continue;
+        if (avoidStarts && this.isNearStart(board, x, y, 2)) continue;
+
+        // Voldoende afstand van alle al geplaatste vlaggen
+        const tooClose = placed.some(p => dist(p, { x, y }) < minGlobalSep);
+        if (tooClose) continue;
+
+        const d = prevPoint ? dist(prevPoint, { x, y }) : 10;
+        if (prevPoint && d < minHopDist && attempt < 35) continue;
+
+        if (d > bestDist) {
+          bestDist = d;
+          best = { x, y };
+        }
       }
-      return { x, y };
+      return best;
     };
 
     for (let i = 0; i < count; i++) {
-      let pos = null;
-      for (let attempt = 0; attempt < 40; attempt++) {
-        const c = candidateAt(i, (rng() - 0.5) * attempt);
-        if (board.grid[c.y][c.x].type !== CONFIG.TILE_TYPES.FLOOR) continue;
-        if (this.isNearStart(board, c.x, c.y, 2)) continue;
-        if (tooClose(c.x, c.y)) continue;
-        pos = c;
-        break;
-      }
+      const prev = placed.length ? placed[placed.length - 1] : null;
+      const quadKey = selectedRoute[i % selectedRoute.length];
+      let pos = pickPointInQuadrant(quadKey, prev, i === 0);
+
       if (!pos) {
-        // Fallback: vrije cel ver van andere vlaggen
-        for (let attempt = 0; attempt < 60 && !pos; attempt++) {
-          const c = pickFree(i === count - 1, 2);
+        // Fallback: zoek een vloercel met maximale afstand tot de vorige vlag
+        let fallbackBest = null;
+        let fallbackMaxDist = -1;
+        for (let attempt = 0; attempt < 80; attempt++) {
+          const c = pickFree(false, 2);
           if (!c) break;
-          if (tooClose(c.x, c.y)) continue;
-          pos = c;
+          const tooClose = placed.some(p => dist(p, c) < minGlobalSep);
+          if (tooClose) continue;
+          const d = prev ? dist(prev, c) : 10;
+          if (d > fallbackMaxDist) {
+            fallbackMaxDist = d;
+            fallbackBest = c;
+          }
         }
+        pos = fallbackBest;
       }
+
       if (!pos) continue;
 
       board.grid[pos.y][pos.x] = this.createCell({
@@ -625,7 +667,6 @@ class RobotRallyEngine {
         walls: [...board.grid[pos.y][pos.x].walls]
       });
       placed.push(pos);
-      side = 1 - side;
     }
 
     // Zorg dat board.checkpointsCount klopt met echt geplaatste vlaggen
@@ -656,8 +697,8 @@ class RobotRallyEngine {
         desc: 'Rustiger random bord: minder banden, muren, lasers en draaischijven.',
         width: 12,
         height: 12,
-        checkpointsBase: 3,
-        checkpointsExtraChance: 0.2,
+        checkpointsBase: 4,
+        checkpointsExtraChance: 0.0,
         conveyor: [12, 22],
         conveyorPaths: [1, 2],
         gear: [0, 1],
@@ -673,8 +714,8 @@ class RobotRallyEngine {
         desc: 'Standaard random parcours voor deze sessie.',
         width: 12,
         height: 12,
-        checkpointsBase: 3,
-        checkpointsExtraChance: 0.45,
+        checkpointsBase: 4,
+        checkpointsExtraChance: 0.0,
         conveyor: [28, 42],
         conveyorPaths: [2, 4],
         gear: [2, 3],
@@ -690,8 +731,8 @@ class RobotRallyEngine {
         desc: 'Gevaarlijker random bord: meer banden, muren, lasers en draaischijven.',
         width: 12,
         height: 12,
-        checkpointsBase: 3,
-        checkpointsExtraChance: 0.75,
+        checkpointsBase: 4,
+        checkpointsExtraChance: 0.0,
         conveyor: [48, 70],
         conveyorPaths: [4, 6],
         gear: [4, 6],
@@ -2363,6 +2404,7 @@ class RobotRallyEngine {
           this.phase = 'finished';
           this.winner = robot;
           this.pushLog(`${robot.name} wint het parcours!`);
+          this.emitStateChange();
         }
       }
     });
