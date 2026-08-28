@@ -1,0 +1,57 @@
+/* MERGE-BLOCK: hud.css */
+#ui {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 10px 12px;
+  border-left: 4px solid var(--accent-2);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.15);
+  border-radius: 0 8px 8px 0;
+}
+
+.stats {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  font-weight: bold;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stats div {
+  padding: 3px 8px;
+  background: rgba(0, 0, 0, 0.5);
+  border-left: 2px solid var(--accent-2);
+  min-width: 140px;
+}
+
+#timer-box {
+  border-left-color: var(--success);
+  color: var(--success);
+}
+
+#speedometer {
+  color: var(--accent-2);
+}
+
+#title {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 10;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 18px;
+  font-style: italic;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-shadow: 0 0 15px var(--accent), 2px 2px var(--accent-2);
+  pointer-events: none;
+}
+
+#instructions {
+  display: none;
+}
+/* END-MERGE-BLOCK */

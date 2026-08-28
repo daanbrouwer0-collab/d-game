@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>D-Tower — Tower Defense</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/nav.css">
+    <link rel="stylesheet" href="css/menu.css">
+    <link rel="stylesheet" href="css/hud.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header Terugknop naar D-Game -->
+        <header class="game-header-bar">
+            <a href="../index.html" class="btn-dgame-back" aria-label="Terug naar D-Game">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M15 19l-7-7 7-7"/></svg>
+                <span>D-Game</span>
+            </a>
+            <span class="game-header-title">D-Tower</span>
+        </header>
+
+        <!-- ===== SPEL TAB ===== -->
+        <section id="screen-play" class="view-screen active">
+            <div id="game-wrap">
+                <canvas id="c"></canvas>
+                <div id="ui">
+                    <div class="hud-top-block">
+                        <div class="hud-row">
+                            <div class="hud-stats hud-stats-primary">
+                                <div id="hp">HP: 100%</div>
+                                <div id="wave">LVL: 1 | WAVE: 1</div>
+                            </div>
+                            <div class="hud-stats hud-stats-secondary">
+                                <div id="money">$: 700</div>
+                                <div id="t-points" class="hud-tpoints">T: 0%</div>
+                            </div>
+                        </div>
+                        <div id="center-msg" aria-live="polite"></div>
+                    </div>
+                    <div class="hud-row hud-btm">
+                        <div class="btn-grp" id="build-menu"></div>
+                    </div>
+                </div>
+
+                <div id="pause-badge" class="hidden">Gepauzeerd</div>
+
+                <div id="over">
+                    <h1>SYSTEM FAILURE</h1>
+                    <p>Compromised at <span id="score"></span></p>
+                    <div class="over-actions">
+                        <button id="btn-over-retry" class="btn success" type="button">Opnieuw proberen</button>
+                        <button id="btn-over-menu" class="btn alt" type="button">Kies Sector</button>
+                    </div>
+                </div>
+
+                <div id="share-modal" class="modal" aria-hidden="true">
+                    <div class="modal-card glass-card">
+                        <div class="modal-head">
+                            <h2>Sector scan vastgelegd!</h2>
+                        </div>
+                        <div class="share-modal-body">
+                            <p class="share-modal-text">Het verdedigingssysteem heeft een tactische snapshot gemaakt van je overwinning. Wil je deze delen?</p>
+                            <div class="share-preview-wrap">
+                                <img id="share-preview" alt="Tactische snapshot" width="600" height="400">
+                            </div>
+                            <div class="share-modal-actions">
+                                <button id="btn-share-yes" class="btn share-btn" type="button">Deel snapshot</button>
+                                <button id="btn-share-no" class="btn alt" type="button">Verder verdedigen</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== SECTOREN TAB ===== -->
+        <section id="screen-sectors" class="view-screen">
+            <div class="panel-scroll">
+                <div class="menu-page-head">
+                    <button class="btn-back" type="button" data-menu-back aria-label="Terug naar verdedigen">← Terug</button>
+                    <h2>Sectoren</h2>
+                </div>
+                <p class="track-intro">Overleef alle waves om de sector te beveiligen en de volgende te openen.</p>
+                <div id="sector-list" class="track-list"></div>
+                <button id="btn-sector-start" class="btn success track-ride-btn" type="button">Start Sector 1</button>
+            </div>
+        </section>
+
+        <!-- ===== COMMANDANT & INFO TAB ===== -->
+        <section id="screen-character" class="view-screen">
+            <div class="panel-scroll character-panel">
+                <div class="menu-page-head">
+                    <button class="btn-back" type="button" data-menu-back aria-label="Terug naar verdedigen">← Terug</button>
+                    <h2>Commandant &amp; Info</h2>
+                </div>
+
+                <!-- 1. Hero Badge -->
+                <div class="glass-card character-hero">
+                    <div class="character-hero-main">
+                        <div class="badge-wrap">
+                            <canvas id="commander-badge" width="72" height="72" aria-label="Commandant badge"></canvas>
+                        </div>
+                        <div class="character-hero-text">
+                            <div class="commander-name" id="stat-commander">—</div>
+                            <div class="commander-session" id="stat-session">—</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Statistieken -->
+                <div class="glass-card character-stats-card">
+                    <h3 class="character-section-title">Statistieken</h3>
+                    <div class="stat-grid">
+                        <div class="stat-card">
+                            <div class="label">Sectoren behaald</div>
+                            <div class="value" id="stat-sectors">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Huidige sector</div>
+                            <div class="value" id="stat-level">1</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Waves overleefd</div>
+                            <div class="value" id="stat-waves">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Kasteel HP</div>
+                            <div class="value" id="stat-castle-hp">100%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Moeilijkheid</div>
+                            <div class="value stat-value-sm" id="stat-difficulty">Normal</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Data ($)</div>
+                            <div class="value" id="stat-money">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Kasteel Customization -->
+                <div class="glass-card character-appearance">
+                    <div class="character-appearance-head">
+                        <h3 class="character-section-title">Kasteel</h3>
+                        <button id="btn-reset-castle-color" class="btn alt" type="button">Reset</button>
+                    </div>
+                    <div class="castle-customize">
+                        <div class="castle-preview-wrap">
+                            <canvas id="castle-preview" width="96" height="96" aria-label="Kasteel preview"></canvas>
+                        </div>
+                        <label class="color-row" for="color-castle">
+                            <span class="color-row-label">Kleur</span>
+                            <input id="color-castle" class="color-input" type="color" value="#00f3ff">
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 4. Instellingen -->
+                <div class="glass-card">
+                    <h3 class="character-section-title">Instellingen</h3>
+                    <div class="setting-row">
+                        <div class="info">
+                            <strong>Geluid</strong>
+                            <span>Effecten en feedback</span>
+                        </div>
+                        <button id="toggle-sound-settings" class="toggle" type="button" aria-pressed="false">Geluid: UIT</button>
+                    </div>
+                    <div class="setting-row">
+                        <div class="info">
+                            <strong>Trillen</strong>
+                            <span>Haptische feedback op mobiel</span>
+                        </div>
+                        <button id="toggle-vibration" class="toggle" type="button" aria-pressed="true">Trillen: AAN</button>
+                    </div>
+                    <div class="setting-row">
+                        <div class="info">
+                            <strong>Speelsnelheid</strong>
+                            <span>1× of 2× versnellen</span>
+                        </div>
+                        <button id="toggle-game-speed" class="toggle" type="button" aria-pressed="false">Snelheid: 1×</button>
+                    </div>
+                    <div class="setting-row">
+                        <div class="info">
+                            <strong>Alles wissen</strong>
+                            <span>Voortgang en instellingen resetten</span>
+                        </div>
+                        <button id="btn-reset-progress" class="btn danger" type="button">Reset</button>
+                    </div>
+                </div>
+
+                <!-- 5. Speltips -->
+                <div class="glass-card menu-help-body">
+                    <h3 class="character-section-title">Speltips</h3>
+                    <p><strong>Doel</strong> — Bescherm het kasteel in het midden. Overleef alle waves om de sector te beveiligen.</p>
+                    <p><strong>Bouwen</strong> — Kies een toren onderaan en tik op een hex. Sommige gebouwen vereisen water, nodes of ruïnes.</p>
+                    <p><strong>Upgrades</strong> — Tik op een bestaand gebouw om te upgraden (max level 3).</p>
+                    <p><strong>T-points</strong> — Tech-towers genereren T-points. Bij 100% krijg je extra schade.</p>
+                    <p><strong>Autosave</strong> — Je voortgang wordt na elke wave en sector automatisch opgeslagen.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Bottom Navigatie: 3 tabs -->
+    <nav class="bottom-nav" aria-label="Hoofdnavigatie">
+        <div class="bottom-nav-inner">
+            <button class="nav-item nav-item-labeled nav-speed-btn active" data-tab="play" type="button" aria-label="Verdedig / Snelheid">
+                <svg class="nav-speed-icon nav-speed-icon-1x" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"/></svg>
+                <svg class="nav-speed-icon nav-speed-icon-2x hidden" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8.25l9 6.75-9 6.75V8.25zM12.75 8.25l9 6.75-9 6.75V8.25z"/></svg>
+                <span class="nav-label">Verdedig</span>
+            </button>
+            <button class="nav-item nav-item-labeled" data-tab="sectors" type="button" aria-label="Sectoren">
+                <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503-14.25c-4.498 0-8.997 1.5-13.496 0v15c4.499 1.5 8.998 0 13.496 0s8.997 1.5 13.496 0v-15c-4.499 1.5-8.998 0-13.496 0z"/></svg>
+                <span class="nav-label">Sectoren</span>
+            </button>
+            <button class="nav-item nav-item-labeled" data-tab="character" type="button" aria-label="Commandant">
+                <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+                <span class="nav-label">Commandant</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Pauze Overlay -->
+    <div id="menu-overlay" class="hidden">
+        <div class="menu-card glass-card">
+            <h1>D-Tower</h1>
+            <p class="subtitle" id="pause-session-meta">Gepauzeerd</p>
+            <div id="menu-msg" class="menu-msg"></div>
+
+            <div class="menu-actions menu-actions-pause">
+                <button id="btn-session-resume" class="btn success" type="button">Hervatten</button>
+                <button id="btn-session-restart" class="btn alt" type="button">Herstart Sector</button>
+                <button id="btn-session-to-sectors" class="btn alt" type="button">Kies Sector</button>
+                <a href="../index.html" class="btn alt" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;">← Naar D-Game</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+        <span id="toast-text">Klaar!</span>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/vip.js"></script>
+    <script src="js/toast.js"></script>
+    <script src="js/share.js"></script>
+    <script src="js/nav.js"></script>
+    <script src="js/character.js"></script>
+    <script src="js/sectors.js"></script>
+    <script src="js/menu.js"></script>
+    <script src="js/app-menu.js"></script>
+    <script src="js/pool.js"></script>
+    <script src="js/engine.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

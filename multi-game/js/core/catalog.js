@@ -32,6 +32,26 @@ export const GAMES = [
     },
   },
   {
+    id: "neon-racer",
+    title: "Neon Racer",
+    path: "neon-racer/",
+    image: "neon-racer/img/D-Racer.jpg",
+    minPlayers: 1,
+    maxPlayers: 1,
+    blurb: "Synthwave 3D racer — scheur over neonbanen en zet toptijden neer.",
+    tags: ["arcade", "solo", "3d"],
+  },
+  {
+    id: "tower-defense",
+    title: "D-Tower",
+    path: "tower-defense/",
+    image: "tower-defense/img/D-Tower.jpg",
+    minPlayers: 1,
+    maxPlayers: 1,
+    blurb: "Hex tower defense — verdedig je kasteel met torens en upgrades.",
+    tags: ["defense", "solo", "tactisch"],
+  },
+  {
     id: "ganzenbord",
     title: "Ganzenbord",
     path: "ganzenbord/",
@@ -99,4 +119,3 @@ export function gamesForPlayerCount(count) {
 export function roomReadyGames(count) {
   return gamesForPlayerCount(count).filter((g) => g.embedded?.roomReady === true);
 }
-

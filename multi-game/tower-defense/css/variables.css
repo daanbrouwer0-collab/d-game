@@ -1,0 +1,61 @@
+/* MERGE-BLOCK: variables.css */
+:root {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --font-display: 'Plus Jakarta Sans', var(--font-sans);
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+    --bg: #020205;
+    --bg-app: #060a12;
+    --bg-canvas: #020205;
+    --bg-card: rgba(14, 22, 38, 0.82);
+    --bg-input: rgba(8, 14, 26, 0.75);
+    --border: rgba(255, 255, 255, 0.08);
+    --border-active: rgba(0, 243, 255, 0.45);
+
+    --prim: #00f3ff;
+    --acc: #ff00ff;
+    --danger: #ff3333;
+    --succ: #71fa71;
+    --warn: #fafa7d;
+    --void: #102c27;
+
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+
+    --accent: #00f3ff;
+    --accent-glow: rgba(0, 243, 255, 0.22);
+    --accent-2: #00f3ff;
+    --accent-2-glow: rgba(0, 243, 255, 0.18);
+    --success: #33ff33;
+    --warning: #fafa7d;
+    --danger-ui: #ef4444;
+
+    --font: var(--font-mono);
+
+    --nav-height: 52px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+    /* Portret speelveld — 9:16, altijd hoger dan breed */
+    --play-height: calc(100dvh - var(--nav-height) - var(--safe-bottom));
+    --play-width: min(100vw, 480px, calc(var(--play-height) * 9 / 16));
+
+    --radius-sm: 10px;
+    --radius-md: 16px;
+    --radius-lg: 22px;
+    --shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+    --transition: 0.2s ease;
+
+    /* HUD / torenknoppen — vast formaat (mobiel = referentie, zelfde op PC) */
+    --build-btn-font: 11px;
+    --build-btn-pad-y: 6px;
+    --build-btn-pad-x: 3px;
+    --build-btn-min-h: 38px;
+    --build-btn-radius: 4px;
+    --build-btn-gap: 3px;
+    --hud-btm-pad-y: 6px;
+    --hud-btm-pad-x: 6px;
+    --hud-play-margin: 6px;
+}
+/* END-MERGE-BLOCK */

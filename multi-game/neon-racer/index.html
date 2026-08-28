@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Neon Racer — D-Game</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/nav.css">
+  <link rel="stylesheet" href="css/menu.css">
+  <link rel="stylesheet" href="css/hud.css">
+  <link rel="stylesheet" href="css/world.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header Terugknop naar D-Game -->
+    <header class="game-header-bar">
+      <a href="../index.html" class="btn-dgame-back" aria-label="Terug naar D-Game">
+        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M15 19l-7-7 7-7"/></svg>
+        <span>D-Game</span>
+      </a>
+      <span class="game-header-title">Neon Racer</span>
+    </header>
+
+    <!-- ===== SPEL TAB ===== -->
+    <section id="screen-play" class="view-screen active">
+      <div id="game-wrap">
+        <div id="title">Neon Racer</div>
+        <div id="countdown-overlay"></div>
+        <div id="finish-fade"></div>
+
+        <div id="ui">
+          <div class="stats">
+            <div id="timer-box">TIJD: <span id="timer">0.00</span>s</div>
+            <div>SPEED: <span id="top-speed">0</span> / <span id="speedometer">0</span> KM/H</div>
+            <div>GATES: <span id="gate-count">0</span> / <span id="gate-total">0</span></div>
+          </div>
+        </div>
+
+        <div id="instructions">Sturen: Left/Right of A/D | Start/Stop | Space = rem</div>
+
+        <div id="touch-controls" aria-hidden="true">
+          <div id="touch-arrows" aria-label="Controls">
+            <button id="btn-left" class="arrow-btn" type="button">←</button>
+            <button id="btn-drive" class="arrow-btn drive-btn" type="button" aria-pressed="false">Start</button>
+            <button id="btn-right" class="arrow-btn" type="button">→</button>
+          </div>
+        </div>
+
+        <div id="pause-badge" class="hidden">Gepauzeerd</div>
+
+        <div id="game-over">
+          <div class="go-card">
+            <h2 id="go-title">FINISH!</h2>
+            <div class="go-stats">
+              Level: <b id="final-level">1</b><br>
+              Tijd: <b id="final-time">0.00</b>s<br>
+              Record: <b id="final-record">—</b><br>
+              <span id="final-record-delta" class="final-record-delta"></span><br>
+              Gates: <b id="final-gates">0</b><br>
+              Top Speed: <b id="final-topspeed">0</b> KM/H
+            </div>
+            <div class="go-actions">
+              <button id="btn-go-next" class="btn success" type="button">Volgend level</button>
+              <button id="btn-go-restart" class="btn alt" type="button">Opnieuw</button>
+              <button id="btn-go-menu" class="btn" type="button">Kies Baan</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="share-modal" class="modal" aria-hidden="true">
+          <div class="modal-card glass-card">
+            <div class="modal-head">
+              <h2 id="share-modal-title">Nieuw record!</h2>
+            </div>
+            <div class="share-modal-body">
+              <p id="share-modal-text" class="share-modal-text">Wil je dit moment delen?</p>
+              <div class="share-preview-wrap">
+                <img id="share-preview" alt="Screenshot van dit moment" width="600" height="400">
+              </div>
+              <div class="share-modal-actions">
+                <button id="btn-share-yes" class="btn share-btn" type="button">Deel foto</button>
+                <button id="btn-share-no" class="btn alt" type="button">Nee, verder</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== BAAN TAB ===== -->
+    <section id="screen-tracks" class="view-screen">
+      <div class="panel-scroll">
+        <div class="menu-page-head">
+          <button class="btn-back" type="button" data-menu-back aria-label="Terug naar race">← Terug</button>
+          <h2>Banen</h2>
+        </div>
+        <p class="track-intro">Speel banen op volgorde vrij. Rond een baan af om de volgende te openen.</p>
+        <p id="track-session-hint" class="track-session-hint"></p>
+        <div id="track-list" class="track-list"></div>
+        <button id="btn-track-ride" class="btn success track-ride-btn" type="button">Rij Neon Start</button>
+      </div>
+    </section>
+
+    <!-- ===== PROFIEL & INFO TAB (Geheugen + Karakter + Instellingen + Tips) ===== -->
+    <section id="screen-profile" class="view-screen">
+      <div class="panel-scroll">
+        <div class="menu-page-head">
+          <button class="btn-back" type="button" data-menu-back aria-label="Terug naar race">← Terug</button>
+          <h2>Profiel &amp; Info</h2>
+        </div>
+
+        <!-- 1. Auto & Customization -->
+        <div class="glass-card auto-name-card">
+          <label class="label" for="player-name">Coureur Naam</label>
+          <input id="player-name" class="input player-name-input" maxlength="18" autocomplete="nickname" placeholder="Jouw coureurnaam">
+        </div>
+
+        <div class="glass-card character-appearance">
+          <div class="character-appearance-head">
+            <h3>Jouw auto</h3>
+          </div>
+          <div class="character-preview-wrap">
+            <canvas id="character-car-preview" width="280" height="148" aria-label="Voorbeeld van je auto"></canvas>
+          </div>
+          <div class="car-theme-presets" id="car-theme-presets"></div>
+          <div class="car-sliders">
+            <label class="car-slider-row">
+              <span class="car-slider-label">Stuurgevoeligheid <b id="car-steer-val">60%</b></span>
+              <input type="range" id="car-steer" min="25" max="100" value="60">
+            </label>
+          </div>
+          <div class="character-color-list" id="car-color-list"></div>
+        </div>
+
+        <!-- 2. Records & Statistieken (Geheugen) -->
+        <div class="glass-card">
+          <div class="character-appearance-head">
+            <h3>Records &amp; Statistieken</h3>
+          </div>
+          <div id="records-list">
+            <p class="empty-state">Jouw tijden per baan verschijnen hier automatisch.</p>
+          </div>
+        </div>
+
+        <!-- 3. Instellingen -->
+        <div class="glass-card">
+          <div class="character-appearance-head">
+            <h3>Instellingen</h3>
+          </div>
+          <div class="setting-row">
+            <div class="info">
+              <strong>Geluidseffecten</strong>
+              <span>Audio feedback en racegeluiden</span>
+            </div>
+            <button id="toggle-sound-settings" class="toggle" type="button" aria-pressed="false">Geluid: UIT</button>
+          </div>
+          <div class="setting-row">
+            <div class="info">
+              <strong>Trillen</strong>
+              <span>Haptische feedback op mobiel</span>
+            </div>
+            <button id="toggle-vibration" class="toggle" type="button" aria-pressed="true">Trillen: AAN</button>
+          </div>
+          <div class="setting-row">
+            <div class="info">
+              <strong>Geheugen wissen</strong>
+              <span>Records, voortgang en instellingen resetten</span>
+            </div>
+            <button id="btn-memory-reset" class="btn danger" type="button">Reset alles</button>
+          </div>
+        </div>
+
+        <!-- 4. Speltips & Uitleg -->
+        <div class="glass-card menu-help-body">
+          <div class="character-appearance-head">
+            <h3>Speltips</h3>
+          </div>
+          <p><strong>Doel</strong> — Bereik de finish zo snel mogelijk over de neon-baan.</p>
+          <p><strong>Voortgang</strong> — Rond een baan af om de volgende vrij te spelen (banen 1 t/m 10).</p>
+          <p><strong>VIP</strong> — Met VIP heb je alle banen direct, inclusief twee exclusieve parcoursen.</p>
+          <p><strong>Remmen</strong> — <em>Spatie</em> of tik op <em>Stop</em>.</p>
+          <p><strong>Gates</strong> — Rij door de gele poorten voor split-tijden en records.</p>
+          <p><strong>Autosave</strong> — Je records en instellingen worden altijd direct automatisch bewaard.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Bottom navigatie: 3 duidelijke tabs -->
+  <nav class="bottom-nav" aria-label="Hoofdnavigatie">
+    <div class="bottom-nav-inner">
+      <button class="nav-item nav-item-labeled active" data-tab="play" type="button" aria-label="Race">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"/></svg>
+        <span class="nav-label">Race</span>
+      </button>
+      <button class="nav-item nav-item-labeled" data-tab="tracks" type="button" aria-label="Banen">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <ellipse cx="12" cy="12" rx="8.5" ry="5.5"/>
+          <circle cx="12" cy="6.5" r="1" fill="currentColor" stroke="none"/>
+          <circle cx="12" cy="17.5" r="1" fill="currentColor" stroke="none"/>
+        </svg>
+        <span class="nav-label">Banen</span>
+      </button>
+      <button class="nav-item nav-item-labeled" data-tab="profile" type="button" aria-label="Profiel &amp; Info">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+        <span class="nav-label">Profiel</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Pauze / Menu Overlay -->
+  <div id="menu-overlay" class="hidden">
+    <div class="menu-card glass-card">
+      <h1>Neon Racer</h1>
+      <p class="subtitle" id="pause-session-meta">Gepauzeerd</p>
+      <div id="menu-msg" class="menu-msg"></div>
+
+      <div class="menu-actions menu-actions-pause">
+        <button id="btn-session-resume" class="btn success" type="button">Hervatten</button>
+        <button id="btn-session-pause-restart" class="btn alt" type="button">Opnieuw</button>
+        <button id="btn-session-to-tracks" class="btn alt" type="button">Kies Baan</button>
+        <a href="../index.html" class="btn alt" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;">← Naar D-Game</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">
+    <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+    <span id="toast-text">Klaar!</span>
+  </div>
+
+  <script src="https://unpkg.com/three@0.156.1/build/three.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/vip.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/toast.js"></script>
+  <script src="js/share.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/app-menu.js"></script>
+  <script src="js/sector-generator.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/character.js"></script>
+  <script src="js/tracks.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

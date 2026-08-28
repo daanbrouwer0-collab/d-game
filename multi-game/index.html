@@ -40,10 +40,17 @@
 
       const list = document.getElementById("game-list");
       list.innerHTML = GAMES.map((g) => {
+        const isSolo = g.minPlayers === 1 && g.maxPlayers === 1;
         const roomOk = isRoomPlayable(g.embedded);
-        const roomLine = roomOk
-          ? "Speelbaar in room"
-          : "Room-modus volgt";
+        const roomLine = isSolo
+          ? "Solo game"
+          : roomOk
+            ? "Speelbaar in room"
+            : "Room-modus volgt";
+        const playersText = isSolo
+          ? "1 speler"
+          : `${g.minPlayers}–${g.maxPlayers} spelers`;
+        const actionText = isSolo ? "Speel Solo" : "Hotseat / Solo";
         const imgUrl = resolveGameImageUrl(g, "");
         const primaryTag = g.tags?.[0] || "Game";
 
@@ -57,13 +64,13 @@
             <div class="game-info-body">
               <div class="game-info-title-row">
                 <strong>${g.title}</strong>
-                <span class="game-info-badge">${g.minPlayers}–${g.maxPlayers} spelers</span>
+                <span class="game-info-badge">${playersText}</span>
               </div>
               <p class="game-info-blurb">${g.blurb}</p>
               <span class="game-meta-line">✓ ${roomLine}</span>
             </div>
             <div class="actions game-info-actions">
-              <a href="${g.path}" class="btn btn-ghost">Hotseat / Solo</a>
+              <a href="${g.path}" class="btn btn-ghost">${actionText}</a>
             </div>
           </div>
         </li>`;
