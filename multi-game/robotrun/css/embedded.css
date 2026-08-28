@@ -119,8 +119,13 @@ html.dgame-embedded #program-board {
 }
 
 html.dgame-embedded .rr-leave-bar {
-  display: flex !important;
+  display: flex;
   flex: 0 0 auto;
+}
+
+html.dgame-embedded #game-wrap.executing-mode .rr-leave-bar,
+html.dgame-embedded #game-wrap.ready-mode .rr-leave-bar {
+  display: none !important;
 }
 
 html.dgame-embedded #game-over-overlay {

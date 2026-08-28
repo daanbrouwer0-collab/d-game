@@ -131,6 +131,11 @@
   flex-shrink: 0;
 }
 
+#game-wrap.executing-mode .rr-leave-bar,
+#game-wrap.ready-mode .rr-leave-bar {
+  display: none !important;
+}
+
 .rr-leave-btn {
   width: 100%;
   max-width: 28rem;
