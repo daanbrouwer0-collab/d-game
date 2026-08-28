@@ -21,6 +21,8 @@ const P2pSessionController = {
   applyingSnapshot: false,
   joinInFlight: false,
   lastSnapshotAt: 0,
+  _localCommittedRound: null,
+  _localCommittedRegisters: null,
   _snapTimer: null,
   _phaseHeartbeatTimer: null,
   _phaseHeartbeatPhase: "",
@@ -265,6 +267,8 @@ const P2pSessionController = {
     this.log = null;
     this.connectionStatus = "idle";
     this.lastError = null;
+    this._localCommittedRound = null;
+    this._localCommittedRegisters = null;
     this.clearPersistedRoom();
   },
 
@@ -837,6 +841,17 @@ const P2pSessionController = {
       const prevRobotId = app.ui?.programmingRegistersRobotId || null;
       const localId = this.localRobotId();
 
+      if (gameState.phase !== "programming" && gameState.phase !== "ready") {
+        this._localCommittedRound = null;
+        this._localCommittedRegisters = null;
+      } else if (
+        this._localCommittedRound != null
+        && this._localCommittedRound !== gameState.roundNumber
+      ) {
+        this._localCommittedRound = null;
+        this._localCommittedRegisters = null;
+      }
+
       if (!this.isHost()) {
         gameState = this.sanitizeStateForLocalView(gameState, localId);
       }
@@ -856,6 +871,39 @@ const P2pSessionController = {
         );
       }
       app.engine.importGameState(gameState);
+
+      // Preserve local committed status on guest if host snapshot has not reflected it yet
+      if (
+        !this.isHost()
+        && localId
+        && (app.engine.phase === "programming" || app.engine.phase === "ready")
+      ) {
+        const isLocallyCommitted = this._localCommittedRound === app.engine.roundNumber;
+        if (isLocallyCommitted && !app.engine.isRobotCommitted(localId)) {
+          if (!app.engine.committedRobotIds) app.engine.committedRobotIds = [];
+          if (!app.engine.committedRobotIds.includes(localId)) {
+            app.engine.committedRobotIds.push(localId);
+          }
+          const localRobot = app.engine.robots.find((r) => r.id === localId);
+          if (localRobot && this._localCommittedRegisters) {
+            const unlocked = app.engine.getUnlockedRegisterCount(localRobot);
+            app.engine.ensureLockedRegisterMemory(localRobot);
+            localRobot.registers = [0, 1, 2, 3, 4].map((i) => {
+              if (i >= unlocked) {
+                return app.engine.getCardForLockedRegister(localRobot, i);
+              }
+              return this._localCommittedRegisters[i]
+                ? { ...this._localCommittedRegisters[i] }
+                : null;
+            });
+            app.engine.syncLockedRegisters(localRobot);
+          }
+          if (app.engine.isSimultaneousProgramming()) {
+            app.engine.refreshReadyPhaseFromCommits();
+          }
+        }
+      }
+
       // Extra safety: wipe foreign hands after import (D-robotrally matrix-session pattern).
       if (!this.isHost() && localId) {
         app.engine.robots.forEach((robot) => {
@@ -880,7 +928,7 @@ const P2pSessionController = {
         if (app.engine.phase === "programming") {
           app.ui.programmingUnlockedRobotId = localId;
           const committed = app.engine.isRobotCommitted?.(localId);
-          if (!committed && prevSelected && prevRobotId === localId) {
+          if (!committed && prevSelected && (prevRobotId === localId || !prevRobotId)) {
             const localRobot = app.engine.robots.find((r) => r.id === localId);
             const lockedInit = app.ui.buildInitialSelectedRegisters(localRobot);
             app.ui.selectedRegisters = prevSelected.map((card, i) => (
@@ -940,11 +988,18 @@ const P2pSessionController = {
   async sendCommit(registers) {
     const robotId = this.localRobotId();
     if (!robotId) throw new Error("Geen robot gekoppeld.");
+    const app = window.RobotRallyApp;
     if (this.isHost()) {
-      window.RobotRallyApp.engine.commitRegistersForRobot(robotId, registers);
+      app?.engine?.commitRegistersForRobot(robotId, registers);
       await this.publishSnapshot();
       await this.maybeAutoStartExecution();
       return;
+    }
+    const currentRound = app?.engine?.roundNumber || 1;
+    this._localCommittedRound = currentRound;
+    this._localCommittedRegisters = (registers || []).map((card) => (card ? { ...card } : null));
+    if (app?.engine) {
+      app.engine.commitRegistersForRobot(robotId, registers);
     }
     this.send("rr_intent_commit", {
       robotId,
@@ -973,10 +1028,17 @@ const P2pSessionController = {
   async sendTogglePowerDown() {
     const robotId = this.localRobotId();
     if (!robotId) throw new Error("Geen robot gekoppeld.");
+    const app = window.RobotRallyApp;
     if (this.isHost()) {
-      window.RobotRallyApp.engine.togglePowerDown(robotId);
+      app?.engine?.togglePowerDown(robotId);
       await this.publishSnapshot();
       return;
+    }
+    if (app?.engine) {
+      app.engine.togglePowerDown(robotId);
+      app.ui?.updateCardsUI?.();
+      app.ui?.render?.();
+      app.ui?.renderPlayerStatusBar?.();
     }
     this.send("rr_intent_power_down", {
       robotId,

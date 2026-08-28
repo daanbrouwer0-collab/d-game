@@ -2049,6 +2049,34 @@ class RobotRallyEngine {
     }
   }
 
+  fillEmptyRegistersRandomly(robot) {
+    if (!robot) return [];
+    const unlocked = this.getUnlockedRegisterCount(robot);
+    const existing = (robot.registers || []).slice(0, 5);
+    const usedIds = new Set(existing.filter(Boolean).map(c => c.id));
+    const pool = (robot.hand || [])
+      .filter(card => card && !usedIds.has(card.id))
+      .map(card => ({ ...card }));
+
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = pool[i];
+      pool[i] = pool[j];
+      pool[j] = tmp;
+    }
+
+    const nextRegisters = [0, 1, 2, 3, 4].map(index => {
+      if (index >= unlocked) {
+        return this.getCardForLockedRegister(robot, index);
+      }
+      if (existing[index]) return existing[index];
+      return pool.shift() || null;
+    });
+
+    robot.registers = nextRegisters;
+    return nextRegisters;
+  }
+
   commitRegistersForRobot(robotId, registers, { silent = false } = {}) {
     if (this.phase !== 'programming' && this.phase !== 'ready') return false;
     if (this.phase === 'ready' && !this.isSimultaneousProgramming()) return false;
@@ -2064,6 +2092,12 @@ class RobotRallyEngine {
 
     const unlocked = this.getUnlockedRegisterCount(robot);
     this.ensureLockedRegisterMemory(robot);
+    const provided = (registers || []).slice(0, 5);
+    const usedIds = new Set(provided.filter(Boolean).map(c => c.id));
+    const fallbackPool = (robot.hand || [])
+      .filter(c => c && !usedIds.has(c.id))
+      .map(c => ({ ...c }));
+
     robot.registers = [0, 1, 2, 3, 4].map(i => {
       if (i >= unlocked) {
         const kept = this.getCardForLockedRegister(robot, i);
@@ -2071,7 +2105,10 @@ class RobotRallyEngine {
         return kept;
       }
       robot.lockedRegisterMemory[i] = null;
-      const card = registers && registers[i];
+      let card = provided[i];
+      if (!card) {
+        card = fallbackPool.shift() || null;
+      }
       return card ? { ...card } : null;
     });
     this.syncLockedRegisters(robot);

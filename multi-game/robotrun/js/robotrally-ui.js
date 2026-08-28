@@ -1164,14 +1164,13 @@ class RobotRallyUI {
     if (this.isP2pMode() && P2pSessionController?.isActive?.()) {
       P2pSessionController.sendCommit(this.selectedRegisters)
         .then(() => {
-          this.selectedRegisters = [null, null, null, null, null];
           this.clearMergeInputs();
           this.setSlotTab('program');
-          this.programmingRegistersRobotId = null;
-          this.programmingRegistersKey = null;
           this._programTimerExpiring = false;
           this.clearProgrammingTimer();
           this.updateCardsUI();
+          this.render();
+          this.renderPlayerStatusBar();
         })
         .catch((err) => {
           this._programTimerExpiring = false;
@@ -2135,6 +2134,10 @@ class RobotRallyUI {
       clearTimeout(this._programTimerInterval);
       this._programTimerInterval = null;
     }
+    if (this._hostProgrammingFallbackTimer != null) {
+      clearTimeout(this._hostProgrammingFallbackTimer);
+      this._hostProgrammingFallbackTimer = null;
+    }
     this._programTimerKey = '';
     this._programTimerDeadline = 0;
     this._programTimerExpiring = false;
@@ -2253,6 +2256,25 @@ class RobotRallyUI {
     this.fillEmptyRegistersRandomly(current);
     Toast.show('Tijd om! Lege slots zijn random gevuld.');
     this.runProgram({ allowPartial: true });
+
+    if (this.isP2pMode() && this.isP2pHost()) {
+      clearTimeout(this._hostProgrammingFallbackTimer);
+      this._hostProgrammingFallbackTimer = setTimeout(() => {
+        if (this.engine.phase !== 'programming') return;
+        const uncommitted = (this.engine.getProgrammableHumans?.() || []).filter(
+          (h) => !this.engine.isRobotCommitted(h.id)
+        );
+        if (uncommitted.length) {
+          uncommitted.forEach((h) => {
+            this.engine.fillEmptyRegistersRandomly(h);
+            this.engine.commitRegistersForRobot(h.id, h.registers, { silent: true });
+          });
+          window.P2pSessionController?.publishSnapshot?.()
+            .then(() => window.P2pSessionController?.maybeAutoStartExecution?.())
+            .catch(() => {});
+        }
+      }, 4000);
+    }
   }
 
   renderUpgradeShop(currentRobot) {
