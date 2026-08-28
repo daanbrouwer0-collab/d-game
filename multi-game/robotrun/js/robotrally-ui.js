@@ -2445,20 +2445,20 @@ class RobotRallyUI {
 
   syncMatchCountdown() {
     const phase = this.engine.phase;
-    if (phase !== 'match_countdown') {
+    if (phase !== 'match_ready' && phase !== 'match_countdown') {
       this.clearMatchCountdown();
       return;
     }
 
     const endsAt = this.engine.matchCountdownEndsAt;
-    const key = String(endsAt || 'pending');
+    const key = String(endsAt || 'pending') + '_' + phase;
     if (key !== this._matchCountdownKey) {
       this.clearMatchCountdown();
       this._matchCountdownKey = key;
     }
 
     const tick = () => {
-      if (this.engine.phase !== 'match_countdown') {
+      if (this.engine.phase !== 'match_ready' && this.engine.phase !== 'match_countdown') {
         this.clearMatchCountdown();
         return;
       }
@@ -2500,7 +2500,8 @@ class RobotRallyUI {
     const phase = this.engine.phase;
     const localRobot = this.getProgrammingRobot();
     const midChoice = phase === 'upgrade_choice' ? this.engine.currentUpgradeChoice : null;
-    const matchOptions = phase === 'match_ready' && localRobot && !this.engine.isRobotMatchReady?.(localRobot.id)
+    const matchOptions = (phase === 'match_ready' || phase === 'match_countdown')
+      && localRobot && !this.engine.isRobotMatchReady?.(localRobot.id)
       ? (this.engine.getMatchUpgradeOffer?.(localRobot.id) || [])
       : [];
     const matchPick = matchOptions.length > 0;

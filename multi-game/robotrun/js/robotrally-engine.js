@@ -1359,9 +1359,11 @@ class RobotRallyEngine {
       currentUpgradeChoice: this.currentUpgradeChoice
         ? {
             robotId: this.currentUpgradeChoice.robotId,
-            options: (this.currentUpgradeChoice.options || []).map(up => up.id)
+            options: (this.currentUpgradeChoice.options || []).map(up => up.id),
+            deadline: this.currentUpgradeChoice.deadline || null,
           }
         : null,
+      programmingDeadline: this.programmingDeadline || null,
       robots: this.robots.map(robot => ({
         id: robot.id,
         name: robot.name,
@@ -1454,6 +1456,17 @@ class RobotRallyEngine {
       ? state.pendingUpgradeQueue.map(entry => ({ ...entry }))
       : [];
     this.currentUpgradeChoice = null;
+    if (state.currentUpgradeChoice?.robotId) {
+      const options = (state.currentUpgradeChoice.options || [])
+        .map(id => (CONFIG.UPGRADES || []).find(upgrade => upgrade.id === id))
+        .filter(Boolean);
+      this.currentUpgradeChoice = {
+        robotId: state.currentUpgradeChoice.robotId,
+        options,
+        deadline: state.currentUpgradeChoice.deadline ? Number(state.currentUpgradeChoice.deadline) : null,
+      };
+    }
+    this.programmingDeadline = state.programmingDeadline ? Number(state.programmingDeadline) : null;
 
     this.robots = state.robots.map(raw => {
       const robot = this.createRobot({
@@ -1656,6 +1669,7 @@ class RobotRallyEngine {
       }
       this.matchUpgradeOffers[robot.id] = options.map((upgrade) => upgrade.id);
     });
+    this.matchCountdownEndsAt = Date.now() + 20000;
     this.pushLog('Iedereen kiest een start-upgrade.');
     autoReadyIds.forEach((robotId) => this.setMatchReady(robotId));
     if (!autoReadyIds.length) this.emitStateChange();
@@ -1672,7 +1686,7 @@ class RobotRallyEngine {
    * Start-upgrade kiezen = match ready. Geen aparte Ready-knop.
    */
   confirmMatchUpgrade(robotId, upgradeId) {
-    if (this.phase !== 'match_ready') return false;
+    if (this.phase !== 'match_ready' && this.phase !== 'match_countdown') return false;
     if (this.isRobotMatchReady(robotId)) return false;
     const robot = this.robots.find((entry) => entry.id === robotId);
     if (!robot || robot.isBot || !this.isRobotInGame(robot)) return false;
@@ -1680,15 +1694,22 @@ class RobotRallyEngine {
     const offerIds = this.matchUpgradeOffers?.[robotId] || [];
     // Lege offer (geen upgrades beschikbaar): toch ready mogen worden zonder keuze.
     if (offerIds.length) {
-      if (!offerIds.includes(upgradeId)) return false;
-      if (!this.applyUpgradeChoice(robotId, upgradeId)) return false;
+      if (offerIds.includes(upgradeId)) {
+        this.applyUpgradeChoice(robotId, upgradeId);
+      } else {
+        const fallback = (CONFIG.UPGRADES || []).find((u) => u.id === upgradeId);
+        if (fallback) this.applyUpgradeChoice(robotId, upgradeId);
+      }
+    } else if (upgradeId) {
+      const fallback = (CONFIG.UPGRADES || []).find((u) => u.id === upgradeId);
+      if (fallback) this.applyUpgradeChoice(robotId, upgradeId);
     }
-    delete this.matchUpgradeOffers[robotId];
+    delete this.matchUpgradeOffers?.[robotId];
     return this.setMatchReady(robotId);
   }
 
   setMatchReady(robotId) {
-    if (this.phase !== 'match_ready') return false;
+    if (this.phase !== 'match_ready' && this.phase !== 'match_countdown') return false;
     const robot = this.robots.find((entry) => entry.id === robotId);
     if (!robot || robot.isBot || !this.isRobotInGame(robot)) return false;
     if (!this.matchReadyRobotIds.includes(robot.id)) {
@@ -1713,10 +1734,10 @@ class RobotRallyEngine {
       return true;
     }
     if (this.phase !== 'match_ready' && this.phase !== 'match_countdown') return false;
-    const seconds = CONFIG.MATCH_COUNTDOWN_SECONDS || 10;
+    const seconds = 1.5;
     this.phase = 'match_countdown';
     this.matchCountdownEndsAt = Date.now() + seconds * 1000;
-    this.pushLog(`Iedereen is klaar — start over ${seconds} seconden.`);
+    this.pushLog('Iedereen is klaar — match start!');
     this.emitStateChange();
     return true;
   }
@@ -1726,6 +1747,17 @@ class RobotRallyEngine {
     if (this.phase !== 'match_countdown') return false;
     this.matchCountdownEndsAt = null;
     this.matchReadyRobotIds = [];
+    this.robots.forEach((robot) => {
+      if (robot && !robot.isBot && this.isRobotInGame(robot)) {
+        if (!robot.upgrades || robot.upgrades.length === 0) {
+          const offerIds = this.matchUpgradeOffers?.[robot.id] || [];
+          const pickId = offerIds[0] || (CONFIG.UPGRADES && CONFIG.UPGRADES[0]?.id);
+          if (pickId) {
+            this.applyUpgradeChoice(robot.id, pickId);
+          }
+        }
+      }
+    });
     this.matchUpgradeOffers = {};
     this.startNewRound();
     return true;
@@ -1996,6 +2028,7 @@ class RobotRallyEngine {
       }
     });
 
+    this.programmingDeadline = Date.now() + 65000;
     const firstHuman = this.getNextProgrammableHuman(-1);
     if (firstHuman === -1) {
       this.phase = 'executing';
@@ -2450,7 +2483,8 @@ class RobotRallyEngine {
 
       this.currentUpgradeChoice = {
         robotId: robot.id,
-        options: validOptions
+        options: validOptions,
+        deadline: Date.now() + 15000,
       };
       this.phase = 'upgrade_choice';
       this.emitStateChange();
@@ -2461,6 +2495,31 @@ class RobotRallyEngine {
     this.phase = 'programming';
     this.roundNumber += 1;
     this.startNewRound();
+  }
+
+  resolveUpgradeChoiceTimeout() {
+    if (this.phase !== 'upgrade_choice' || !this.currentUpgradeChoice) return false;
+    const { robotId, options } = this.currentUpgradeChoice;
+    const fallbackId = (options && options[0]?.id) || (CONFIG.UPGRADES && CONFIG.UPGRADES[0]?.id);
+    if (fallbackId) {
+      this.applyUpgradeChoice(robotId, fallbackId);
+    }
+    this.currentUpgradeChoice = null;
+    this.advanceUpgradeChoice();
+    return true;
+  }
+
+  resolveProgrammingTimeout() {
+    if (this.phase !== 'programming') return false;
+    const uncommitted = this.getProgrammableHumans().filter(h => !this.isRobotCommitted(h.id));
+    if (uncommitted.length) {
+      uncommitted.forEach(h => {
+        this.fillEmptyRegistersRandomly(h);
+        this.commitRegistersForRobot(h.id, h.registers, { silent: true });
+      });
+      return true;
+    }
+    return false;
   }
 
   chooseUpgrade(upgradeId) {

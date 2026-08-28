@@ -836,7 +836,12 @@ const P2pSessionController = {
         userId: seat.userId,
       }));
 
-      const prevSelected = app.ui?.selectedRegisters
+      const isNewRound = app.engine?.roundNumber !== gameState.roundNumber;
+      const isSameRoundProgramming = !isNewRound
+        && app.engine?.phase === "programming"
+        && gameState.phase === "programming";
+
+      const prevSelected = isSameRoundProgramming && app.ui?.selectedRegisters
         ? app.ui.selectedRegisters.map((card) => (card ? { ...card } : null))
         : null;
       const prevRobotId = app.ui?.programmingRegistersRobotId || null;
@@ -947,6 +952,14 @@ const P2pSessionController = {
             ));
             app.ui.programmingRegistersRobotId = localId;
             app.ui.programmingRegistersKey = `${app.engine.roundNumber}:${localId}`;
+          } else if (isNewRound) {
+            const localRobot = app.engine.robots.find((r) => r.id === localId);
+            if (localRobot) {
+              app.ui.selectedRegisters = app.ui.buildInitialSelectedRegisters(localRobot);
+              app.ui.programmingRegistersRobotId = localId;
+              app.ui.programmingRegistersKey = `${app.engine.roundNumber}:${localId}`;
+              app.ui.clearMergeInputs?.();
+            }
           }
         }
         app.ui.resizeCanvas();
@@ -1094,7 +1107,7 @@ const P2pSessionController = {
   async maybeFinishMatchCountdown() {
     if (!this.isHost()) return;
     const engine = window.RobotRallyApp?.engine;
-    if (!engine || engine.phase !== "match_countdown") return;
+    if (!engine || (engine.phase !== "match_countdown" && engine.phase !== "match_ready")) return;
     const endsAt = engine.matchCountdownEndsAt;
     if (endsAt != null && Date.now() < endsAt) return;
     engine.startMatchFromCountdown();
@@ -1112,7 +1125,7 @@ const P2pSessionController = {
     if (!robotId) throw new Error("Geen robot gekoppeld.");
     if (this.isHost()) {
       const engine = window.RobotRallyApp.engine;
-      if (engine.phase === "match_ready") {
+      if (engine.phase === "match_ready" || engine.phase === "match_countdown") {
         const ok = engine.confirmMatchUpgrade(robotId, upgradeId);
         if (!ok) throw new Error("Upgrade kiezen lukt nu niet.");
       } else {
@@ -1314,7 +1327,7 @@ const P2pSessionController = {
       if (!bound) return;
       if (bound.userId === this.playerId) return;
       const engine = window.RobotRallyApp.engine;
-      if (engine.phase === "match_ready") {
+      if (engine.phase === "match_ready" || engine.phase === "match_countdown") {
         engine.confirmMatchUpgrade(bound.robotId, payload.upgradeId);
         this.publishSnapshot({ persist: true }).catch(() => {});
         return;
@@ -1322,7 +1335,7 @@ const P2pSessionController = {
       const choice = engine.currentUpgradeChoice;
       if (choice && choice.robotId === bound.robotId) {
         engine.chooseUpgrade(payload.upgradeId);
-        this.publishSnapshot().catch(() => {});
+        this.publishSnapshot({ persist: true }).catch(() => {});
       }
     }
   },
@@ -1362,7 +1375,25 @@ const P2pSessionController = {
           this._phaseHeartbeatPhase = "";
           return;
         }
+        if (livePhase === "match_ready" || livePhase === "match_countdown") {
+          const endsAt = app.engine.matchCountdownEndsAt;
+          if (endsAt != null && Date.now() >= endsAt) {
+            this.maybeFinishMatchCountdown().catch(() => {});
+            return;
+          }
+        }
+        if (livePhase === "upgrade_choice") {
+          const choice = app.engine.currentUpgradeChoice;
+          if (choice?.deadline != null && Date.now() >= choice.deadline) {
+            app.engine.resolveUpgradeChoiceTimeout?.();
+            this.publishSnapshot({ persist: true }).catch(() => {});
+            return;
+          }
+        }
         if (livePhase === "programming" && app.engine.isSimultaneousProgramming?.()) {
+          if (app.engine.programmingDeadline != null && Date.now() >= app.engine.programmingDeadline) {
+            app.engine.resolveProgrammingTimeout?.();
+          }
           app.engine.refreshReadyPhaseFromCommits?.();
           if (app.engine.phase === "ready") {
             this.publishSnapshot({ persist: true })

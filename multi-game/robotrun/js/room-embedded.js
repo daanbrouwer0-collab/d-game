@@ -337,21 +337,32 @@ function adoptTruthCheckpoint(ctrl, raw) {
   // Ignore stale/out-of-order checkpoints (keep newest tip).
   if (tip && ctrl._truthTipSeq && tip < ctrl._truthTipSeq) return;
 
-  // Same tip already applied — mark healthy, do not reset local Play/UI.
+  // Same tip already applied — check if state changed before skipping.
   if (
     tip
     && tip === ctrl._truthTipSeq
     && tipId
     && tipId === ctrl._truthTipEventId
   ) {
-    ctrl._lastTruthAdoptAt = Date.now();
-    maybeSendTipAck(
-      ctrl,
-      tip,
-      tipId,
-      /** @type {{ phase?: string }} */ (payload.gameState).phase,
-    );
-    return;
+    const engine = window.RobotRallyApp?.engine;
+    const incoming = /** @type {{ phase?: string, roundNumber?: number, committedRobotIds?: string[], matchReadyRobotIds?: string[], currentUpgradeChoice?: unknown }} */ (payload.gameState || {});
+    const stateMatches = engine
+      && engine.phase === incoming.phase
+      && engine.roundNumber === incoming.roundNumber
+      && (incoming.committedRobotIds || []).length === (engine.committedRobotIds || []).length
+      && (incoming.matchReadyRobotIds || []).length === (engine.matchReadyRobotIds || []).length
+      && !!incoming.currentUpgradeChoice === !!engine.currentUpgradeChoice;
+
+    if (stateMatches) {
+      ctrl._lastTruthAdoptAt = Date.now();
+      maybeSendTipAck(
+        ctrl,
+        tip,
+        tipId,
+        /** @type {{ phase?: string }} */ (payload.gameState).phase,
+      );
+      return;
+    }
   }
 
   ctrl._truthTipSeq = tip || ctrl._truthTipSeq || 0;
