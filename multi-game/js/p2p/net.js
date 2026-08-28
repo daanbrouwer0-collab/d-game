@@ -221,6 +221,15 @@ export class Net {
       };
 
       const onPeerError = (err) => {
+        const type = err?.type || "";
+        if (type === "peer-unavailable") {
+          fail(new Error(`Room "${code}" niet gevonden. Zorg dat de host de room open heeft staan.`));
+          return;
+        }
+        if (type === "network" || type === "server-error" || type === "socket-error") {
+          fail(new Error("Netwerkfout bij verbinden met PeerJS. Controleer je internetverbinding."));
+          return;
+        }
         fail(err instanceof Error ? err : new Error(String(err)));
       };
 
@@ -231,8 +240,8 @@ export class Net {
       };
 
       timer = setTimeout(() => {
-        fail(new Error("Verbinden duurde te lang. Host moet online blijven."));
-      }, 12000);
+        fail(new Error(`Verbinden met room "${code}" duurde te lang. Zorg dat de host online is en probeer opnieuw.`));
+      }, 14000);
 
       peer.on("open", onOpen);
       peer.on("error", onPeerError);

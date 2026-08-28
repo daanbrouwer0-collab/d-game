@@ -120,9 +120,11 @@ function setStatus(text) {
   roomStatus.textContent = text || "";
 }
 
+let lastBootIntent = null; // { type: 'host' } | { type: 'join', code: string }
+
 /**
  * @param {"idle"|"lobby"|"playing"} name
- * @param {{ bootTitle?: string, bootHint?: string }} [opts]
+ * @param {{ bootTitle?: string, bootHint?: string, showActions?: boolean, hideRings?: boolean }} [opts]
  */
 function showPanel(name, opts = {}) {
   panelIdle.classList.toggle("hidden", name !== "idle");
@@ -132,8 +134,12 @@ function showPanel(name, opts = {}) {
   if (name === "idle") {
     const titleEl = document.getElementById("room-boot-title");
     const hintEl = document.getElementById("room-boot-hint");
+    const actionsEl = document.getElementById("room-boot-actions");
+    const ringsEl = document.querySelector(".room-boot-rings");
     if (titleEl && opts.bootTitle) titleEl.textContent = opts.bootTitle;
     if (hintEl && opts.bootHint) hintEl.textContent = opts.bootHint;
+    if (actionsEl) actionsEl.classList.toggle("hidden", !opts.showActions);
+    if (ringsEl) ringsEl.classList.toggle("hidden", !!opts.hideRings);
   }
 }
 
@@ -855,10 +861,6 @@ function bindSession(s) {
     if (status === "hosting" || status === "connected") {
       showPanel(activeSession ? "playing" : "lobby");
     }
-    // Alleen terug naar Rooms als sessie echt weg is — niet bij kortstondige disconnect.
-    if (status === "idle" && !session) {
-      goToRooms();
-    }
   };
 
   s.onPeerJoin = () => {};
@@ -1265,6 +1267,7 @@ function endGame(reason = "back_to_lobby") {
 async function startHost() {
   if (hostStartInFlight) return;
   hostStartInFlight = true;
+  lastBootIntent = { type: "host" };
   setError("");
   if (session) {
     await session.destroy();
@@ -1273,6 +1276,8 @@ async function startHost() {
   showPanel("idle", {
     bootTitle: "Host Room",
     bootHint: "Peer-verbinding opzetten…",
+    showActions: false,
+    hideRings: false,
   });
   setStatus("Room maken…");
   document.getElementById("invite-card")?.classList.remove("hidden");
@@ -1352,11 +1357,18 @@ async function startHost() {
       }
     }
   } catch (err) {
-    setError(err instanceof Error ? err.message : String(err));
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    setError(errorMsg);
     shareUrl = null;
     await s.destroy();
     session = null;
-    goToRooms();
+    showPanel("idle", {
+      bootTitle: "Host Mislukt",
+      bootHint: errorMsg,
+      showActions: true,
+      hideRings: true,
+    });
+    setStatus("Fout");
   } finally {
     hostStartInFlight = false;
   }
@@ -1375,6 +1387,8 @@ async function joinRoom(code) {
     return;
   }
 
+  lastBootIntent = { type: "join", code: c };
+
   if (session) {
     await session.destroy();
     session = null;
@@ -1385,6 +1399,8 @@ async function joinRoom(code) {
   showPanel("idle", {
     bootTitle: "Join Room",
     bootHint: `Verbinden met ${c}…`,
+    showActions: false,
+    hideRings: false,
   });
   setStatus("Verbinden…");
 
@@ -1420,11 +1436,18 @@ async function joinRoom(code) {
     renderRoster();
     persistRoomDesk();
   } catch (err) {
-    setError(err instanceof Error ? err.message : String(err));
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    setError(errorMsg);
     await s.destroy();
     session = null;
     roomLog = null;
-    goToRooms();
+    showPanel("idle", {
+      bootTitle: "Verbinding Mislukt",
+      bootHint: errorMsg,
+      showActions: true,
+      hideRings: true,
+    });
+    setStatus("Fout");
   } finally {
     joinInFlight = false;
   }
@@ -1454,6 +1477,19 @@ document.getElementById("btn-dismiss-end")?.addEventListener("click", dismissGam
 document.getElementById("btn-toggle-view-board")?.addEventListener("click", () => toggleBoardView(true));
 document.getElementById("btn-show-end-card")?.addEventListener("click", () => toggleBoardView(false));
 document.getElementById("btn-dismiss-minibar")?.addEventListener("click", dismissGameEndScreen);
+document.getElementById("btn-boot-retry")?.addEventListener("click", () => {
+  setError("");
+  if (lastBootIntent?.type === "host") {
+    startHost();
+  } else if (lastBootIntent?.type === "join") {
+    joinRoom(lastBootIntent.code);
+  } else {
+    goToRooms();
+  }
+});
+document.getElementById("btn-boot-back")?.addEventListener("click", () => {
+  goToRooms();
+});
 
 function inviteShareUrl() {
   return (

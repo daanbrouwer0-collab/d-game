@@ -167,6 +167,8 @@ export function listDeskCards(base = "") {
 export function navigateDeskCard(card, intent = "open") {
   /** @type {Record<string, string>} */
   const params = { room: card.code };
-  if (intent === "host") params.as = "host";
+  if (intent === "host" || (intent === "open" && card.role === "host")) {
+    params.as = "host";
+  }
   navigateInShell(ROOM_PATH, params);
 }
