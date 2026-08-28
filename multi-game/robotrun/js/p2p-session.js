@@ -269,6 +269,7 @@ const P2pSessionController = {
     this.lastError = null;
     this._localCommittedRound = null;
     this._localCommittedRegisters = null;
+    this._pendingGuestCommits = {};
     this.clearPersistedRoom();
   },
 
@@ -879,27 +880,35 @@ const P2pSessionController = {
         && (app.engine.phase === "programming" || app.engine.phase === "ready")
       ) {
         const isLocallyCommitted = this._localCommittedRound === app.engine.roundNumber;
-        if (isLocallyCommitted && !app.engine.isRobotCommitted(localId)) {
-          if (!app.engine.committedRobotIds) app.engine.committedRobotIds = [];
-          if (!app.engine.committedRobotIds.includes(localId)) {
-            app.engine.committedRobotIds.push(localId);
-          }
-          const localRobot = app.engine.robots.find((r) => r.id === localId);
-          if (localRobot && this._localCommittedRegisters) {
-            const unlocked = app.engine.getUnlockedRegisterCount(localRobot);
-            app.engine.ensureLockedRegisterMemory(localRobot);
-            localRobot.registers = [0, 1, 2, 3, 4].map((i) => {
-              if (i >= unlocked) {
-                return app.engine.getCardForLockedRegister(localRobot, i);
-              }
-              return this._localCommittedRegisters[i]
-                ? { ...this._localCommittedRegisters[i] }
-                : null;
+        if (isLocallyCommitted) {
+          if (!app.engine.isRobotCommitted(localId)) {
+            if (!app.engine.committedRobotIds) app.engine.committedRobotIds = [];
+            if (!app.engine.committedRobotIds.includes(localId)) {
+              app.engine.committedRobotIds.push(localId);
+            }
+            const localRobot = app.engine.robots.find((r) => r.id === localId);
+            if (localRobot && this._localCommittedRegisters) {
+              const unlocked = app.engine.getUnlockedRegisterCount(localRobot);
+              app.engine.ensureLockedRegisterMemory(localRobot);
+              localRobot.registers = [0, 1, 2, 3, 4].map((i) => {
+                if (i >= unlocked) {
+                  return app.engine.getCardForLockedRegister(localRobot, i);
+                }
+                return this._localCommittedRegisters[i]
+                  ? { ...this._localCommittedRegisters[i] }
+                  : null;
+              });
+              app.engine.syncLockedRegisters(localRobot);
+            }
+            if (app.engine.isSimultaneousProgramming()) {
+              app.engine.refreshReadyPhaseFromCommits();
+            }
+            // Host snapshot did not have our commit yet -> re-transmit commit intent to host
+            this.send("rr_intent_commit", {
+              robotId: localId,
+              userId: this.playerId,
+              registers: (this._localCommittedRegisters || []).map((card) => (card ? { ...card } : null)),
             });
-            app.engine.syncLockedRegisters(localRobot);
-          }
-          if (app.engine.isSimultaneousProgramming()) {
-            app.engine.refreshReadyPhaseFromCommits();
           }
         }
       }
@@ -1231,11 +1240,23 @@ const P2pSessionController = {
       );
       if (!bound) return;
       if (bound.userId === this.playerId) return;
-      window.RobotRallyApp.engine.commitRegistersForRobot(
+      const engine = window.RobotRallyApp?.engine;
+      if (!engine) return;
+
+      if (engine.phase !== "programming" && engine.phase !== "ready") {
+        this._pendingGuestCommits = this._pendingGuestCommits || {};
+        this._pendingGuestCommits[bound.robotId] = {
+          userId: bound.userId,
+          registers: payload.registers,
+        };
+        return;
+      }
+
+      engine.commitRegistersForRobot(
         bound.robotId,
         payload.registers,
       );
-      this.publishSnapshot()
+      this.publishSnapshot({ persist: true })
         .then(() => this.maybeAutoStartExecution())
         .catch(() => {});
       return;
@@ -1341,6 +1362,15 @@ const P2pSessionController = {
           this._phaseHeartbeatPhase = "";
           return;
         }
+        if (livePhase === "programming" && app.engine.isSimultaneousProgramming?.()) {
+          app.engine.refreshReadyPhaseFromCommits?.();
+          if (app.engine.phase === "ready") {
+            this.publishSnapshot({ persist: true })
+              .then(() => this.maybeAutoStartExecution())
+              .catch(() => {});
+            return;
+          }
+        }
         if (typeof this.rebroadcastLastTruth === "function") {
           if (this.rebroadcastLastTruth()) return;
         }
@@ -1356,6 +1386,21 @@ const P2pSessionController = {
       syncPhaseHeartbeat(phase);
       const prevPhase = this._lastEnginePhase;
       this._lastEnginePhase = phase;
+
+      if (phase === "programming" && this._pendingGuestCommits) {
+        let appliedAny = false;
+        Object.entries(this._pendingGuestCommits).forEach(([robotId, data]) => {
+          if (data?.registers) {
+            app.engine.commitRegistersForRobot(robotId, data.registers, { silent: true });
+            appliedAny = true;
+          }
+        });
+        this._pendingGuestCommits = {};
+        if (appliedAny) {
+          this.maybeAutoStartExecution();
+        }
+      }
+
       // Local Play: do not flood peers with micro-step snapshots.
       if (phase === "executing") return;
       // Critical phase exits → persist + tip checkpoint.
