@@ -1,0 +1,48 @@
+# Static Multi Device hub — deploy root of this repo.
+# Invite-links gebruiken de huidige site-origin (Netlify URL of www.d-game.nl).
+
+[build]
+  publish = "."
+  # Geen build-stap nodig (pure HTML/JS/CSS)
+
+# Redirect apex to www with HTTPS (fixes TLS eof on apex domain)
+[[redirects]]
+  from = "https://d-game.nl/*"
+  to = "https://www.d-game.nl/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "http://d-game.nl/*"
+  to = "https://www.d-game.nl/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "http://www.d-game.nl/*"
+  to = "https://www.d-game.nl/:splat"
+  status = 301
+  force = true
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# HTML altijd vers na deploy (Matrix hub / games)
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# JS/CSS kort cachen zodat multiplayer-fixes snel live staan
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=60, must-revalidate"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=60, must-revalidate"
